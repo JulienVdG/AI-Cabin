@@ -50,6 +50,9 @@ AI_CABIN_HOME="${BASE_PATH}/home"
 AI_CABIN_DESK="${BASE_PATH}/workflow"
 AI_CABIN_WORKDIR="${BASE_PATH}/workdir"
 
+# Get Git email from host config (fallback to default)
+GIT_AGENT_EMAIL=$(git config --global user.email 2>/dev/null || echo "ai-agent@vdg.name")
+
 # Source paths (from workspace)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_DIR="$(dirname "$(dirname "${SCRIPT_DIR}")")"
@@ -154,6 +157,9 @@ export AI_CABIN_WORKDIR=${AI_CABIN_WORKDIR}
 
 # SCW_PROJECT_ID: Scaleway project ID (replace with real one)
 export SCW_PROJECT_ID=e60d561f-8d71-4253-8f71-1d70a83c2575
+
+# GIT_AGENT_EMAIL: Git user email (from host git config)
+export GIT_AGENT_EMAIL=${GIT_AGENT_EMAIL}
 
 # OPENCODE_SERVER_PASSWORD: OpenCode web UI password (replace with real one)
 export OPENCODE_SERVER_PASSWORD=change-me

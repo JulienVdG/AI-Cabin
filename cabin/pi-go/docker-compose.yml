@@ -5,6 +5,7 @@ services:
       dockerfile: pi.Dockerfile
       args:
         - PI_VERSION=v0.72.1
+        - GIT_AGENT_EMAIL=${GIT_AGENT_EMAIL:-ai-agent@vdg.name}
     container_name: pi_go_agent
     hostname: pi-go
     stdin_open: true

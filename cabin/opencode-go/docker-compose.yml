@@ -5,6 +5,7 @@ services:
       dockerfile: opencode.Dockerfile
       args:
         - OPENCODE_VERSION=1.4.9
+        - GIT_AGENT_EMAIL=${GIT_AGENT_EMAIL:-ai-agent@vdg.name}
     container_name: opencode_go_agent
     hostname: opencode-go
     stdin_open: true

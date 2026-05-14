@@ -23,14 +23,40 @@ Generic script to bootstrap a new AI Cabin environment from scratch.
    - `<base-path>/workdir/` → `AI_CABIN_WORKDIR` (empty, for git repos)
 
 2. **Copies templates to WORKFLOW:**
-   - `desk/` → TODO.md (from template), docs including  system rules (AGENTS.md, DEVELOPMENT.md, etc.)
+   - `desk/` → TODO.md (from template), docs including system rules (AGENTS.md, DEVELOPMENT.md, etc.)
    - `desk/skills/` → All skill modules
 
-3. **Creates `.envrc`** at base path with all variables configured
+3. **Detects `GIT_AGENT_EMAIL`** from host git config
 
-4. **You copy `.envrc` to your cabin** and test from there
+4. **Creates `.envrc`** at base path with all variables configured
+
+5. **You either source `.envrc` or copy `.envrc` to your cabin** and test from there
 
 ## Usage
+
+### Option 1: Source `.envrc` manually (without direnv)
+
+```bash
+# 1. Bootstrap environment
+./bootstrap-cabin.sh /tmp/ai-cabin-test-1
+
+# 2. Source the .envrc before each session
+source /tmp/ai-cabin-test-1/.envrc
+
+# 3. Go to your cabin
+cd /path/to/your/cabin  # e.g., cabin/opencode-go/
+
+# 4. Verify variables are set
+env | grep AI_CABIN
+
+# 5. Run setup (creates AI_CABIN_HOME subdirs, copies config)
+make setup
+
+# 6. Start cabin
+make docker-up
+```
+
+### Option 2: Use direnv (automatic, recommended)
 
 ```bash
 # 1. Bootstrap environment
@@ -42,7 +68,7 @@ cp /tmp/ai-cabin-test-1/.envrc /path/to/your/cabin/.envrc
 # 3. Go to your cabin
 cd /path/to/your/cabin  # e.g., cabin/opencode-go/
 
-# 4. Allow direnv
+# 4. Allow direnv (loads .envrc automatically when entering directory)
 direnv allow
 
 # 5. Run setup (creates AI_CABIN_HOME subdirs, copies config)
@@ -208,4 +234,3 @@ rm -rf /tmp/ai-cabin-test-1
 ## Related
 
 - [cabin/opencode-go/README.md](../../cabin/opencode-go/README.md) - Cabin documentation
-- [desk/target-directory-structure.md](../../desk/target-directory-structure.md) - Architecture reference

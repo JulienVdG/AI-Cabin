@@ -4,6 +4,9 @@ FROM golang:1.26-trixie
 # Define the version as an argument.
 ARG OPENCODE_VERSION=1.4.9
 
+# Git email configuration (set from host or .envrc)
+ARG GIT_AGENT_EMAIL=ai-agent@vdg.name
+
 # Install tools, including bash-completion.
 RUN apt-get update && apt-get install -y \
     git \
@@ -64,7 +67,7 @@ USER ai_agent
 WORKDIR /home/ai_agent
 
 RUN git config --global user.name "AI Agent" && \
-    git config --global user.email "ai-agent@vdg.name"
+    git config --global user.email "${GIT_AGENT_EMAIL}"
 
 # Ensure bash-completion is sourced in the agent's shell.
 RUN echo 'if [ -f /etc/bash_completion ]; then . /etc/bash_completion; fi' >> /home/ai_agent/.bashrc

@@ -10,11 +10,12 @@
    export AI_CABIN_DESK=/home/user/ai-cabin-desk/
    export AI_CABIN_WORKDIR=/home/user/workdir/
    export SCW_PROJECT_ID=your-project-id
+   export GIT_AGENT_EMAIL=$(git config --global user.email)
    ```
 
    **Or use direnv** (recommended):
+   Create a .envrc file with these variables
    ```bash
-   cp .envrc.example .envrc
    direnv allow
    ```
 
@@ -54,6 +55,7 @@
 | `AI_CABIN_DESK` | Shared desk directory (AGENTS.md, skills/) | `/home/user/ai-cabin-desk/` | _Required_ |
 | `AI_CABIN_WORKDIR` | Git repositories | `/home/user/workdir/` | _Required_ |
 | `SCW_PROJECT_ID` | Scaleway project ID | `12345678-...` | _Required_ |
+| `GIT_AGENT_EMAIL` | Git email for agent commits | `user@example.com` | `ai-agent@vdg.name` |
 | `CONTAINER_WORKDIR` | Container workdir path (advanced) | `/workspace/` | `${AI_CABIN_WORKDIR}` |
 
 **Advanced: Remap Mode**
@@ -218,5 +220,4 @@ make setup
 
 ## See Also
 
-- [AI Cabin Target Structure](../../desk/target-directory-structure.md)
-- [Greywall Documentation](../../references/greyheavenhq/greywall/docs/)
+- [Greywall Documentation](https://github.com/GreyhavenHQ/greywall/tree/main/docs)
