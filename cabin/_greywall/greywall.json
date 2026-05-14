@@ -1,0 +1,12 @@
+{
+  "network": {
+    "proxyUrl": "socks5://host.docker.internal:43052",
+    "dnsAddr": "host.docker.internal:43053"
+  },
+  "credentials": {
+    "inject": [
+      "SCW_SECRET_KEY"
+    ],
+    "ignore": []
+  }
+}

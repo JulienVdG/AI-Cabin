@@ -1,0 +1,50 @@
+OUTDIR = .
+
+# Default target
+.PHONY: all
+all: run
+
+# Run the application
+.PHONY: run
+run:
+	go run ./cmd/$(project)/
+
+# Build the binary
+.PHONY: build
+build:
+	go build -o $(OUTDIR) ./cmd/$(project)/
+
+# Run tests
+.PHONY: test
+test:
+ifdef run
+	go test ./... -v -run $(run)
+else
+	go test ./...
+endif
+
+# Run tests with coverage
+.PHONY: cover
+cover:
+	go test -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
+
+# Run linters
+.PHONY: lint
+lint:
+	go tool golangci-lint run
+
+# Format imports
+.PHONY: fmt
+fmt:
+	go tool goimports -local $(module) -w .
+
+# Auto-fix lint issues
+.PHONY: lint-auto-fix
+lint-auto-fix:
+	go tool golangci-lint run --fix
+
+# Clean build artifacts
+.PHONY: clean
+clean:
+	rm -f $(OUTDIR)/$(project) coverage.out coverage.html

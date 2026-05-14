@@ -1,0 +1,41 @@
+# =============================================================================
+# AI Cabin Environment Variables
+# =============================================================================
+# Source this file before running make commands:
+#   source .envrc.example
+#   # Or copy to .envrc and use with direnv:
+#   cp .envrc.example .envrc
+#   direnv allow
+# =============================================================================
+
+# AI_CABIN_HOME: Host home directory for agent data (REQUIRED)
+# This is where agent sessions, config, and state are stored.
+# Default usage: /home/user/ (your actual home directory)
+# Debug/Meta: /home/user/ai-cabin-meta-opencode/ (isolated)
+#
+# Inside container: Same path (AI_CABIN_HOME/.local/... → AI_CABIN_HOME/.local/...)
+# Sessions will be stored in: ${AI_CABIN_HOME}/.local/share/opencode/
+export AI_CABIN_HOME=/home/user/
+
+# AI_CABIN_DESK: Shared desk directory (REQUIRED)
+# Mount:
+# - ${AI_CABIN_DESK} → /home/ai_agent/desk/ (includes AGENT.md and skills/)
+export AI_CABIN_DESK=/home/user/ai-cabin-desk/
+
+# AI_CABIN_WORKDIR: Git repositories directory (REQUIRED)
+# Contains all your project Git repositories
+# Default: /home/user/workdir/
+#
+# Inside container: Same path (AI_CABIN_WORKDIR → AI_CABIN_WORKDIR)
+# Pi.dev/OpenCode sessions will reference these real paths
+export AI_CABIN_WORKDIR=/home/user/workdir/
+
+# SCW_PROJECT_ID: Scaleway project ID (required for Scaleway API)
+export SCW_PROJECT_ID=your-project-id
+
+# TODO:Doc password to acces webui
+export OPENCODE_SERVER_PASSWORD=your-chosen-password
+
+
+# Optional: Override OpenCode version
+# export OPENCODE_VERSION=1.4.9

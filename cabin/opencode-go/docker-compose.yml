@@ -1,0 +1,57 @@
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: opencode.Dockerfile
+      args:
+        - OPENCODE_VERSION=1.4.9
+    container_name: opencode_go_agent
+    hostname: opencode-go
+    stdin_open: true
+    tty: true
+    ports:
+      - "127.0.0.1:9090:9090"
+      - "[::1]:9090:9090"
+    environment:
+      - TERM=xterm-256color
+      - OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD}
+      # AI_CABIN_HOME: Host home directory for agent data
+      # AI_CABIN_DESK: Shared desk directory (desk, skills)
+      - AI_CABIN_DESK=${AI_CABIN_DESK}
+      # AI_CABIN_WORKDIR: Git repositories
+      - AI_CABIN_WORKDIR=${AI_CABIN_WORKDIR}
+      # CONTAINER_HOME: Home directory inside container
+      - CONTAINER_HOME=/home/ai_agent
+      # CONTAINER_WORKDIR: Container workdir path (optional, advanced)
+      # Default: ${AI_CABIN_WORKDIR} (transparent mode)
+      # Example: /workspace (remap mode - breaks session paths)
+      - CONTAINER_WORKDIR=${CONTAINER_WORKDIR:-${AI_CABIN_WORKDIR}}
+      # SCW_PROJECT_ID from env (greyproxy injects SCW_SECRET_KEY)
+      - SCW_PROJECT_ID=${SCW_PROJECT_ID}
+
+    volumes:
+      # Desk (single mount for desk + skills)
+      - ${AI_CABIN_DESK}:${CONTAINER_HOME}/desk:rw
+
+      # Agent Data (AI_CABIN_HOME host → CONTAINER_HOME container)
+      # opencode system config
+      - ${AI_CABIN_HOME}/.local/share/opencode:${CONTAINER_HOME}/.local/share/opencode:rw
+      - ${AI_CABIN_HOME}/.local/state/opencode:${CONTAINER_HOME}/.local/state/opencode:rw
+      - ${AI_CABIN_HOME}/.config/opencode:${CONTAINER_HOME}/.config/opencode:rw
+      - ${AI_CABIN_DESK}/skills:${CONTAINER_HOME}/.config/opencode/skills:ro
+
+      # Workdir (same path in host and container by default)
+      # If CONTAINER_WORKDIR is set, remap to that path (advanced mode)
+      - ${AI_CABIN_WORKDIR}:${CONTAINER_WORKDIR:-${AI_CABIN_WORKDIR}}:rw
+
+      # Cache and bash_history (cabin-specific, in agent_data/)
+      - ./agent_data/cache:${CONTAINER_HOME}/.cache:rw
+      - ./agent_data/bash_history:${CONTAINER_HOME}/.bash_history:rw
+
+      # Greywall configuration
+      - ${AI_CABIN_HOME}/.config/greywall:${CONTAINER_HOME}/.config/greywall:rw
+
+    # Required for bubblewrap (greywall)
+    privileged: true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
