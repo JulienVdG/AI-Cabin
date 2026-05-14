@@ -41,8 +41,12 @@ endef
 $(eval $(call COPY_IF_NOT_EXISTS,${AI_CABIN_HOME}/.config/greywall/greywall.json,../_greywall/greywall.json))
 $(eval $(call COPY_IF_NOT_EXISTS,${AI_CABIN_HOME}/.config/greywall/learned/workspace.json,../_greywall/profile/workspace.json))
 $(eval $(call COPY_IF_NOT_EXISTS,${AI_CABIN_HOME}/.config/greywall/learned/pi.json,../_greywall/profile/pi.json))
-$(eval $(call COPY_IF_NOT_EXISTS,${AI_CABIN_HOME}/.pi/agent/models.json,models.json))
 $(eval $(call COPY_IF_NOT_EXISTS,${AI_CABIN_HOME}/.pi/agent/settings.json,settings.json))
+
+# models.json with templating (replace __SCW_PROJECT_ID__)
+.PHONY: ${AI_CABIN_HOME}/.pi/agent/models.json
+${AI_CABIN_HOME}/.pi/agent/models.json: models.json.template guard-SCW_PROJECT_ID | setup-dirs
+	sed "s/__SCW_PROJECT_ID__/${SCW_PROJECT_ID}/g" "$<" > "$@"; \
 
 # Phony to force the regeneration of the file if any vars change.
 .PHONY: ${AI_CABIN_HOME}/.pi/agent/AGENTS.md guard-AI_CABIN_HOME guard-AI_CABIN_DESK guard-CONTAINER_HOME setup-dirs
