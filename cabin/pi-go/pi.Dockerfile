@@ -4,9 +4,6 @@ FROM golang:1.26-trixie
 # Define the version as an argument.
 ARG PI_VERSION=v0.72.1
 
-# Git email configuration (set from host or .envrc)
-ARG GIT_AGENT_EMAIL=ai-agent@vdg.name
-
 # Install tools, including bash-completion.
 RUN apt-get update && apt-get install -y \
     git \
@@ -50,12 +47,14 @@ RUN curl -L "https://github.com/badlogic/pi-mono/releases/download/${PI_VERSION}
 # Create entrypoint.d directory for hooks
 RUN mkdir -p /docker-entrypoint.d
 
-# Copy generic entrypoint
-COPY ./docker-entrypoint.sh /docker-entrypoint.sh
+# Copy generic entrypoint from .deps/_common
+COPY .deps/_common/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
-# Copy entrypoint.d hooks
-COPY ./docker-entrypoint.d/ /docker-entrypoint.d/
+# Copy entrypoint.d hooks from .deps/_common (git email)
+COPY .deps/_common/docker-entrypoint.d/ /docker-entrypoint.d/
+# Copy entrypoint.d hooks from .deps/_greywall (socat greyproxy)
+COPY .deps/_greywall/docker-entrypoint.d/ /docker-entrypoint.d/
 RUN chmod +x /docker-entrypoint.d/*.sh 2>/dev/null || true
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
@@ -69,13 +68,10 @@ RUN chmod +x /usr/local/bin/greybash /usr/local/bin/greypi
 RUN useradd -m ai_agent
 WORKDIR /home/ai_agent
 
-# Set ownership and Git config.
+# Set ownership.
 RUN chown -R ai_agent:ai_agent /home/ai_agent
 USER ai_agent
 WORKDIR /home/ai_agent
-
-RUN git config --global user.name "AI Agent" && \
-    git config --global user.email "${GIT_AGENT_EMAIL}"
 
 # Ensure bash-completion is sourced in the agent's shell.
 RUN echo 'if [ -f /etc/bash_completion ]; then . /etc/bash_completion; fi' >> /home/ai_agent/.bashrc

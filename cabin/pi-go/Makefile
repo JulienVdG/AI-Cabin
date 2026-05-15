@@ -9,7 +9,7 @@ ifndef V
 .SILENT:
 endif
 
-.PHONY: all setup setup-dirs docker-build docker-debug-build docker-up docker-down docker-shell docker-logs docker-greyshell
+.PHONY: all setup setup-dirs deps docker-build docker-debug-build docker-up docker-down docker-shell docker-logs docker-greyshell
 
 all: docker-up info
 
@@ -86,7 +86,14 @@ setup: guard-AI_CABIN_HOME guard-AI_CABIN_DESK guard-AI_CABIN_WORKDIR ${AI_CABIN
 	cp ~/.local/bin/greywall . 2>/dev/null || true
 	cp ~/.local/share/greyproxy/ca-cert.pem greyproxy-ca.crt 2>/dev/null || true
 
-docker-build: setup
+# Copy factorized files (.deps/) for Docker build context
+.PHONY: deps
+deps:
+	mkdir -p .deps/_common .deps/_greywall
+	cp -r ../_common/* .deps/_common/
+	cp -r ../_greywall/* .deps/_greywall/
+
+docker-build: setup deps
 	BUILDKIT_PROGRESS=plain docker compose build
 
 docker-debug-build: setup

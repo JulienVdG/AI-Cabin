@@ -5,13 +5,14 @@ services:
       dockerfile: pi.Dockerfile
       args:
         - PI_VERSION=v0.72.1
-        - GIT_AGENT_EMAIL=${GIT_AGENT_EMAIL:-ai-agent@vdg.name}
     container_name: pi_go_agent
     hostname: pi-go
     stdin_open: true
     tty: true
     environment:
       - TERM=xterm-256color
+      # Git agent email (used by entrypoint.d/90-git-agent-email.sh)
+      - GIT_AGENT_EMAIL=${GIT_AGENT_EMAIL:-ai-agent@vdg.name}
       # AI_CABIN_HOME: Host home directory for agent data
       - AI_CABIN_DESK=${AI_CABIN_DESK}
       # AI_CABIN_WORKDIR: Git repositories
