@@ -77,6 +77,7 @@ export AI_CABIN_DESK=/home/user/ai-cabin-prod/desk/
 export AI_CABIN_WORKDIR=/home/user/ai-cabin-prod/workdir/
 export SCW_PROJECT_ID=your-scaleway-project-id
 export OPENCODE_SERVER_PASSWORD=your-password  # For OpenCode WebUI
+export GIT_AGENT_NAME="AI Agent + $(git config --global user.name)"  # Git name for agent
 export GIT_AGENT_EMAIL=$(git config --global user.email)  # Git email for agent
 ```
 
@@ -213,6 +214,7 @@ make docker-greyshell
 | `AI_CABIN_DESK` | Shared desk directory | `/home/user/ai-cabin/desk/` | _Required_ |
 | `AI_CABIN_WORKDIR` | Git repositories | `/home/user/workdir/` | _Required_ |
 | `SCW_PROJECT_ID` | Scaleway project ID | `12345678-...` | _Required_ |
+| `GIT_AGENT_NAME` | Git name for agent commits | `AI Agent + John Doe` | `AI Agent` |
 | `GIT_AGENT_EMAIL` | Git email for agent commits | `user@example.com` | `ai-agent@vdg.name` |
 | `CONTAINER_WORKDIR` | Container workdir path (advanced) | `/workspace/` | `${AI_CABIN_WORKDIR}` |
 

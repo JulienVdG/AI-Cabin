@@ -26,7 +26,7 @@ Generic script to bootstrap a new AI Cabin environment from scratch.
    - `desk/` → TODO.md (from template), docs including system rules (AGENTS.md, DEVELOPMENT.md, etc.)
    - `desk/skills/` → All skill modules
 
-3. **Detects `GIT_AGENT_EMAIL`** from host git config
+3. **Detects `GIT_AGENT_NAME` and `GIT_AGENT_EMAIL`** from host git config
 
 4. **Creates `.envrc`** at base path with all variables configured
 

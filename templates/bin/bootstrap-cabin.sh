@@ -50,6 +50,14 @@ AI_CABIN_HOME="${BASE_PATH}/home"
 AI_CABIN_DESK="${BASE_PATH}/workflow"
 AI_CABIN_WORKDIR="${BASE_PATH}/workdir"
 
+# Get Git user name from host config and create agent name
+GIT_USER_NAME=$(git config --global user.name 2>/dev/null || echo "")
+if [ -n "$GIT_USER_NAME" ]; then
+    GIT_AGENT_NAME="AI Agent + $GIT_USER_NAME"
+else
+    GIT_AGENT_NAME="AI Agent"
+fi
+
 # Get Git email from host config (fallback to default)
 GIT_AGENT_EMAIL=$(git config --global user.email 2>/dev/null || echo "ai-agent@vdg.name")
 
@@ -160,6 +168,9 @@ export SCW_PROJECT_ID=e60d561f-8d71-4253-8f71-1d70a83c2575
 
 # GIT_AGENT_EMAIL: Git user email (from host git config)
 export GIT_AGENT_EMAIL=${GIT_AGENT_EMAIL}
+
+# GIT_AGENT_NAME: Git user name for agent commits (AI Agent + user name)
+export GIT_AGENT_NAME=${GIT_AGENT_NAME}
 
 # OPENCODE_SERVER_PASSWORD: OpenCode web UI password (replace with real one)
 export OPENCODE_SERVER_PASSWORD=change-me

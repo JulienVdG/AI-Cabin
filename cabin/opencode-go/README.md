@@ -10,6 +10,7 @@
    export AI_CABIN_DESK=/home/user/ai-cabin-desk/
    export AI_CABIN_WORKDIR=/home/user/workdir/
    export SCW_PROJECT_ID=your-project-id
+   export GIT_AGENT_NAME="AI Agent + $(git config --global user.name)"
    export GIT_AGENT_EMAIL=$(git config --global user.email)
    ```
 
@@ -55,6 +56,7 @@
 | `AI_CABIN_DESK` | Shared desk directory (AGENTS.md, skills/) | `/home/user/ai-cabin-desk/` | _Required_ |
 | `AI_CABIN_WORKDIR` | Git repositories | `/home/user/workdir/` | _Required_ |
 | `SCW_PROJECT_ID` | Scaleway project ID | `12345678-...` | _Required_ |
+| `GIT_AGENT_NAME` | Git name for agent commits | `AI Agent + John Doe` | `AI Agent` |
 | `GIT_AGENT_EMAIL` | Git email for agent commits | `user@example.com` | `ai-agent@vdg.name` |
 | `CONTAINER_WORKDIR` | Container workdir path (advanced) | `/workspace/` | `${AI_CABIN_WORKDIR}` |
 

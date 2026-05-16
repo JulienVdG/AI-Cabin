@@ -11,7 +11,8 @@ services:
     tty: true
     environment:
       - TERM=xterm-256color
-      # Git agent email (used by entrypoint.d/90-git-agent-email.sh)
+      # Git agent name and email (used by entrypoint.d/90-git-agent-email.sh)
+      - GIT_AGENT_NAME=${GIT_AGENT_NAME:-AI Agent}
       - GIT_AGENT_EMAIL=${GIT_AGENT_EMAIL:-ai-agent@vdg.name}
       # AI_CABIN_HOME: Host home directory for agent data
       - AI_CABIN_DESK=${AI_CABIN_DESK}
