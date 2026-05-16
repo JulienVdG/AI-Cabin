@@ -80,9 +80,6 @@ setup-dirs: guard-AI_CABIN_HOME guard-AI_CABIN_DESK guard-AI_CABIN_WORKDIR
 setup: guard-AI_CABIN_HOME guard-AI_CABIN_DESK guard-AI_CABIN_WORKDIR ${AI_CABIN_HOME}/.config/greywall/greywall.json ${AI_CABIN_HOME}/.config/greywall/learned/workspace.json ${AI_CABIN_HOME}/.config/greywall/learned/opencode.json ${AI_CABIN_HOME}/.config/opencode/opencode.json ${AI_CABIN_HOME}/.config/opencode/AGENTS.md
 	# Cabin-specific data (in agent_data/)
 	touch agent_data/bash_history
-	# Used by docker build
-	cp ~/.local/bin/greywall . 2>/dev/null || true
-	cp ~/.local/share/greyproxy/ca-cert.pem greyproxy-ca.crt 2>/dev/null || true
 
 # Copy factorized files (.deps/) for Docker build context
 .PHONY: deps
@@ -90,6 +87,9 @@ deps:
 	mkdir -p .deps/_common .deps/_greywall
 	cp -r ../_common/* .deps/_common/
 	cp -r ../_greywall/* .deps/_greywall/
+	# Host file used by docker build
+	cp ~/.local/bin/greywall .deps/greywall 2>/dev/null || true
+	cp ~/.local/share/greyproxy/ca-cert.pem .deps/greyproxy-ca.crt 2>/dev/null || true
 
 docker-build: setup deps
 	BUILDKIT_PROGRESS=plain docker compose build

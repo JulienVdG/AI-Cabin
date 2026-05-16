@@ -17,11 +17,11 @@ RUN apt-get update && apt-get install -y \
     netcat-openbsd iproute2 iputils-ping \
     && rm -rf /var/lib/apt/lists/*
 
-COPY greywall /usr/local/bin/greywall
+COPY .deps/greywall /usr/local/bin/greywall
 RUN chmod +x /usr/local/bin/greywall
 
 # Greyproxy CA certificate for HTTPS inspection
-COPY greyproxy-ca.crt /usr/local/share/ca-certificates/greyproxy.crt
+COPY .deps/greyproxy-ca.crt /usr/local/share/ca-certificates/greyproxy.crt
 RUN update-ca-certificates
 
 # Greybash wrappers (greywall sandboxed shells)

@@ -1,5 +1,3 @@
 .env
 agent_data/
-greyproxy-ca.crt
-greywall
 .deps/
