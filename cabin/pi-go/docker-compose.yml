@@ -29,6 +29,8 @@ services:
       # Disable Pi.dev telemetry and version checks
       - PI_SKIP_VERSION_CHECK=1
       - PI_OFFLINE=0
+      # go
+      - GOPATH=${CONTAINER_HOME}/go
 
     volumes:
       # Desk (single mount for desk + skills)
@@ -46,6 +48,7 @@ services:
       # Cache and bash_history (cabin-specific, in agent_data/)
       - ./agent_data/cache:${CONTAINER_HOME}/.cache:rw
       - ./agent_data/bash_history:${CONTAINER_HOME}/.bash_history:rw
+      - ./agent_data/go:${CONTAINER_HOME}/go:rw
 
       # Greywall configuration
       - ${AI_CABIN_HOME}/.config/greywall:${CONTAINER_HOME}/.config/greywall:rw

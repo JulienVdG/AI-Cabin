@@ -31,6 +31,8 @@ services:
       - CONTAINER_WORKDIR=${CONTAINER_WORKDIR:-${AI_CABIN_WORKDIR}}
       # SCW_PROJECT_ID from env (greyproxy injects SCW_SECRET_KEY)
       - SCW_PROJECT_ID=${SCW_PROJECT_ID}
+      # go
+      - GOPATH=${CONTAINER_HOME}/go
 
     volumes:
       # Desk (single mount for desk + skills)
@@ -50,6 +52,7 @@ services:
       # Cache and bash_history (cabin-specific, in agent_data/)
       - ./agent_data/cache:${CONTAINER_HOME}/.cache:rw
       - ./agent_data/bash_history:${CONTAINER_HOME}/.bash_history:rw
+      - ./agent_data/go:${CONTAINER_HOME}/go:rw
 
       # Greywall configuration
       - ${AI_CABIN_HOME}/.config/greywall:${CONTAINER_HOME}/.config/greywall:rw

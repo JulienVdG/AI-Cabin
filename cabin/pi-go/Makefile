@@ -77,6 +77,7 @@ setup-dirs: guard-AI_CABIN_HOME guard-AI_CABIN_DESK guard-AI_CABIN_WORKDIR
 	mkdir -p ${AI_CABIN_DESK}/skills
 	# Cabin-specific data (in agent_data/)
 	mkdir -p agent_data/cache
+	mkdir -p agent_data/go
 
 
 setup: guard-AI_CABIN_HOME guard-AI_CABIN_DESK guard-AI_CABIN_WORKDIR ${AI_CABIN_HOME}/.config/greywall/greywall.json ${AI_CABIN_HOME}/.config/greywall/learned/workspace.json ${AI_CABIN_HOME}/.config/greywall/learned/pi.json ${AI_CABIN_HOME}/.pi/agent/models.json ${AI_CABIN_HOME}/.pi/agent/settings.json ${AI_CABIN_HOME}/.pi/agent/AGENTS.md
