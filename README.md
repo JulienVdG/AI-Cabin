@@ -233,6 +233,20 @@ Greyproxy handles credentials and network access:
 - Greyproxy running on host
 - CA certificate at `~/.local/share/greyproxy/ca-cert.pem`
 
+**Update with Greyproxy v0.4.4:**
+
+Starting v0.4.4 greyproxy no longer bind 0.0.0.0 by default but 127.0.0.1 which makes it unreachable to the docker networks.
+
+To make it bind another interface add the `-host ip-to-bind` parameter ([greyproxy doc](https://github.com/GreyhavenHQ/greyproxy/blob/main/docs/cli-reference.md#greyproxy-install)).
+
+I strongly recommend to use the docker network host address (172.17.0.1 by default, 100.64.0.1 for me) see next section for details.
+
+On linux edit `~/.config/systemd/user/greyproxy.service` and add the parameter
+```diff
+- ExecStart=/home/jvdg/.local/bin/greyproxy "serve"
++ ExecStart=/home/jvdg/.local/bin/greyproxy "serve" -host 100.64.0.1
+```
+
 **Firewall Configuration (Recommended for Production):**
 
 By default, greyproxy listens on `0.0.0.0` (all interfaces). To secure it from LAN access while preserving Docker access:
@@ -291,6 +305,21 @@ curl --connect-timeout 2 http://<your-IP>:43080/api/health
 
 - **[Bootstrap Script](templates/bin/README.md)** - Environment setup guide
 - **[Cabin Docs](cabin/opencode-go/README.md)** - Detailed cabin configuration
+
+---
+
+## Troubleshooting
+
+### Ubuntu AppArmor Blocks Greywall
+
+**Issue:** Bubblewrap cannot mount tun due to AppArmor restrictions.
+
+**Solution:**
+```bash
+sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0
+```
+
+**Note:** A PPA-based solution may also be available.
 
 ---
 
