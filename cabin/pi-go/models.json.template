@@ -8,17 +8,40 @@
         {
           "id": "qwen3.5-397b-a17b",
           "name": "Qwen 3.5 397B",
-          "reasoning": false,
+          "reasoning": true,
           "input": ["text"],
-          "contextWindow": 256000,
-          "maxTokens": 16384,
+          "contextWindow": 250000,
+          "maxTokens": 16000,
           "cost": {
-            "input": 0.80,
-            "output": 2.40,
-            "cacheRead": 0,
-            "cacheWrite": 0
+            "input": 5,
+            "output": 25,
+            "cacheRead": 0.5,
+            "cacheWrite": 10
+          },
+	  "compat": {
+	    "thinkingFormat": "qwen-chat-template",
+	    "supportsDeveloperRole": false,
+	    "supportsReasoningEffort": false
           }
-        }
+        },
+	{
+	  "id": "devstral-2-123b-instruct-2512",
+	  "name": "Devstral 2 123B",
+          "reasoning": true,
+	  "input": ["text"],
+	  "contextWindow": 128000,
+          "maxTokens": 4096,
+          "cost": {
+            "input": 5,
+            "output": 25,
+            "cacheRead": 0.5,
+            "cacheWrite": 10
+          },
+	  "compat": {
+	    "supportsDeveloperRole": false,
+	    "supportsReasoningEffort": false
+	  }
+	}
       ]
     }
   }
