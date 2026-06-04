@@ -47,7 +47,7 @@ ENV_NAME="${2:-$(basename "${BASE_PATH}")}"
 
 # Derive directories from base path
 AI_CABIN_HOME="${BASE_PATH}/home"
-AI_CABIN_DESK="${BASE_PATH}/workflow"
+AI_CABIN_DESK="${BASE_PATH}/desk"
 AI_CABIN_WORKDIR="${BASE_PATH}/workdir"
 
 # Get Git user name from host config and create agent name
@@ -155,28 +155,25 @@ main() {
 # =============================================================================
 
 # AI_CABIN_HOME: Home directory for agent data (empty, make setup creates subdirs)
-export AI_CABIN_HOME=${AI_CABIN_HOME}
+export AI_CABIN_HOME="${AI_CABIN_HOME}"
 
 # AI_CABIN_DESK: Shared desk directory (populated by bootstrap script)
-export AI_CABIN_DESK=${AI_CABIN_DESK}
+export AI_CABIN_DESK="${AI_CABIN_DESK}"
 
 # AI_CABIN_WORKDIR: Work directory for git repos (empty)
-export AI_CABIN_WORKDIR=${AI_CABIN_WORKDIR}
+export AI_CABIN_WORKDIR="${AI_CABIN_WORKDIR}"
 
 # SCW_PROJECT_ID: Scaleway project ID (replace with real one)
 export SCW_PROJECT_ID=e60d561f-8d71-4253-8f71-1d70a83c2575
 
 # GIT_AGENT_EMAIL: Git user email (from host git config)
-export GIT_AGENT_EMAIL=${GIT_AGENT_EMAIL}
+export GIT_AGENT_EMAIL="${GIT_AGENT_EMAIL}"
 
 # GIT_AGENT_NAME: Git user name for agent commits (AI Agent + user name)
-export GIT_AGENT_NAME=${GIT_AGENT_NAME}
+export GIT_AGENT_NAME="${GIT_AGENT_NAME}"
 
 # OPENCODE_SERVER_PASSWORD: OpenCode web UI password (replace with real one)
 export OPENCODE_SERVER_PASSWORD=change-me
-
-# SCW_SECRET_KEY: Optional (greyproxy injects it if running)
-# export SCW_SECRET_KEY=<your-secret-key>
 
 # CONTAINER_WORKDIR: Transparent mode (same as workdir)
 # Uncomment for remap mode:
