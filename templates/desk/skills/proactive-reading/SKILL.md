@@ -6,8 +6,8 @@ compatibility: opencode
 metadata:
   source: desk/AGENTS.md
   related:
-    - validation-checkpoint
-    - makefile-awareness
+    - skill:workflow-protocol
+    - skill:makefile-awareness
 ---
 
 ## What I do
@@ -131,8 +131,3 @@ cat .env
 **Core principle:**
 > **Assume intentionality.** User changes are deliberate unless stated otherwise.  
 > **When in doubt: ASK, don't overwrite.**
-
-## Related Skills
-
-- `makefile-awareness` - Read Makefile before commands
-- `validation-checkpoint` - When to ask validation

@@ -83,8 +83,3 @@ Validate?
 ```bash
 cd importer && git add . && git commit -m "feat: add priority system for PreRenderer"
 ```
-
-## Related Skills
-
-- `todo-workflow` - Full task protocol
-- `validation-checkpoint` - When to ask approval

@@ -53,7 +53,7 @@ Continuously improve the AI Agent's behavior based on actual session experience.
 
 | Pattern type | Skill location | Write method |
 |--------------|----------------|--------------|
-| Workflow (universal) | `desk/skills/` | In-place (git diff review) |
+| Global (universal) | `desk/skills/` | In-place (git diff review) |
 | Technical (repo-specific) | `.agents/skills/` in project repo | In-place (git diff review) |
 
 **Examples:**

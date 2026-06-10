@@ -12,6 +12,7 @@ Speed is secondary to alignment.
 
 **Mental checklist before ANY action:**
 - [ ] Did I read the full context (desk/TODO.md, related docs)?
+- [ ] Did I check relevant skills? (search by tags/keywords)
 - [ ] Did I propose a plan (even for small changes)?
 - [ ] Did I ask "Le plan est-il clair ?"
 - [ ] Has user switched to Build mode?
@@ -28,6 +29,7 @@ Speed is secondary to alignment.
 - **Start of session**: Read project documentation (desk/README.md, README.md, ARCHITECTURE.md, desk/*.md) to understand the project architecture and technical decisions.
 - **Before starting any task**:
   - Read `desk/TODO.md` to understand current task status and context
+  - Check relevant skills - search by tags/keywords for workflow patterns
   - If user question seems out of context (exploration/general question): Seek context from documentation first before proposing code changes
 - Follow the **Workflow Protocol** below carefully.
 
@@ -84,6 +86,11 @@ After EACH significant action, pause and ask for validation:
 ```
 ✅ [action] completed. Continue or validate?
 ```
+
+**Atomic Edits Rule:**
+- One logical change = one edit
+- Wait for validation before next edit
+- If diff is unreadable, it's too large — split it
 
 ### Acceptable vs Unacceptable Patterns
 
@@ -465,6 +472,10 @@ Whenever a bug is identified or a new idea/feature is mentioned (by the user or 
 
 Skills are located in the `desk/skills/` directory and apply to the current project.
 
+**Proactive Usage:**
+- Before starting a task: Search skills by tags/keywords (e.g., "validation", "git", "docker", "test")
+- When unsure: Check if a skill covers the pattern (e.g., `skill:validation-checkpoint` for "when to ask?")
+
 **Usage:**
 - Use skills from `desk/skills/` for workflow patterns and technical guidance
 - Skills are generic and reusable across projects
@@ -514,3 +525,54 @@ bash command="git add file"
 # ...wait for result...
 bash command="git commit -m 'msg'"
 ```
+
+---
+
+# Project Memory
+
+> **Purpose:** Index linking code locations to documentation. Avoids re-explaining patterns in every prompt.
+>
+> **Scope:** AI-Cabin (cabin/, templates/, desk/)
+>
+> **Update:** End of session via `skill:retro-process` when new patterns are discovered.
+
+## Quick Index
+
+| Topic | Code Location | Documentation |
+|-------|---------------|---------------|
+| **Desk (current)** | `~/desk/` | `AGENTS.md`, `TODO.md`, `skills/` |
+| **Workflow** | `~/desk/TODO.md` | [`skill:workflow-protocol`](desk/skills/workflow-protocol/SKILL.md) |
+| **Skills** | `~/desk/skills/` | 8 skills (workflow-protocol, retro-process, semantic-commit, ...) |
+
+---
+
+## Gotchas (Lessons Learned)
+
+| Bug | Root Cause | Solution | Reference |
+|-----|------------|----------|-----------|
+| **Commits sans validation** | AI "dans le flow" oublie la checklist | Relire mentalement checklist avant CHAQUE commit : [ ] Ask explicit approval, [ ] User has seen diff | [`desk/session-lessons.md`](desk/session-lessons.md) |
+| **Propositions sans lire la doc** | AI propose changements sans vérifier l'existant | Lire doc existante avant de proposer : check duplicates, existing patterns | [`desk/session-lessons.md`](desk/session-lessons.md) |
+| **Questions sans inspection** | AI pose questions avant de lire les fichiers | Lire fichiers AVANT de demander : user dit "modifié X" → READ X, git diff, git status, THEN respond | [`desk/session-lessons.md`](desk/session-lessons.md) |
+
+---
+
+## Recent Decisions
+
+| Date | Decision | Location |
+|------|----------|----------|
+| **2026-06-04** | Update Qwen model config + add Devstral 2 123B | [`/workspace/AI-Cabin/cabin/pi-go/models.json.template`](/workspace/AI-Cabin/cabin/pi-go/models.json.template) |
+
+---
+
+## Maintenance
+
+**When to update:**
+- New code pattern discovered → Add to Quick Index
+- New documentation written → Add link
+- Architecture decision → Add to Recent Decisions
+- Bug fixed → Add to Gotchas
+
+**How to update:**
+1. Edit during retro (via `skill:retro-process`)
+2. User reviews with `git diff`
+3. Commit with semantic message

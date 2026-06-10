@@ -50,8 +50,3 @@ Me: "Run docker-compose build"
 - About to run build/test/deploy commands
 - User mentions "make" or Makefile targets
 - Debugging build issues
-
-## Related Skills
-
-- `debug-go` - Debugging workflow with testing
-- `todo-workflow` - Task protocol

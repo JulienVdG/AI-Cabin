@@ -4,7 +4,9 @@ description: Task closing protocol - documentation updates and completion tracki
 license: MIT
 compatibility: opencode
 metadata:
-  related: desk/TODO.md, project documentation (README.md, ARCHITECTURE.md, desk/*.md)
+  related:
+    - desk/TODO.md, project documentation (README.md, ARCHITECTURE.md, desk/*.md)
+    - skill:workflow-protocol
 ---
 
 ## What I do
@@ -27,7 +29,7 @@ Determine if feature is complete:
 
 **Incomplete feature:**
 - Plan remaining work
-- Return to Execution step (todo-workflow step 2)
+- Return to Execution step (skill:workflow-protocol step 2)
 - Create sub-tasks in `desk/TODO.md` if needed
 
 **Complete feature:**
@@ -93,11 +95,12 @@ Review and validate?
 
 ```bash
 # After user approval of docs
-git add desk/TODO.md
+cd desk
+git add todo.md
 git commit -m "docs: [description]"
 
 # For project documentation, commit in the project repo:
-cd path/to/project && git add README.md ARCHITECTURE.md desk/*.md
+cd path/to/project && git add README.md ARCHITECTURE.md
 git commit -m "docs: [description]"
 ```
 
@@ -148,6 +151,7 @@ This fix is covered by existing docs in `desk/DEVELOPMENT.md`. No architecture u
 
 Should I:
 1. Mark task complete in desk/TODO.md?
+2. Add test coverage note to DEVELOPMENT.md?
 
 ## Update desk/TODO.md
 
@@ -247,8 +251,3 @@ Should I add to desk/TODO.md:
 
 Validate?
 ```
-
-## Related Skills
-
-- `todo-workflow` - Full 7-step protocol
-- `validation-checkpoint` - When to ask validation

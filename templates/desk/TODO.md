@@ -1,4 +1,4 @@
-# TODO du Projet
+# Liste des Tâches (TODO)
 
 ## Structure
 
@@ -12,8 +12,11 @@
 **Statuts :**
 - `(À faire 🚩)` - Tâche prête à être commencée
 - `(En cours 🚧)` - Tâche activée (Workflow étape 1)
+- `(En revue 📋)` - Code terminé, tests OK, en attente de review utilisateur
 - `(Suspendu ⏸️)` - Tâche bloquée ou en pause
 - `(Terminé ✅)` - Tâche validée et commitée (Workflow étape 7)
+
+**Tâches terminées :** Résumer en 1 ligne avec lien vers la doc.
 
 **Groupes :**
 Les tâches sont organisées en sections (titres ###) avec emoji et titre.
@@ -31,13 +34,15 @@ Les sections représentent des objectifs ou des thèmes.
 4. **Review (BLOCKER)** : Présenter résumé + demander validation utilisateur
 5. **Commit** : Commiter avec message sémantique (après approval explicite)
 6. **Documentation** : Mettre à jour les docs si nécessaire
-7. **Closing** : Marquer `(Terminé ✅)` + résumé dans TODO.md ← **Fin (après validation et commit)**
+7. **Closing** : Marquer (Terminé ✅) + résumé 1 ligne avec lien doc ← **Fin** (après validation par l'utilisateur et commit)
 
 **Règles :**
 - ✅ 1 action = 1 validation (après chaque modification de fichier, test, commit)
 - ✅ Test échoué → STOP + demander guidance (ne pas itérer seul)
 - ✅ Mode Build requis pour toute modification de code
 - ✅ Review utilisateur obligatoire avant commit (git diff)
+- ✅ Une sous-tâche à la fois (sauf si solutions identiques)
+- ✅ **Statut `(Terminé ✅)` = validé ET commité** (ne jamais marquer avant review + approval explicite)
 
 **Voir aussi :** `skill:todo-workflow` pour le protocole complet.
 

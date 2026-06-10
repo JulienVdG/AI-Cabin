@@ -6,9 +6,8 @@ compatibility: opencode
 metadata:
   source: desk/interactive-rebase.md
   related:
-    - todo-workflow
-    - validation-checkpoint
-    - semantic-commit
+    - skill:workflow-protocol
+    - skill:semantic-commit
 ---
 
 ## What I do
@@ -117,9 +116,3 @@ git rebase --continue
    ```
 3. Suggest alternative placements (like `c82eac2` example)
 4. Update `rebase-guide.md` with new commit hashes
-
-## Related Skills
-
-- `todo-workflow` - Task tracking and validation
-- `validation-checkpoint` - When to ask for approval
-- `semantic-commit` - Writing clear commit messages

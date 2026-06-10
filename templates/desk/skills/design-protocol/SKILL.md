@@ -4,7 +4,10 @@ description: Design First, Code Second - explore options before implementation
 license: MIT
 compatibility: opencode
 metadata:
-  related: project documentation (README.md, ARCHITECTURE.md, desk/*.md)
+  related:
+    - project documentation (README.md, ARCHITECTURE.md, desk/*.md)
+    - skill:workflow-protocol
+    - skill:semantic-commit
 ---
 
 ## What I do
@@ -86,7 +89,7 @@ Checklist:
 
 ```markdown
 J'ai analysé [composant]. Sa philosophie est : [X].
-J'ai relu : [docs/commentaires/git history].
+J'ai relu : [docs, commentaires, git history].
 Je propose : [changement aligné].
 ⚠️ Point d'attention : [déviation éventuelle].
 ```
@@ -197,8 +200,3 @@ Alternative options:
 
 Which approach?
 ```
-
-## Related Skills
-
-- `todo-workflow` - Full task protocol
-- `validation-checkpoint` - When to ask validation

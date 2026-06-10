@@ -6,9 +6,8 @@ compatibility: opencode
 metadata:
   source: desk/retro.md
   related:
-    - todo-workflow
-    - validation-checkpoint
-    - task-closing
+    - skill:workflow-protocol
+    - skill:task-closing
 ---
 
 ## What I do
@@ -22,9 +21,10 @@ I run session retrospectives following the process in **desk/retro.md**.
 **Key steps:**
 1. Analyze the session (what went well/wrong)
 2. Ask user for perspective
-3. Identify skills opportunities
-4. Propose updates (AGENT.md, skills, docs)
-5. Remind user of actions (make setup, restart cabin)
+3. **Priority 1:** Update AGENTS.md (Workflow + Project Memory sections)
+4. **Priority 2:** Create/update skills (multi-step workflows only)
+5. **Priority 3:** Update project docs (ARCHITECTURE.md, DEVELOPMENT.md, etc.)
+6. Remind user of actions (make setup, restart)
 
 ## Critical Rules
 
@@ -33,8 +33,7 @@ I run session retrospectives following the process in **desk/retro.md**.
 - Present proposals clearly
 - Wait for explicit user approval
 - Let user manage commits and cleanup
-- Remind user to run `make setup` after AGENT.md changes
-- Remind user to restart cabin after skill changes
+- Remind user to restart session after AGENTS.md/skills changes (see "After Writing Proposals")
 
 **DO NOT:**
 - Commit any changes
@@ -52,16 +51,17 @@ I run session retrospectives following the process in **desk/retro.md**.
 
 ## After Writing Proposals
 
-**Remind user:**
-1. `git diff` AGENTS.md → commit → run `make setup` in cabin
-2. `git diff` skills → commit → restart cabin
+**Remind user (priority order):**
+1. `git diff` AGENTS.md → commit → propagate
+   - **opencode:** `make setup` then `make docker-restart-agent`
+     - ⚠️ **Restart required** — opencode loads AGENTS.md only at startup
+   - **pi.dev:** `make setup` is sufficient
+     - ✅ **No restart needed** — reads at each session start
+2. `git diff` skills → commit → restart (only if skills created/updated)
+   - **opencode:** `make docker-restart-agent` or exit + `make opencode`
+     - ⚠️ **Critical for Web UI** - skills NOT discovered without restart
+   - **pi.dev:** End session (`/quit`) and start new `pi` session
+     - 💡 **Workaround:** Tell agent to `ls desk/skills/` to discover without restart
 3. `git diff` project docs → commit if relevant
 
 **Full details**: Read `desk/retro.md` section "Propose Updates".
-
-## Related Skills
-
-- `todo-workflow` - Full 7-step task protocol
-- `validation-checkpoint` - When to ask validation
-- `task-closing` - Documentation and closing process
-- `design-protocol` - Design options and tradeoffs

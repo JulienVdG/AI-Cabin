@@ -94,12 +94,12 @@ I [action] following the process in **desk/some-doc.md**.
 ### 4. Tables (if applicable)
 
 ```markdown
-## Skill Locations
+## Skills Locations
 
 | Type | Write to | Review |
 |------|----------|--------|
-| Workflow (universal) | `skills/` | `git diff` in project |
-| Technical (project) | `skills/` in that project | `git diff` in project |
+| Global (universal) | `skills/` | `git diff` in project |
+| Technical (project) | `.agents/skills/` in that project | `git diff` in project |
 ```
 
 **Purpose:** Quick lookup for common patterns.
