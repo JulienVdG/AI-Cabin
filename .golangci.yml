@@ -1,0 +1,20 @@
+run:
+  timeout: 5m
+  modules-cache-mode: off
+  build-tags:
+    - !cabin
+
+cache:
+  dir: .cache/golangci-lint
+
+issues:
+  exclude-dirs:
+    - cabin
+
+linters:
+  enable:
+    - goimports
+
+linters-settings:
+  goimports:
+    local-prefixes: github.com/JulienVdG/AI-Cabin

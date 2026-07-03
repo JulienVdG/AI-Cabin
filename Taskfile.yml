@@ -1,0 +1,38 @@
+version: '3'
+
+tasks:
+  default:
+    cmds:
+      - task: test
+
+  fmt:
+    desc: Format Go code with goimports
+    cmds:
+      - go tool goimports -local github.com/JulienVdG/AI-Cabin -w .
+
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - go tool golangci-lint run ./...
+
+  test:
+    desc: Run tests
+    cmds:
+      - go test ./...
+
+  build:
+    desc: Build the CLI
+    cmds:
+      - mkdir -p bin
+      - go build -o bin/cabin ./cmd/cabin
+
+  tidy:
+    desc: Tidy go.mod
+    cmds:
+      - go mod tidy
+
+  cover:
+    desc: Run tests with coverage
+    cmds:
+      - go test -coverprofile=coverage.out ./...
+      - go tool cover -html=coverage.out -o coverage.html
