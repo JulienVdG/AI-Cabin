@@ -1,0 +1,22 @@
+log-level: warn
+
+quiet: false
+dir: internal/mocks/{{ trimPrefix .InterfaceDirRelative "internal" }}
+
+outpkg: "mock_{{.PackageName}}"
+mockname: "{{.InterfaceName}}"
+filename: "mock_{{lower .InterfaceName}}.go"
+disable-version-string: true
+resolve-type-alias: false
+issue-845-fix: true
+
+packages:
+  github.com/JulienVdG/AI-Cabin/internal/config:
+    interfaces:
+      GitConfigProvider:
+      HomeDirProvider:
+  io/fs:
+    interfaces:
+      FS:
+      ReadDirFS:
+      StatFS:
