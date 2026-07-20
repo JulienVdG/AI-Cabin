@@ -80,7 +80,7 @@ RUN echo 'if [ -f /etc/bash_completion ]; then . /etc/bash_completion; fi' >> /h
 RUN echo 'if [ "$GREYWALL_SANDBOX" = "1" ]; then debian_chroot="🔒"; fi' >> /home/ai_agent/.bashrc
 
 # Create future mount-points so that owner is ai_agent
-RUN mkdir -p .local/share .local/state .local/bin .pi/agent
+RUN mkdir -p .local/share .local/state .local/bin .cache .config/greywall .pi/agent desk go
 
 # Default command: sleep infinity for manual testing
 CMD ["sleep", "infinity"]

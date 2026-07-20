@@ -69,20 +69,21 @@ ${AI_CABIN_HOME}/.pi/agent/AGENTS.md: ${AI_CABIN_DESK}/AGENTS.md
 	@echo "**Note:** Always use absolute paths (e.g., \`${CONTAINER_HOME}/desk/TODO.md\`) not relative paths." >> "$@"
 
 setup-dirs: guard-AI_CABIN_HOME guard-AI_CABIN_DESK guard-AI_CABIN_WORKDIR
-	# Agent Data directories (in AI_CABIN_HOME)
-	mkdir -p ${AI_CABIN_HOME}/.pi/agent
-	mkdir -p ${AI_CABIN_HOME}/.config/greywall/learned
 	# Desk directory (in AI_CABIN_DESK)
 	mkdir -p ${AI_CABIN_DESK}
 	mkdir -p ${AI_CABIN_DESK}/skills
-	# Cabin-specific data (in agent_data/)
-	mkdir -p agent_data/cache
-	mkdir -p agent_data/go
+	# Agent Data directories (in AI_CABIN_HOME)
+	mkdir -p ${AI_CABIN_HOME}/.local/state/ai-cabin/
+	mkdir -p ${AI_CABIN_HOME}/.pi/agent
+	mkdir -p ${AI_CABIN_HOME}/.config/greywall/learned
+	mkdir -p ${AI_CABIN_HOME}/.cache
+	mkdir -p ${AI_CABIN_HOME}/go
+	# Go (compatible with greywall go profile)
+	mkdir -p ${AI_CABIN_HOME}/.cache/go-build ${AI_CABIN_HOME}/.cache/golangci-lint
 
 
 setup: guard-AI_CABIN_HOME guard-AI_CABIN_DESK guard-AI_CABIN_WORKDIR ${AI_CABIN_HOME}/.config/greywall/greywall.json ${AI_CABIN_HOME}/.config/greywall/learned/workspace.json ${AI_CABIN_HOME}/.config/greywall/learned/pi.json ${AI_CABIN_HOME}/.pi/agent/models.json ${AI_CABIN_HOME}/.pi/agent/settings.json ${AI_CABIN_HOME}/.pi/agent/AGENTS.md
-	# Cabin-specific data (in agent_data/)
-	touch agent_data/bash_history
+	touch ${AI_CABIN_HOME}/.local/state/ai-cabin/container_bash_history
 
 # Copy factorized files (.deps/) for Docker build context
 .PHONY: deps

@@ -37,6 +37,11 @@ services:
       - ${AI_CABIN_DESK}:${CONTAINER_HOME}/desk:rw
 
       # Agent Data (AI_CABIN_HOME host → CONTAINER_HOME container)
+      # Cache
+      - ${AI_CABIN_HOME}/.cache:${CONTAINER_HOME}/.cache:rw
+      # Go GOPATH
+      - ${AI_CABIN_HOME}/go:${CONTAINER_HOME}/go:rw
+
       # Pi.dev sessions, config, extensions
       - ${AI_CABIN_HOME}/.pi:${CONTAINER_HOME}/.pi:rw
       - ${AI_CABIN_DESK}/skills:${CONTAINER_HOME}/.pi/agent/skills:ro
@@ -45,10 +50,8 @@ services:
       # If CONTAINER_WORKDIR is set, remap to that path (advanced mode)
       - ${AI_CABIN_WORKDIR}:${CONTAINER_WORKDIR:-${AI_CABIN_WORKDIR}}:rw
 
-      # Cache and bash_history (cabin-specific, in agent_data/)
-      - ./agent_data/cache:${CONTAINER_HOME}/.cache:rw
-      - ./agent_data/bash_history:${CONTAINER_HOME}/.bash_history:rw
-      - ./agent_data/go:${CONTAINER_HOME}/go:rw
+      # bash_history (to ease debugging greywall setup)
+      - ${AI_CABIN_HOME}/.local/state/ai-cabin/container_bash_history:${CONTAINER_HOME}/.bash_history:rw
 
       # Greywall configuration
       - ${AI_CABIN_HOME}/.config/greywall:${CONTAINER_HOME}/.config/greywall:rw
