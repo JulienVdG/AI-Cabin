@@ -74,7 +74,8 @@ USER ai_agent
 WORKDIR /home/ai_agent
 
 # Ensure bash-completion is sourced in the agent's shell.
-RUN echo 'if [ -f /etc/bash_completion ]; then . /etc/bash_completion; fi' >> /home/ai_agent/.bashrc
+# already present in source image
+#RUN echo 'if [ -f /etc/bash_completion ]; then . /etc/bash_completion; fi' >> /home/ai_agent/.bashrc
 
 # Add greywall sandbox indicator to prompt
 RUN echo 'if [ "$GREYWALL_SANDBOX" = "1" ]; then debian_chroot="🔒"; fi' >> /home/ai_agent/.bashrc
