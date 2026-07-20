@@ -1,0 +1,225 @@
+version: '3'
+
+# CONTAINER_HOME is exported to the environment (docker-compose reads it via ${CONTAINER_HOME})
+# and is also available as a template var ({{.CONTAINER_HOME}}).
+env:
+  CONTAINER_HOME: /home/ai_agent
+
+tasks:
+  default:
+    desc: Start the cabin (docker-up + info)
+    cmds:
+      - task: docker-up
+      - task: info
+
+  setup-dirs:
+    desc: Create AI_CABIN_HOME and AI_CABIN_DESK subdirectories
+    preconditions:
+      - sh: '[ -v AI_CABIN_HOME ]'
+        msg: "missing environment variable AI_CABIN_HOME"
+      - sh: '[ -v AI_CABIN_DESK ]'
+        msg: "missing environment variable AI_CABIN_DESK"
+      - sh: '[ -v AI_CABIN_WORKDIR ]'
+        msg: "missing environment variable AI_CABIN_WORKDIR"
+    cmds:
+      # Desk directory (in AI_CABIN_DESK)
+      - mkdir -p {{.AI_CABIN_DESK}}
+      - mkdir -p {{.AI_CABIN_DESK}}/skills
+      # Agent Data directories (in AI_CABIN_HOME)
+      - mkdir -p {{.AI_CABIN_HOME}}/.local/state/ai-cabin/
+      - mkdir -p {{.AI_CABIN_HOME}}/.pi/agent
+      - mkdir -p {{.AI_CABIN_HOME}}/.config/greywall/learned
+      - mkdir -p {{.AI_CABIN_HOME}}/.cache
+      - mkdir -p {{.AI_CABIN_HOME}}/go
+      # Go (compatible with greywall go profile)
+      - mkdir -p {{.AI_CABIN_HOME}}/.cache/go-build {{.AI_CABIN_HOME}}/.cache/golangci-lint
+
+  # copy-if-absent copies SOURCE to TARGET only if TARGET does not exist.
+  # TODO: rework the copy strategy (force-copy with backup is the planned v1).
+  copy-if-absent:
+    internal: true
+    preconditions:
+      - sh: '[ -n "{{.SOURCE}}" ]'
+        msg: "SOURCE is required"
+      - sh: '[ -n "{{.TARGET}}" ]'
+        msg: "TARGET is required"
+    cmds:
+      - |
+        if [ -e "{{.TARGET}}" ]; then
+          echo "{{.TARGET}} already exists, not updating"
+          echo "compare to $(realpath {{.SOURCE}}) to manually update"
+        else
+          cp "{{.SOURCE}}" "{{.TARGET}}"
+        fi
+
+  copy-config:
+    internal: true
+    deps: [setup-dirs]
+    cmds:
+      - task: copy-if-absent
+        vars:
+          SOURCE: ../_greywall/greywall.json
+          TARGET: "{{.AI_CABIN_HOME}}/.config/greywall/greywall.json"
+      - task: copy-if-absent
+        vars:
+          SOURCE: ../_greywall/profile/workspace.json
+          TARGET: "{{.AI_CABIN_HOME}}/.config/greywall/learned/workspace.json"
+      - task: copy-if-absent
+        vars:
+          SOURCE: ../_greywall/profile/pi.json
+          TARGET: "{{.AI_CABIN_HOME}}/.config/greywall/learned/pi.json"
+      - task: copy-if-absent
+        vars:
+          SOURCE: settings.json
+          TARGET: "{{.AI_CABIN_HOME}}/.pi/agent/settings.json"
+
+  generate-models:
+    internal: true
+    desc: Generate models.json from template (replace __SCW_PROJECT_ID__)
+    preconditions:
+      - sh: '[ -v SCW_PROJECT_ID ]'
+        msg: "missing environment variable SCW_PROJECT_ID"
+    deps: [setup-dirs]
+    cmds:
+      - sed "s/__SCW_PROJECT_ID__/${SCW_PROJECT_ID}/g" models.json.template > "{{.AI_CABIN_HOME}}/.pi/agent/models.json"
+
+  generate-agents-md:
+    internal: true
+    desc: Generate AGENTS.md from desk source with workspace paths appended
+    deps: [setup-dirs]
+    cmds:
+      - |
+        cat "{{.AI_CABIN_DESK}}/AGENTS.md" > "{{.AI_CABIN_HOME}}/.pi/agent/AGENTS.md"
+        {
+          echo ""
+          echo "---"
+          echo ""
+          echo "## Workspace Directories (Reference)"
+          echo ""
+          echo "Reference paths for this workspace:"
+          echo ""
+          echo "- **Home**: {{.CONTAINER_HOME}}"
+          echo "- **Desk**: {{.CONTAINER_HOME}}/desk/"
+          echo "- **Skills**: {{.CONTAINER_HOME}}/desk/skills/"
+          echo "- **Workdir**: ${CONTAINER_WORKDIR:-{{.AI_CABIN_WORKDIR}}}"
+          echo "- **Cache**: {{.CONTAINER_HOME}}/.cache/"
+          echo ""
+          echo "**Note:** Always use absolute paths (e.g., \`{{.CONTAINER_HOME}}/desk/TODO.md\`) not relative paths."
+        } >> "{{.AI_CABIN_HOME}}/.pi/agent/AGENTS.md"
+
+  setup:
+    desc: Setup environment (directories + config)
+    cmds:
+      - task: copy-config
+      - task: generate-models
+      - task: generate-agents-md
+      - touch {{.AI_CABIN_HOME}}/.local/state/ai-cabin/container_bash_history
+
+  deps:
+    desc: Copy factorized files (.deps/) for Docker build context
+    cmds:
+      - mkdir -p .deps/_common .deps/_greywall
+      - cp -r ../_common/* .deps/_common/
+      - cp -r ../_greywall/* .deps/_greywall/
+      # Host file used by docker build (best effort, may be absent)
+      - cp ~/.local/bin/greywall .deps/greywall 2>/dev/null || true
+      - cp ~/.local/share/greyproxy/ca-cert.pem .deps/greyproxy-ca.crt 2>/dev/null || true
+
+  docker-build:
+    desc: Build the cabin image
+    cmds:
+      - task: setup
+      - task: deps
+      - BUILDKIT_PROGRESS=plain docker compose build
+
+  docker-debug-build:
+    desc: Build the cabin image without cache
+    cmds:
+      - task: setup
+      - BUILDKIT_PROGRESS=plain docker compose build --no-cache
+
+  docker-debug-run:
+    desc: Run a one-off debug container
+    cmds:
+      - task: setup
+      - docker compose run --rm --service-ports agent /bin/bash
+
+  docker-up:
+    desc: Start the cabin in background
+    cmds:
+      - task: setup
+      - docker compose up -d
+
+  docker-down:
+    desc: Stop the cabin
+    cmds:
+      - docker compose down
+
+  docker-shell:
+    desc: Get a bash shell inside the already running agent
+    cmds:
+      - docker compose exec agent bash
+
+  docker-greyshell:
+    desc: Get a greywall sandboxed shell inside the agent
+    cmds:
+      - docker compose exec agent greybash
+
+  pi:
+    desc: Continue pi.dev session (greywall sandboxed TUI)
+    cmds:
+      - docker compose exec agent greypi -c
+
+  docker-logs:
+    desc: Follow agent logs
+    cmds:
+      - docker compose logs -f agent
+
+  docker-restart-agent:
+    desc: Restart the agent container
+    cmds:
+      - task: setup
+      - docker compose restart agent
+
+  up:
+    desc: Start the cabin (alias for docker-up + info)
+    cmds:
+      - task: docker-up
+      - task: info
+
+  down:
+    desc: Stop the cabin (alias for docker-down)
+    cmds:
+      - task: docker-down
+
+  info:
+    desc: Show cabin access info
+    cmds:
+      - |
+        echo "greyproxy (host):            http://localhost:43080"
+        echo "AI Agent (pi.dev TUI):        Use 'task pi' or './cabin-pi'"
+    silent: true
+
+  help:
+    desc: Show usage
+    cmds:
+      - |
+        echo "Environment variables (must be set before running task):"
+        echo "  AI_CABIN_HOME      : Host home directory (e.g., /home/user/)"
+        echo "  AI_CABIN_DESK      : Shared desk directory (AGENTS.md, skills)"
+        echo "  AI_CABIN_WORKDIR   : Git repositories"
+        echo "  SCW_PROJECT_ID     : Scaleway project ID"
+        echo "  CONTAINER_WORKDIR  : Container workdir (default: AI_CABIN_WORKDIR, advanced)"
+        echo ""
+        echo "Usage:"
+        echo "  task setup             # Setup environment (directories + config)"
+        echo "  task docker-up         # Start cabin"
+        echo "  task docker-shell      # Get shell inside container"
+        echo "  task pi                # pi.dev TUI"
+        echo "  task docker-greyshell  # Greywall sandboxed shell"
+        echo "  task docker-logs       # Follow logs"
+        echo ""
+        echo "Advanced:"
+        echo "  CONTAINER_WORKDIR=/workspace task docker-up  # Remap workdir to /workspace"
+    silent: true
+
