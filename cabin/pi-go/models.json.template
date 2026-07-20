@@ -13,8 +13,8 @@
           "contextWindow": 250000,
           "maxTokens": 16000,
           "cost": {
-            "input": 5,
-            "output": 25,
+            "input": 0.8,
+            "output": 2.4,
             "cacheRead": 0.5,
             "cacheWrite": 10
           },
@@ -32,8 +32,26 @@
 	  "contextWindow": 128000,
           "maxTokens": 4096,
           "cost": {
-            "input": 5,
-            "output": 25,
+            "input": 0.8,
+            "output": 2.4,
+            "cacheRead": 0.5,
+            "cacheWrite": 10
+          },
+	  "compat": {
+	    "supportsDeveloperRole": false,
+	    "supportsReasoningEffort": false
+	  }
+	},
+	{
+	  "id": "glm-5.2",
+	  "name": "GLM 5.2",
+          "reasoning": true,
+	  "input": ["text"],
+	  "contextWindow": 262000,
+          "maxTokens": 16384,
+          "cost": {
+            "input": 1.80,
+            "output": 5.50,
             "cacheRead": 0.5,
             "cacheWrite": 10
           },

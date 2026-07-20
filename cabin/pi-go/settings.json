@@ -1,4 +1,6 @@
 {
   "enableInstallTelemetry": false,
-  "quietStartup": true
+  "quietStartup": true,
+  "defaultProvider": "scaleway",
+  "defaultModel": "glm-5.2"
 }
