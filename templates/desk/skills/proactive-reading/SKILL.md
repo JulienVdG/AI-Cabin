@@ -91,8 +91,7 @@ git log --oneline -5
 **Logs:**
 ```bash
 # From host: docker compose logs agent | tail -100
-# From container: cat agent_data/share/log/*.log | grep -i "error" | tail -50
-# Or: journalctl, systemctl logs, etc.
+# From container: journalctl, systemctl logs, etc.
 ```
 
 **Configs:**

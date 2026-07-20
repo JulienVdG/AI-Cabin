@@ -340,8 +340,7 @@ git diff --stat
 
 # Logs (errors, issues) - adapt to context
 # From host: docker compose logs agent | tail -100
-# From container: cat agent_data/share/log/*.log | grep -i "error" | tail -50
-# Or: journalctl, systemctl logs, etc.
+# From container: journalctl, systemctl logs, etc.
 
 # Configs (what's configured)
 cat docker-compose.yml
