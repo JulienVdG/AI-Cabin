@@ -1,3 +1,5 @@
+ai-cabin: {}
+
 version: '3'
 
 # CONTAINER_HOME is exported to the environment (docker-compose reads it via ${CONTAINER_HOME})

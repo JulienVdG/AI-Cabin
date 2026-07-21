@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -831,4 +832,28 @@ func TestConfigService_SaveProfile_WriteError(t *testing.T) {
 	}
 
 	mockWriter.AssertExpectations(t)
+}
+
+func TestConfigService_GetCabin(t *testing.T) {
+	svc := newTestService(t)
+	if err := svc.AddCabin("blog", "/blog/path"); err != nil {
+		t.Fatalf("AddCabin() error = %v", err)
+	}
+
+	t.Run("returns cabin added via ConfigService", func(t *testing.T) {
+		c, err := svc.GetCabin("blog")
+		if err != nil {
+			t.Fatalf("GetCabin(blog) error = %v", err)
+		}
+		if c.Name != "blog" || c.Path != "/blog/path" {
+			t.Errorf("GetCabin(blog) = {%q, %q}, want {blog, /blog/path}", c.Name, c.Path)
+		}
+	})
+
+	t.Run("missing name returns ErrCabinNotFound", func(t *testing.T) {
+		_, err := svc.GetCabin("ghost")
+		if !errors.Is(err, config.ErrCabinNotFound) {
+			t.Errorf("GetCabin(ghost) error = %v, want ErrCabinNotFound", err)
+		}
+	})
 }
