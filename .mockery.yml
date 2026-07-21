@@ -15,6 +15,7 @@ packages:
     interfaces:
       GitConfigProvider:
       HomeDirProvider:
+      FileWriter:
   io/fs:
     interfaces:
       FS:

@@ -9,6 +9,8 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/JulienVdG/AI-Cabin/internal/config"
 	mock_config "github.com/JulienVdG/AI-Cabin/internal/mocks/config"
 	mock_fs "github.com/JulienVdG/AI-Cabin/internal/mocks/io/fs"
@@ -36,7 +38,7 @@ func newTestService(t *testing.T) *config.ConfigService {
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		t.Fatalf("failed to create config dir: %v", err)
 	}
-	return config.NewConfigServiceWithFS(nil, nil, os.DirFS(configDir))
+	return config.NewConfigService(nil, nil, os.DirFS(configDir), config.AtomicFileWriter{})
 }
 
 func TestGetConfigDir(t *testing.T) {
@@ -307,7 +309,7 @@ func TestConfigService_BuildDefaultProfile(t *testing.T) {
 		mockHomeDir.On("GetHomeDir").Return("/tmp/test-home", nil)
 
 		// Create service with mocks
-		svc := config.NewConfigService(mockGit, mockHomeDir)
+		svc := config.NewConfigService(mockGit, mockHomeDir, nil, nil)
 
 		// Build profile (logic only, no I/O)
 		profile, err := svc.BuildDefaultProfile("test")
@@ -358,7 +360,7 @@ func TestConfigService_BuildDefaultProfile(t *testing.T) {
 		mockHomeDir.On("GetHomeDir").Return("/tmp/test-home", nil)
 
 		// Create service with mocks
-		svc := config.NewConfigService(mockGit, mockHomeDir)
+		svc := config.NewConfigService(mockGit, mockHomeDir, nil, nil)
 
 		// Build profile (should succeed with defaults)
 		profile, err := svc.BuildDefaultProfile("test")
@@ -386,7 +388,7 @@ func TestConfigService_BuildDefaultProfile(t *testing.T) {
 		mockHomeDir.On("GetHomeDir").Return("", fmt.Errorf("home dir not found"))
 
 		// Create service with mock
-		svc := config.NewConfigService(&mock_config.GitConfigProvider{}, mockHomeDir)
+		svc := config.NewConfigService(&mock_config.GitConfigProvider{}, mockHomeDir, nil, nil)
 
 		// Build profile should fail
 		_, err := svc.BuildDefaultProfile("test")
@@ -405,7 +407,7 @@ func TestConfigService_SaveProfile(t *testing.T) {
 	setupTestConfig(t)
 
 	// SaveProfile doesn't use gitProvider or homeDir, so nil is safe.
-	svc := config.NewConfigService(nil, nil)
+	svc := config.NewConfigService(nil, nil, nil, config.AtomicFileWriter{})
 
 	// Build a profile
 	profile := &config.Profile{
@@ -456,7 +458,7 @@ func TestConfigService_CreateDefaultProfile(t *testing.T) {
 		mockHomeDir.On("GetHomeDir").Return("/tmp/test-home", nil)
 
 		// Create service with mocks
-		svc := config.NewConfigService(mockGit, mockHomeDir)
+		svc := config.NewConfigService(mockGit, mockHomeDir, nil, config.AtomicFileWriter{})
 
 		// Create profile (BuildDefaultProfile + SaveProfile)
 		profile, err := svc.CreateDefaultProfile("test")
@@ -493,7 +495,7 @@ func TestConfigService_CreateDefaultProfile(t *testing.T) {
 		mockHomeDir.On("GetHomeDir").Return("", fmt.Errorf("home dir not found"))
 
 		// Create service with mock
-		svc := config.NewConfigService(&mock_config.GitConfigProvider{}, mockHomeDir)
+		svc := config.NewConfigService(&mock_config.GitConfigProvider{}, mockHomeDir, nil, config.AtomicFileWriter{})
 
 		// Create profile should fail
 		_, err := svc.CreateDefaultProfile("test")
@@ -531,7 +533,7 @@ func TestRealHomeDir_GetHomeDir(t *testing.T) {
 func TestGetCurrentProfile(t *testing.T) {
 	t.Run("returns_empty_when_config_file_does_not_exist", func(t *testing.T) {
 		mapFS := fstest.MapFS{}
-		svc := config.NewConfigServiceWithFS(nil, nil, mapFS)
+		svc := config.NewConfigService(nil, nil, mapFS, nil)
 
 		current, err := svc.GetCurrentProfile()
 		if err != nil {
@@ -548,7 +550,7 @@ func TestGetCurrentProfile(t *testing.T) {
 				Data: []byte("currentProfile: perso"),
 			},
 		}
-		svc := config.NewConfigServiceWithFS(nil, nil, mapFS)
+		svc := config.NewConfigService(nil, nil, mapFS, nil)
 
 		current, err := svc.GetCurrentProfile()
 		if err != nil {
@@ -565,7 +567,7 @@ func TestGetCurrentProfile(t *testing.T) {
 				Data: []byte("::: not valid yaml :::"),
 			},
 		}
-		svc := config.NewConfigServiceWithFS(nil, nil, mapFS)
+		svc := config.NewConfigService(nil, nil, mapFS, nil)
 
 		_, err := svc.GetCurrentProfile()
 		if err == nil {
@@ -585,7 +587,7 @@ func TestConfigService_LoadProfile(t *testing.T) {
 			},
 		}
 
-		svc := config.NewConfigServiceWithFS(nil, nil, mapFS)
+		svc := config.NewConfigService(nil, nil, mapFS, nil)
 
 		profile, err := svc.LoadProfile("perso")
 		if err != nil {
@@ -601,7 +603,7 @@ func TestConfigService_LoadProfile(t *testing.T) {
 
 	t.Run("returns error when profile not found", func(t *testing.T) {
 		mapFS := fstest.MapFS{}
-		svc := config.NewConfigServiceWithFS(nil, nil, mapFS)
+		svc := config.NewConfigService(nil, nil, mapFS, nil)
 
 		_, err := svc.LoadProfile("nonexistent")
 		if err == nil {
@@ -613,7 +615,7 @@ func TestConfigService_LoadProfile(t *testing.T) {
 		mockFS := &mock_fs.FS{}
 		mockFS.On("Open", "profiles/test.yaml").Return(nil, fmt.Errorf("disk error"))
 
-		svc := config.NewConfigServiceWithFS(nil, nil, mockFS)
+		svc := config.NewConfigService(nil, nil, mockFS, nil)
 
 		_, err := svc.LoadProfile("test")
 		if err == nil {
@@ -632,7 +634,7 @@ func TestConfigService_LoadProfile(t *testing.T) {
 				Data: []byte("::: not valid yaml :::"),
 			},
 		}
-		svc := config.NewConfigServiceWithFS(nil, nil, mapFS)
+		svc := config.NewConfigService(nil, nil, mapFS, nil)
 
 		_, err := svc.LoadProfile("bad")
 		if err == nil {
@@ -650,7 +652,7 @@ func TestConfigService_ListProfiles(t *testing.T) {
 			"profiles/perso.yaml": &fstest.MapFile{Data: []byte("name: perso")},
 			"profiles/work.yaml":  &fstest.MapFile{Data: []byte("name: work")},
 		}
-		svc := config.NewConfigServiceWithFS(nil, nil, mapFS)
+		svc := config.NewConfigService(nil, nil, mapFS, nil)
 
 		profiles, err := svc.ListProfiles()
 		if err != nil {
@@ -663,7 +665,7 @@ func TestConfigService_ListProfiles(t *testing.T) {
 
 	t.Run("returns empty list when profiles dir does not exist", func(t *testing.T) {
 		mapFS := fstest.MapFS{}
-		svc := config.NewConfigServiceWithFS(nil, nil, mapFS)
+		svc := config.NewConfigService(nil, nil, mapFS, nil)
 
 		profiles, err := svc.ListProfiles()
 		if err != nil {
@@ -678,7 +680,7 @@ func TestConfigService_ListProfiles(t *testing.T) {
 		mockFS := &mock_fs.ReadDirFS{}
 		mockFS.On("ReadDir", config.ProfilesDirName).Return([]fs.DirEntry(nil), fmt.Errorf("disk error"))
 
-		svc := config.NewConfigServiceWithFS(nil, nil, mockFS)
+		svc := config.NewConfigService(nil, nil, mockFS, nil)
 
 		_, err := svc.ListProfiles()
 		if err == nil {
@@ -694,7 +696,7 @@ func TestConfigService_ListProfiles(t *testing.T) {
 	t.Run("returns error when fs does not implement ReadDirFS", func(t *testing.T) {
 		// mock_fs.FS only implements Open, not ReadDir.
 		mockFS := &mock_fs.FS{}
-		svc := config.NewConfigServiceWithFS(nil, nil, mockFS)
+		svc := config.NewConfigService(nil, nil, mockFS, nil)
 
 		_, err := svc.ListProfiles()
 		if err == nil {
@@ -712,7 +714,7 @@ func TestConfigService_ListProfiles(t *testing.T) {
 			"profiles/README.md":    &fstest.MapFile{Data: []byte("not a profile")},
 			"profiles/template.txt": &fstest.MapFile{Data: []byte("ignored")},
 		}
-		svc := config.NewConfigServiceWithFS(nil, nil, mapFS)
+		svc := config.NewConfigService(nil, nil, mapFS, nil)
 
 		profiles, err := svc.ListProfiles()
 		if err != nil {
@@ -732,7 +734,7 @@ func TestConfigService_ProfileExists(t *testing.T) {
 		mapFS := fstest.MapFS{
 			"profiles/perso.yaml": &fstest.MapFile{Data: []byte("name: perso")},
 		}
-		svc := config.NewConfigServiceWithFS(nil, nil, mapFS)
+		svc := config.NewConfigService(nil, nil, mapFS, nil)
 
 		exists, err := svc.ProfileExists("perso")
 		if err != nil {
@@ -745,7 +747,7 @@ func TestConfigService_ProfileExists(t *testing.T) {
 
 	t.Run("returns false when profile not found", func(t *testing.T) {
 		mapFS := fstest.MapFS{}
-		svc := config.NewConfigServiceWithFS(nil, nil, mapFS)
+		svc := config.NewConfigService(nil, nil, mapFS, nil)
 
 		exists, err := svc.ProfileExists("nonexistent")
 		if err != nil {
@@ -760,7 +762,7 @@ func TestConfigService_ProfileExists(t *testing.T) {
 		mockFS := &mock_fs.StatFS{}
 		mockFS.On("Stat", "profiles/test.yaml").Return(nil, fmt.Errorf("disk error"))
 
-		svc := config.NewConfigServiceWithFS(nil, nil, mockFS)
+		svc := config.NewConfigService(nil, nil, mockFS, nil)
 
 		_, err := svc.ProfileExists("test")
 		if err == nil {
@@ -772,4 +774,61 @@ func TestConfigService_ProfileExists(t *testing.T) {
 
 		mockFS.AssertExpectations(t)
 	})
+}
+
+func TestConfigService_SetCurrentProfile_WriteError(t *testing.T) {
+	setupTestConfig(t)
+
+	mockWriter := &mock_config.FileWriter{}
+	mockWriter.On("WriteFile",
+		mock.Anything, // path
+		mock.Anything, // data
+		mock.Anything, // perm
+	).Return(fmt.Errorf("disk write error"))
+
+	svc := config.NewConfigService(nil, nil, nil, mockWriter)
+
+	err := svc.SetCurrentProfile("perso")
+	if err == nil {
+		t.Fatal("SetCurrentProfile() expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "disk write error") {
+		t.Errorf("SetCurrentProfile() error = %q, should contain 'disk write error'", err.Error())
+	}
+	if !strings.Contains(err.Error(), "failed to write config file") {
+		t.Errorf("SetCurrentProfile() error = %q, should be wrapped by 'failed to write config file'", err.Error())
+	}
+
+	mockWriter.AssertExpectations(t)
+}
+
+func TestConfigService_SaveProfile_WriteError(t *testing.T) {
+	setupTestConfig(t)
+
+	mockWriter := &mock_config.FileWriter{}
+	mockWriter.On("WriteFile",
+		mock.Anything, // path
+		mock.Anything, // data
+		mock.Anything, // perm
+	).Return(fmt.Errorf("disk write error"))
+
+	svc := config.NewConfigService(nil, nil, nil, mockWriter)
+
+	profile := &config.Profile{
+		Name: "test-save",
+		Vars: map[string]string{"TEST_VAR": "test-value"},
+	}
+
+	err := svc.SaveProfile(profile)
+	if err == nil {
+		t.Fatal("SaveProfile() expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "disk write error") {
+		t.Errorf("SaveProfile() error = %q, should contain 'disk write error'", err.Error())
+	}
+	if !strings.Contains(err.Error(), "failed to write profile file") {
+		t.Errorf("SaveProfile() error = %q, should be wrapped by 'failed to write profile file'", err.Error())
+	}
+
+	mockWriter.AssertExpectations(t)
 }

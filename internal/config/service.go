@@ -16,28 +16,34 @@ type ConfigService struct {
 	gitProvider GitConfigProvider
 	homeDir     HomeDirProvider
 	fs          fs.FS
+	writer      FileWriter
 }
 
-// NewConfigService creates a new ConfigService with the given dependencies.
-func NewConfigService(gitProvider GitConfigProvider, homeDir HomeDirProvider) *ConfigService {
+// NewConfigService creates a new ConfigService with all dependencies explicit.
+// This is the canonical DI constructor (see skill:go-test-patterns):
+//   - gitProvider: Git user identity source (nil if unused by the tested method).
+//   - homeDir: user home directory source (nil if unused).
+//   - filesystem: fs.FS rooted at the config dir, used for reads (nil for write-only tests).
+//   - writer: FileWriter used for atomic writes (nil if unused; tests use mock_config.FileWriter).
+//
+// Production code should use newGlobalConfigService, which wires real implementations.
+func NewConfigService(
+	gitProvider GitConfigProvider,
+	homeDir HomeDirProvider,
+	filesystem fs.FS,
+	writer FileWriter,
+) *ConfigService {
 	return &ConfigService{
 		gitProvider: gitProvider,
 		homeDir:     homeDir,
+		fs:          filesystem,
+		writer:      writer,
 	}
-}
-
-// NewConfigServiceWithFS creates a new ConfigService with a custom filesystem.
-// The filesystem uses paths relative to the config dir (e.g. "profiles/perso.yaml").
-// This allows testing with fstest.MapFS and mocking I/O errors.
-func NewConfigServiceWithFS(gitProvider GitConfigProvider, homeDir HomeDirProvider, filesystem fs.FS) *ConfigService {
-	svc := NewConfigService(gitProvider, homeDir)
-	svc.fs = filesystem
-	return svc
 }
 
 // configService is the global instance used by package-level functions.
 // It is initialized with the real config dir as an os.DirFS so reads go to disk.
-// Tests should create their own ConfigService (via NewConfigServiceWithFS) instead of relying on this global.
+// Tests should create their own ConfigService (via NewConfigService) instead of relying on this global.
 var configService = newGlobalConfigService()
 
 // newGlobalConfigService initializes the global ConfigService with real dependencies
@@ -47,12 +53,12 @@ func newGlobalConfigService() *ConfigService {
 	if err != nil {
 		panic(fmt.Sprintf("failed to init global config service: %v", err))
 	}
-	return NewConfigServiceWithFS(&RealGitConfig{}, &RealHomeDir{}, os.DirFS(configDir))
+	return NewConfigService(&RealGitConfig{}, &RealHomeDir{}, os.DirFS(configDir), AtomicFileWriter{})
 }
 
 // LoadProfile loads a profile by name using the configured filesystem.
 // Paths are relative to the config dir (e.g. "profiles/perso.yaml").
-// The fs field must be set via NewConfigServiceWithFS; a nil fs will panic.
+// The fs field must be set via NewConfigService; a nil fs will panic.
 func (s *ConfigService) LoadProfile(name string) (*Profile, error) {
 	pathStr := path.Join(ProfilesDirName, name+".yaml")
 	data, err := fs.ReadFile(s.fs, pathStr)
@@ -71,7 +77,7 @@ func (s *ConfigService) LoadProfile(name string) (*Profile, error) {
 
 // ListProfiles returns all available profile names using the configured filesystem.
 // It reads the profiles directory relative to the config dir.
-// The fs field must be set via NewConfigServiceWithFS; a nil fs will panic.
+// The fs field must be set via NewConfigService; a nil fs will panic.
 func (s *ConfigService) ListProfiles() ([]string, error) {
 	readDirFS, ok := s.fs.(fs.ReadDirFS)
 	if !ok {
@@ -121,18 +127,9 @@ func (s *ConfigService) GetCurrentProfile() (string, error) {
 }
 
 // SetCurrentProfile updates config.yaml with the selected profile.
-// It writes config.yaml directly via os.* (fs.FS is read-only). Respects XDG_CONFIG_HOME.
+// It writes config.yaml atomically via the injected FileWriter (fs.FS is read-only).
+// Respects XDG_CONFIG_HOME.
 func (s *ConfigService) SetCurrentProfile(name string) error {
-	configDir, err := GetConfigDir()
-	if err != nil {
-		return err
-	}
-
-	// Ensure config directory exists
-	if err := os.MkdirAll(configDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create config directory: %w", err)
-	}
-
 	path, err := getConfigPath()
 	if err != nil {
 		return err
@@ -144,7 +141,7 @@ func (s *ConfigService) SetCurrentProfile(name string) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	if err := s.writer.WriteFile(path, data, filePerm); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
@@ -153,7 +150,7 @@ func (s *ConfigService) SetCurrentProfile(name string) error {
 
 // ProfileExists checks if a profile exists using the configured filesystem.
 // It stats the profile path relative to the config dir.
-// The fs field must be set via NewConfigServiceWithFS; a nil fs will panic.
+// The fs field must be set via NewConfigService; a nil fs will panic.
 func (s *ConfigService) ProfileExists(name string) (bool, error) {
 	relPath := path.Join(ProfilesDirName, name+".yaml")
 	statFS, ok := s.fs.(fs.StatFS)
@@ -259,15 +256,11 @@ func (s *ConfigService) BuildDefaultProfile(name string) (*Profile, error) {
 	return profile, nil
 }
 
-// SaveProfile writes a profile to disk.
+// SaveProfile writes a profile to disk atomically via the injected FileWriter.
 func (s *ConfigService) SaveProfile(profile *Profile) error {
 	profilesDir, err := GetProfilesDir()
 	if err != nil {
 		return err
-	}
-
-	if err := os.MkdirAll(profilesDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create profiles directory: %w", err)
 	}
 
 	path := filepath.Join(profilesDir, profile.Name+".yaml")
@@ -278,7 +271,7 @@ func (s *ConfigService) SaveProfile(profile *Profile) error {
 		return fmt.Errorf("failed to marshal profile: %w", err)
 	}
 
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	if err := s.writer.WriteFile(path, data, filePerm); err != nil {
 		return fmt.Errorf("failed to write profile file: %w", err)
 	}
 
