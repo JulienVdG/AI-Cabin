@@ -1,0 +1,13 @@
+# Test Taskfile for internal/task integration tests.
+# Exercises {{.CLI_ARGS}} forwarding and ${VAR} resolution from the process
+# env (set by Run from the profile vars — env is the only channel for
+version: '3'
+
+tasks:
+  echo-args:
+    cmds:
+      - echo "{{.CLI_ARGS}}"
+
+  echo-env:
+    cmds:
+      - echo "SOME_VAR=$SOME_VAR"
