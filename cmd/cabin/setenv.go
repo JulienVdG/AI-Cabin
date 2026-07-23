@@ -25,26 +25,28 @@ Example usage in .bashrc or .envrc:
 `,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		var profileName string
+		// Positional <profile> is a shorthand for --profile (backward compat
+		// with `eval "$(cabin setenv perso)"`); wins over the flag if both set.
+		profileName := profileFlag
 		if len(args) > 0 {
 			profileName = args[0]
 		}
 
-		profile, err := config.GetActiveProfile(profileName)
+		vars, err := config.ResolveVars(profileName, cliVars)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 
 		// Output in sorted order for consistency
-		keys := make([]string, 0, len(profile.Vars))
-		for k := range profile.Vars {
+		keys := make([]string, 0, len(vars))
+		for k := range vars {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
 
 		for _, k := range keys {
-			v := profile.Vars[k]
+			v := vars[k]
 			fmt.Printf("export %s=%q\n", k, v)
 		}
 	},

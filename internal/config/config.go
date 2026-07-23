@@ -99,6 +99,12 @@ func GetActiveProfile(name string) (*Profile, error) {
 	return configService.GetActiveProfile(name)
 }
 
+// ResolveVars returns the variable view (defaults + selected profile + env
+// + --var overrides) the CLI sets on its task subprocess.
+func ResolveVars(profileFlag string, cliVars []string) (map[string]string, error) {
+	return configService.ResolveVars(profileFlag, cliVars)
+}
+
 // CreateDefaultProfile creates a default profile with values derived from the environment.
 // TODO: AI_CABIN_HOME/DESK/WORKDIR should be templated or passed as parameters to `cabin profile init`.
 // For now, we use the user's home as a base, but this needs to be customized per bootstrap-cabin.sh pattern.
