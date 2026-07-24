@@ -57,6 +57,9 @@ COPY .deps/_common/docker-entrypoint.d/ /docker-entrypoint.d/
 COPY .deps/_greywall/docker-entrypoint.d/ /docker-entrypoint.d/
 RUN chmod +x /docker-entrypoint.d/*.sh 2>/dev/null || true
 
+COPY profile.d/ /etc/profile.d/
+RUN chmod +x /etc/profile.d/ai-cabin-*.sh 2>/dev/null || true
+
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
 # Greybash and Greypi wrappers (greywall sandboxed shells)
