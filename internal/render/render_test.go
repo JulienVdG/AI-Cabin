@@ -37,6 +37,20 @@ func TestParse(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("NameWithDirIsExecutable", func(t *testing.T) {
+		// Regression: ParseFS names the parsed body by the file's base name, so a
+		// name with a directory component left the returned template unexecutable
+		// ("incomplete or empty template"). Parse must return a template whose
+		// Execute works regardless of the name's path.
+		fsys := fstest.MapFS{"base/deps/t.tmpl": {Data: []byte("hi {{.Vars.X}}")}}
+		tmpl, err := render.Parse(fsys, "base/deps/t.tmpl")
+		require.NoError(t, err)
+		var buf bytes.Buffer
+		err = render.Execute(tmpl, map[string]string{"X": "v"}, nil, &buf)
+		require.NoError(t, err)
+		assert.Equal(t, "hi v", buf.String())
+	})
+
 	t.Run("MissingFile", func(t *testing.T) {
 		_, err := render.Parse(fstest.MapFS{}, "missing.tmpl")
 		require.Error(t, err)
@@ -152,5 +166,29 @@ func TestExecute(t *testing.T) {
 		require.Error(t, err)
 		assert.NotErrorIs(t, err, render.ErrUndefinedVar)
 		assert.NotErrorIs(t, err, render.ErrReservedAttr)
+	})
+}
+
+func TestRenderString(t *testing.T) {
+	vars := map[string]string{"SCW_PROJECT_ID": "proj-1"}
+	attrs := map[string]any{"host": "mariadb", "port": "3306"}
+
+	t.Run("FilenameTemplating", func(t *testing.T) {
+		out, err := render.RenderString("50-socat-{{.host}}-{{.port}}.sh", vars, attrs)
+		require.NoError(t, err)
+		assert.Equal(t, "50-socat-mariadb-3306.sh", out)
+	})
+
+	t.Run("UndefinedVarReturnsPartial", func(t *testing.T) {
+		out, err := render.RenderString("p-{{.host}}-{{.port}}", vars, map[string]any{"host": "mariadb"})
+		require.ErrorIs(t, err, render.ErrUndefinedVar)
+		assert.Equal(t, "p-mariadb-<no value>", out)
+	})
+
+	t.Run("NoTemplateVars", func(t *testing.T) {
+		// A plain string with no {{ renders to itself.
+		out, err := render.RenderString("models.json", vars, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "models.json", out)
 	})
 }
