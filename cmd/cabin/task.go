@@ -58,7 +58,7 @@ Examples:
 			os.Exit(1)
 		}
 
-		if err := task.Run(context.Background(), c.Path, taskName, rawArgs, vars, os.Stdout, os.Stderr); err != nil {
+		if err := task.Run(context.Background(), c.Path, taskName, rawArgs, vars.AsMap(), os.Stdout, os.Stderr); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}

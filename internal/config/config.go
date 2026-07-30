@@ -101,7 +101,7 @@ func GetActiveProfile(name string) (*Profile, error) {
 
 // ResolveVars returns the variable view (defaults + selected profile + env
 // + --var overrides) the CLI sets on its task subprocess.
-func ResolveVars(profileFlag string, cliVars []string) (map[string]string, error) {
+func ResolveVars(profileFlag string, cliVars []string) (Vars, error) {
 	return configService.ResolveVars(profileFlag, cliVars)
 }
 

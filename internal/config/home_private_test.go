@@ -1,4 +1,4 @@
-package cabin
+package config
 
 import "testing"
 

@@ -28,7 +28,6 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/JulienVdG/AI-Cabin/internal/cabin"
 	"github.com/JulienVdG/AI-Cabin/internal/render"
 	"github.com/JulienVdG/AI-Cabin/internal/unionfs"
 )
@@ -67,22 +66,20 @@ const filePerm os.FileMode = 0o666
 const dirPerm os.FileMode = 0o777
 
 // BuildLayers constructs the fallback chain as a union fs.FS, ordered highest
-// priority first (first-wins like $PATH): AI_CABIN_FRAGMENTS_DIRS entries
-// (conf), then the cabin-local dir (dev), then the embedded base layer.
+// priority first (first-wins like $PATH): the conf dirs, then the cabin-local
+// dir (dev), then the embedded base layer. Each conf dir is an os.DirFS layer;
+// cabin-local is an os.DirFS on the cabin dir; embedFS is the base (typically
+// embedded.Fragments()).
 //
-// dirsVar is a comma-separated list; each entry is ~-expanded via
-// cabin.ExpandHome. A missing dir entry is a strict error (no silent skip of a
+// The conf dirs come pre-resolved from config.Vars.FragmentsDirs (which parses
+// AI_CABIN_FRAGMENTS_DIRS: comma-split + ~ expansion); BuildLayers does not
+// re-parse the env var. A missing dir is a strict error (no silent skip of a
 // typo'd path — a misconfigured override layer should fail loudly, not
 // silently drop). Returns an error if no layer is configured at all.
-//
-// When the var is unset, it defaults to the XDG path alone — but that default
-// is applied by the caller (which resolves AI_CABIN_FRAGMENTS_DIRS like any
-// profile var), not here. BuildLayers receives the resolved value.
-func BuildLayers(dirsVar, cabinDir string, embedFS fs.FS) (fs.FS, error) {
+func BuildLayers(dirs []string, cabinDir string, embedFS fs.FS) (fs.FS, error) {
 	var layers []fs.FS
 
-	for _, dir := range splitAndTrim(dirsVar) {
-		dir = cabin.ExpandHome(dir)
+	for _, dir := range dirs {
 		if _, err := os.Stat(dir); err != nil {
 			return nil, fmt.Errorf("fragment dir %q: %w", dir, err)
 		}
@@ -105,23 +102,6 @@ func BuildLayers(dirsVar, cabinDir string, embedFS fs.FS) (fs.FS, error) {
 	}
 
 	return unionfs.New(layers...), nil
-}
-
-// splitAndTrim splits a comma-separated list and trims whitespace, dropping
-// empty entries. Returns nil for an empty string so the caller's range is a
-// no-op.
-func splitAndTrim(s string) []string {
-	if s == "" {
-		return nil
-	}
-	var out []string
-	for _, part := range strings.Split(s, ",") {
-		part = strings.TrimSpace(part)
-		if part != "" {
-			out = append(out, part)
-		}
-	}
-	return out
 }
 
 // manifest is the on-disk deps.yaml/setup.yaml file. It has two mutually

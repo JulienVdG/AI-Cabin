@@ -20,8 +20,8 @@ const ProfileEnvVar = "AI_CABIN_PROFILE"
 // only on an explicitly selected missing/unparseable profile, or a malformed
 // --var. The whole process env is included, so system vars (PATH, HOME, ...)
 // are preserved; the runner sets the view via os.Setenv without clearing.
-func (s *ConfigService) ResolveVars(profileFlag string, cliVars []string) (map[string]string, error) {
-	view := make(map[string]string)
+func (s *ConfigService) ResolveVars(profileFlag string, cliVars []string) (Vars, error) {
+	view := make(Vars)
 
 	// 1. CLI overrides (--var, --profile sets AI_CABIN_PROFILE).
 	for _, kv := range cliVars {
@@ -79,6 +79,11 @@ func (s *ConfigService) ResolveVars(profileFlag string, cliVars []string) (map[s
 	}
 	setIfAbsent(view, defaults.Vars)
 
+	// 5. Normalize typed vars whose profile/env form is permissive (CSV,
+	// JSON array, ...) into the canonical form templates expect. Applied
+	// after assembly so --var and env are normalized too, not just profile.
+	sanitizeTypedVars(view)
+
 	return view, nil
 }
 
@@ -88,5 +93,28 @@ func setIfAbsent(dst, src map[string]string) {
 		if _, present := dst[k]; !present {
 			dst[k] = v
 		}
+	}
+}
+
+// sanitizeTypedVars normalizes vars whose input form is permissive (CSV,
+// JSON array, quoted or not) into the canonical form templates expect, so the
+// template can consume the var directly. Applied at the end of ResolveVars so
+// --var, env, and profile values are all covered. Today: CREDENTIAL_INJECT
+// and CREDENTIAL_IGNORE (list normalization via SanitizeNameList, defaulting
+// to empty when unset so the template renders []), CONTAINER_WORKDIR (fallback
+// to AI_CABIN_WORKDIR).
+func sanitizeTypedVars(view Vars) {
+	// CREDENTIAL_INJECT/IGNORE are optional: always sanitize so an unset var
+	// defaults to empty (renders []), never <no value>.
+	view[CredentialInjectEnvVar] = SanitizeNameList(view[CredentialInjectEnvVar])
+	view[CredentialIgnoreEnvVar] = SanitizeNameList(view[CredentialIgnoreEnvVar])
+	// CONTAINER_WORKDIR is an optional container-side remap of the workdir
+	// path (advanced mode); when unset, it falls back to AI_CABIN_WORKDIR
+	// (transparent mode). Resolving it here makes the fallback a single
+	// source of truth consumed by templates ({{.Vars.CONTAINER_WORKDIR}})
+	// and the Taskfile alike, instead of duplicating the shell idiom
+	// ${CONTAINER_WORKDIR:-$AI_CABIN_WORKDIR} at each use site.
+	if view[ContainerWorkdirVar] == "" {
+		view[ContainerWorkdirVar] = view[WorkdirVar]
 	}
 }

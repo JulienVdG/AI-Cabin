@@ -39,8 +39,10 @@ func newResolveService(t *testing.T) *config.ConfigService {
 // (correct behavior), so a leaked env var masks the value under test.
 var cabinEnvVars = []string{
 	"AI_CABIN_HOME", "AI_CABIN_DESK", "AI_CABIN_WORKDIR",
+	"CONTAINER_WORKDIR",
 	"GIT_AGENT_NAME", "GIT_AGENT_EMAIL", "SCW_PROJECT_ID",
 	"AI_CABIN_PROFILE", "CABIN_TEST_VAR",
+	"CREDENTIAL_INJECT", "CREDENTIAL_IGNORE",
 }
 
 // unsetCabinEnv unsets the AI-Cabin env vars for the test duration, restoring
@@ -194,6 +196,39 @@ func TestResolveVars(t *testing.T) {
 			profileFlag: "perso",
 			wantVar:     "AI_CABIN_PROFILE",
 			wantVal:     "perso",
+		},
+		{
+			// CONTAINER_WORKDIR unset falls back to AI_CABIN_WORKDIR
+			// (transparent mode) — resolved in sanitizeTypedVars so templates
+			// and the Taskfile read CONTAINER_WORKDIR directly.
+			name:     "container_workdir falls back to AI_CABIN_WORKDIR when unset",
+			cleanEnv: true,
+			wantVar:  "CONTAINER_WORKDIR",
+			wantVal:  filepath.Join("/tmp/cabin-home", "projects"),
+		},
+		{
+			// CONTAINER_WORKDIR set (container-side remap, advanced mode)
+			// wins over AI_CABIN_WORKDIR.
+			name:     "container_workdir set wins over AI_CABIN_WORKDIR",
+			cleanEnv: true,
+			env:      map[string]string{"CONTAINER_WORKDIR": "/workspace"},
+			wantVar:  "CONTAINER_WORKDIR",
+			wantVal:  "/workspace",
+		},
+		{
+			// CREDENTIAL_INJECT unset defaults to empty (renders [] in the
+			// template), never <no value> — sanitizeTypedVars always sanitizes.
+			name:     "credential_inject defaults to empty when unset",
+			cleanEnv: true,
+			wantVar:  "CREDENTIAL_INJECT",
+			wantVal:  "",
+		},
+		{
+			// CREDENTIAL_IGNORE unset defaults to empty (same as inject).
+			name:     "credential_ignore defaults to empty when unset",
+			cleanEnv: true,
+			wantVar:  "CREDENTIAL_IGNORE",
+			wantVal:  "",
 		},
 	}
 

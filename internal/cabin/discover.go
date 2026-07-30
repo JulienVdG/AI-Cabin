@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/JulienVdG/AI-Cabin/internal/config"
 )
 
 // ValidateCabin validates that path points to a valid cabin directory and
@@ -32,7 +34,7 @@ import (
 // on error.
 func ValidateCabin(path, nameOverride string) (name, normalizedPath string, err error) {
 	// Expand "~"/"~user" before any FS operation (these are pure string ops).
-	expanded := ExpandHome(path)
+	expanded := config.ExpandHome(path)
 
 	// Make absolute relative to the process CWD. EvalSymlinks requires an
 	// absolute path to behave predictably across platforms.

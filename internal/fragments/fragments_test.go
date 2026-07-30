@@ -44,7 +44,7 @@ func TestBuildLayers(t *testing.T) {
 		writeLayer(t, cabinDir, map[string]string{"base/shared.txt": "cabin", "base/only-cabin.txt": "cabin"})
 		embedFS := fstest.MapFS{"base/shared.txt": {Data: []byte("embed")}, "base/only-embed.txt": {Data: []byte("embed")}}
 
-		merged, err := fragments.BuildLayers(confDir, cabinDir, embedFS)
+		merged, err := fragments.BuildLayers([]string{confDir}, cabinDir, embedFS)
 		require.NoError(t, err)
 
 		assert.Equal(t, "conf", readFS(t, merged, "base/shared.txt"))
@@ -52,42 +52,36 @@ func TestBuildLayers(t *testing.T) {
 		assert.Equal(t, "embed", readFS(t, merged, "base/only-embed.txt"))
 	})
 
-	t.Run("DirsVarCommaSeparatedAndTildeExpanded", func(t *testing.T) {
-		// Two conf dirs in the comma list, first wins; ~ is expanded to $HOME.
+	t.Run("MultipleConfDirsFirstWins", func(t *testing.T) {
+		// Two conf dirs in the list: the first wins for a shared file, the
+		// second contributes its own files. (Comma-split and ~ expansion are
+		// covered by config.SplitPathList tests; here only the union order.)
 		dir1 := t.TempDir()
 		dir2 := t.TempDir()
 		writeLayer(t, dir1, map[string]string{"base/x.txt": "1"})
 		writeLayer(t, dir2, map[string]string{"base/x.txt": "2", "base/y.txt": "2"})
 
-		// Use a path under HOME so ~ expansion is exercised.
-		home := t.TempDir()
-		t.Setenv("HOME", home)
-		tildeDir := filepath.Join(home, "fragments-tilde")
-		require.NoError(t, os.MkdirAll(tildeDir, 0o755))
-		writeLayer(t, tildeDir, map[string]string{"base/tilde.txt": "tilde"})
-
-		merged, err := fragments.BuildLayers(dir1+","+dir2+",~/fragments-tilde", "", nil)
+		merged, err := fragments.BuildLayers([]string{dir1, dir2}, "", nil)
 		require.NoError(t, err)
 
 		assert.Equal(t, "1", readFS(t, merged, "base/x.txt")) // dir1 wins over dir2
 		assert.Equal(t, "2", readFS(t, merged, "base/y.txt")) // dir2 only
-		assert.Equal(t, "tilde", readFS(t, merged, "base/tilde.txt"))
 	})
 
 	t.Run("MissingConfDirIsStrictError", func(t *testing.T) {
-		_, err := fragments.BuildLayers("/does/not/exist", "", nil)
+		_, err := fragments.BuildLayers([]string{"/does/not/exist"}, "", nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "fragment dir")
 	})
 
 	t.Run("MissingCabinDirIsStrictError", func(t *testing.T) {
-		_, err := fragments.BuildLayers("", "/does/not/exist", nil)
+		_, err := fragments.BuildLayers(nil, "/does/not/exist", nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cabin-local")
 	})
 
 	t.Run("NoLayersConfiguredErrors", func(t *testing.T) {
-		_, err := fragments.BuildLayers("", "", nil)
+		_, err := fragments.BuildLayers(nil, "", nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no fragment layers")
 	})
@@ -295,7 +289,7 @@ func TestMaterialize(t *testing.T) {
 		require.NoError(t, os.WriteFile(plain, []byte("#!/bin/bash\n"), 0o644))
 		require.NoError(t, os.WriteFile(filepath.Join(src, "base", "deps.yaml"), []byte("mirror: deps/\n"), 0o644))
 
-		merged, err := fragments.BuildLayers(src, "", nil)
+		merged, err := fragments.BuildLayers([]string{src}, "", nil)
 		require.NoError(t, err)
 
 		dest := t.TempDir()

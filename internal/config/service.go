@@ -245,11 +245,11 @@ func (s *ConfigService) BuildDefaultProfile(name string) (*Profile, error) {
 	profile := &Profile{
 		Name: name,
 		Vars: map[string]string{
-			"AI_CABIN_HOME":    home,
-			"AI_CABIN_DESK":    filepath.Join(home, "Documents", "desk"),
-			"AI_CABIN_WORKDIR": filepath.Join(home, "projects"),
-			"GIT_AGENT_NAME":   gitAgentName,
-			"GIT_AGENT_EMAIL":  gitAgentEmail,
+			HomeVar:           home,
+			DeskVar:           filepath.Join(home, "Documents", "desk"),
+			WorkdirVar:        filepath.Join(home, "projects"),
+			"GIT_AGENT_NAME":  gitAgentName,
+			"GIT_AGENT_EMAIL": gitAgentEmail,
 		},
 	}
 
