@@ -1,11 +1,12 @@
-ai-cabin: {}
+ai-cabin:
+  agents: [pi]
+  features: [git-agent, go]
 
 version: '3'
 
-# CONTAINER_HOME is exported to the environment (docker-compose reads it via ${CONTAINER_HOME})
-# and is also available as a template var ({{.CONTAINER_HOME}}).
 env:
   CONTAINER_HOME: /home/ai_agent
+  AI_CABIN_CMD: '{{.AI_CABIN_CMD | default "cabin"}}'
 
 tasks:
   default:
@@ -36,94 +37,19 @@ tasks:
       # Go (compatible with greywall go profile)
       - mkdir -p {{.AI_CABIN_HOME}}/.cache/go-build {{.AI_CABIN_HOME}}/.cache/golangci-lint
 
-  # copy-if-absent copies SOURCE to TARGET only if TARGET does not exist.
-  # TODO: rework the copy strategy (force-copy with backup is the planned v1).
-  copy-if-absent:
-    internal: true
-    preconditions:
-      - sh: '[ -n "{{.SOURCE}}" ]'
-        msg: "SOURCE is required"
-      - sh: '[ -n "{{.TARGET}}" ]'
-        msg: "TARGET is required"
-    cmds:
-      - |
-        if [ -e "{{.TARGET}}" ]; then
-          echo "{{.TARGET}} already exists, not updating"
-          echo "compare to $(realpath {{.SOURCE}}) to manually update"
-        else
-          cp "{{.SOURCE}}" "{{.TARGET}}"
-        fi
-
-  copy-config:
-    internal: true
-    deps: [setup-dirs]
-    cmds:
-      - task: copy-if-absent
-        vars:
-          SOURCE: ../_greywall/greywall.json
-          TARGET: "{{.AI_CABIN_HOME}}/.config/greywall/greywall.json"
-      - task: copy-if-absent
-        vars:
-          SOURCE: ../_greywall/profile/workspace.json
-          TARGET: "{{.AI_CABIN_HOME}}/.config/greywall/learned/workspace.json"
-      - task: copy-if-absent
-        vars:
-          SOURCE: ../_greywall/profile/pi.json
-          TARGET: "{{.AI_CABIN_HOME}}/.config/greywall/learned/pi.json"
-      - task: copy-if-absent
-        vars:
-          SOURCE: settings.json
-          TARGET: "{{.AI_CABIN_HOME}}/.pi/agent/settings.json"
-
-  generate-models:
-    internal: true
-    desc: Generate models.json from template (replace __SCW_PROJECT_ID__)
-    preconditions:
-      - sh: '[ -v SCW_PROJECT_ID ]'
-        msg: "missing environment variable SCW_PROJECT_ID"
-    deps: [setup-dirs]
-    cmds:
-      - sed "s/__SCW_PROJECT_ID__/${SCW_PROJECT_ID}/g" models.json.template > "{{.AI_CABIN_HOME}}/.pi/agent/models.json"
-
-  generate-agents-md:
-    internal: true
-    desc: Generate AGENTS.md from desk source with workspace paths appended
-    deps: [setup-dirs]
-    cmds:
-      - |
-        cat "{{.AI_CABIN_DESK}}/AGENTS.md" > "{{.AI_CABIN_HOME}}/.pi/agent/AGENTS.md"
-        {
-          echo ""
-          echo "---"
-          echo ""
-          echo "## Workspace Directories (Reference)"
-          echo ""
-          echo "Reference paths for this workspace:"
-          echo ""
-          echo "- **Home**: {{.CONTAINER_HOME}}"
-          echo "- **Desk**: {{.CONTAINER_HOME}}/desk/"
-          echo "- **Skills**: {{.CONTAINER_HOME}}/desk/skills/"
-          echo "- **Workdir**: ${CONTAINER_WORKDIR:-{{.AI_CABIN_WORKDIR}}}"
-          echo "- **Cache**: {{.CONTAINER_HOME}}/.cache/"
-          echo ""
-          echo "**Note:** Always use absolute paths (e.g., \`{{.CONTAINER_HOME}}/desk/TODO.md\`) not relative paths."
-        } >> "{{.AI_CABIN_HOME}}/.pi/agent/AGENTS.md"
-
   setup:
-    desc: Setup environment (directories + config)
+    desc: Setup environment (directories + agent configs)
     cmds:
-      - task: copy-config
-      - task: generate-models
-      - task: generate-agents-md
+      - task: setup-dirs
+      - $AI_CABIN_CMD internal setup
+      - cat "{{.AI_CABIN_DESK}}/AGENTS.md" "{{.AI_CABIN_HOME}}/.cache/ai-cabin/AGENTS-workspace.md" > "{{.AI_CABIN_HOME}}/.pi/agent/AGENTS.md"
       - touch {{.AI_CABIN_HOME}}/.local/state/ai-cabin/container_bash_history
 
   deps:
-    desc: Copy factorized files (.deps/) for Docker build context
+    desc: Materialize .deps/ from active bundles (CLI) + copy host binaries
     cmds:
-      - mkdir -p .deps/_common .deps/_greywall
-      - cp -r ../_common/* .deps/_common/
-      - cp -r ../_greywall/* .deps/_greywall/
-      # Host file used by docker build (best effort, may be absent)
+      - $AI_CABIN_CMD internal deps
+      # Host binaries the CLI cannot ship (best-effort; absent fails at COPY).
       - cp ~/.local/bin/greywall .deps/greywall 2>/dev/null || true
       - cp ~/.local/share/greyproxy/ca-cert.pem .deps/greyproxy-ca.crt 2>/dev/null || true
 
@@ -214,7 +140,7 @@ tasks:
         echo "  CONTAINER_WORKDIR  : Container workdir (default: AI_CABIN_WORKDIR, advanced)"
         echo ""
         echo "Usage:"
-        echo "  task setup             # Setup environment (directories + config)"
+        echo "  task setup             # Setup environment (directories + configs)"
         echo "  task docker-up         # Start cabin"
         echo "  task docker-shell      # Get shell inside container"
         echo "  task pi                # pi.dev TUI"
@@ -224,4 +150,3 @@ tasks:
         echo "Advanced:"
         echo "  CONTAINER_WORKDIR=/workspace task docker-up  # Remap workdir to /workspace"
     silent: true
-

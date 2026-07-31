@@ -47,24 +47,17 @@ RUN curl -L "https://github.com/badlogic/pi-mono/releases/download/${PI_VERSION}
 # Create entrypoint.d directory for hooks
 RUN mkdir -p /docker-entrypoint.d
 
-# Copy generic entrypoint from .deps/_common
-COPY .deps/_common/docker-entrypoint.sh /docker-entrypoint.sh
+COPY .deps/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
-
-# Copy entrypoint.d hooks from .deps/_common (git email)
-COPY .deps/_common/docker-entrypoint.d/ /docker-entrypoint.d/
-# Copy entrypoint.d hooks from .deps/_greywall (socat greyproxy)
-COPY .deps/_greywall/docker-entrypoint.d/ /docker-entrypoint.d/
+COPY .deps/docker-entrypoint.d/ /docker-entrypoint.d/
 RUN chmod +x /docker-entrypoint.d/*.sh 2>/dev/null || true
-
-COPY profile.d/ /etc/profile.d/
+COPY .deps/profile.d/ /etc/profile.d/
 RUN chmod +x /etc/profile.d/ai-cabin-*.sh 2>/dev/null || true
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
-# Greybash and Greypi wrappers (greywall sandboxed shells)
-COPY greybash /usr/local/bin/greybash
-COPY greypi /usr/local/bin/greypi
+COPY .deps/greybash /usr/local/bin/greybash
+COPY .deps/greypi /usr/local/bin/greypi
 RUN chmod +x /usr/local/bin/greybash /usr/local/bin/greypi
 
 # User setup.

@@ -1,4 +1,0 @@
-#!/bin/bash
-for f in /etc/profile.d/ai-cabin-*.sh; do [ -r "$f" ] && . "$f"; done
-cd "$CONTAINER_WORKDIR"
-exec greywall --profile workspace,pi,go -- /opt/pi/pi "$@"
