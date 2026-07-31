@@ -1,0 +1,10 @@
+{
+  "enableInstallTelemetry": false,
+{{- if .Vars.DEFAULT_PROVIDER}}
+  "defaultProvider": "{{.Vars.DEFAULT_PROVIDER}}",
+{{- end}}
+{{- if .Vars.DEFAULT_MODEL}}
+  "defaultModel": "{{.Vars.DEFAULT_MODEL}}",
+{{- end}}
+  "quietStartup": true
+}

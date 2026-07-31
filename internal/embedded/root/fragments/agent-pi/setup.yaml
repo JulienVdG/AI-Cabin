@@ -1,0 +1,7 @@
+entries:
+  - src: setup/models.json.tmpl
+    dst: .pi/agent/models.json
+  - src: setup/settings.json.tmpl
+    dst: .pi/agent/settings.json
+  - src: setup/learned/pi.json
+    dst: .config/greywall/learned/pi.json

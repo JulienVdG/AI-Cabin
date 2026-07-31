@@ -1,0 +1,94 @@
+{
+  "providers": {
+    "scaleway": {
+    "baseUrl": "https://api.scaleway.ai/{{ if .Vars.SCW_PROJECT_ID }}{{.Vars.SCW_PROJECT_ID}}/{{ end }}v1",
+      "apiKey": "SCW_SECRET_KEY",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "qwen3.5-397b-a17b",
+          "name": "Qwen 3.5 397B",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 250000,
+          "maxTokens": 16000,
+          "cost": {
+            "input": 0.8,
+            "output": 2.4,
+            "cacheRead": 0.5,
+            "cacheWrite": 10
+          },
+          "compat": {
+            "thinkingFormat": "qwen-chat-template",
+            "supportsDeveloperRole": false,
+            "supportsReasoningEffort": false
+          }
+        },
+        {
+          "id": "devstral-2-123b-instruct-2512",
+          "name": "Devstral 2 123B",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 128000,
+          "maxTokens": 4096,
+          "cost": {
+            "input": 0.8,
+            "output": 2.4,
+            "cacheRead": 0.5,
+            "cacheWrite": 10
+          },
+          "compat": {
+            "supportsDeveloperRole": false,
+            "supportsReasoningEffort": false
+          }
+        },
+        {
+          "id": "glm-5.2",
+          "name": "GLM 5.2",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 245000,
+          "maxTokens": 16384,
+          "cost": {
+            "input": 1.80,
+            "output": 5.50,
+            "cacheRead": 0.5,
+            "cacheWrite": 10
+          },
+          "compat": {
+            "supportsDeveloperRole": false,
+            "supportsReasoningEffort": false
+          }
+        },
+        {
+          "id": "deepseek-v4-flash-0731",
+          "name": "DeepSeek v4 Flash",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 230000,
+          "maxTokens": 32768,
+          "cost": {
+            "input": 0.40,
+            "output": 0.80,
+            "cacheRead": 0.08,
+            "cacheWrite": 0
+          },
+            "thinkingLevelMap": {
+            "minimal": null,
+            "low": "low",
+            "medium": null,
+            "high": "high",
+            "max": "max"
+          },
+          "compat": {
+            "supportsStore": false,
+            "supportsDeveloperRole": false,
+            "maxTokensField": "max_tokens",
+            "requiresReasoningContentOnAssistantMessages": true,
+            "thinkingFormat": "deepseek"
+          }
+        }
+      ]
+    }
+  }
+}

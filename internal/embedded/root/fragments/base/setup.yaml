@@ -1,0 +1,7 @@
+entries:
+  - src: setup/greywall.json.tmpl
+    dst: .config/greywall/greywall.json
+  - src: setup/learned/workspace.json
+    dst: .config/greywall/learned/workspace.json
+  - src: setup/AGENTS-workspace.md.tmpl
+    dst: .cache/ai-cabin/AGENTS-workspace.md

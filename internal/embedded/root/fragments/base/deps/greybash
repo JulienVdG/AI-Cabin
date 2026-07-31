@@ -1,0 +1,3 @@
+#!/bin/bash
+for f in /etc/profile.d/ai-cabin-*.sh; do [ -r "$f" ] && . "$f"; done
+exec greywall $GREYWALL_ARGS -- bash "$@"
