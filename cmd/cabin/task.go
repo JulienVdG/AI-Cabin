@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/JulienVdG/AI-Cabin/internal/config"
 	"github.com/JulienVdG/AI-Cabin/internal/task"
@@ -58,6 +59,16 @@ Examples:
 			os.Exit(1)
 		}
 
+		// Inject the CLI's own path so the Taskfile can self-delegate via
+		// $AI_CABIN_CMD (e.g. `deps` target runs "$AI_CABIN_CMD internal deps").
+		// An absolute path avoids PATH lookups failing on a freshly built binary.
+		if exe, err := resolveExecutable(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: resolve cabin executable: %v\n", err)
+			os.Exit(1)
+		} else {
+			vars.AsMap()["AI_CABIN_CMD"] = exe
+		}
+
 		if err := task.Run(context.Background(), c.Path, taskName, rawArgs, vars.AsMap(), os.Stdout, os.Stderr); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
@@ -71,4 +82,18 @@ func init() {
 	// of being interpreted by Cobra.
 	taskCmd.Flags().SetInterspersed(false)
 	rootCmd.AddCommand(taskCmd)
+}
+
+// resolveExecutable returns the resolved absolute path of the running cabin
+// binary (os.Executable + symlink resolution). Used to inject AI_CABIN_CMD so
+// the Taskfile can self-delegate via $AI_CABIN_CMD without depending on PATH.
+func resolveExecutable() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("get executable path: %w", err)
+	}
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		return resolved, nil
+	}
+	return exe, nil
 }

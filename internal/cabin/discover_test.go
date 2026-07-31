@@ -232,3 +232,61 @@ tasks:
 		}
 	})
 }
+
+func TestHeader(t *testing.T) {
+	validTaskfile := `ai-cabin:
+  cabin: pi-go
+  agents: [pi]
+  features:
+    - git-agent
+`
+
+	t.Run("returns parsed header and normalized path", func(t *testing.T) {
+		dir := t.TempDir()
+		writeTaskfile(t, dir, validTaskfile)
+
+		header, resolved, err := cabin.Header(dir)
+		if err != nil {
+			t.Fatalf("Header error = %v", err)
+		}
+		if header == nil {
+			t.Fatal("header = nil, want parsed header")
+		}
+		if header.Cabin != "pi-go" {
+			t.Errorf("header.Cabin = %q, want %q", header.Cabin, "pi-go")
+		}
+		if len(header.Agents) != 1 || header.Agents[0] != "pi" {
+			t.Errorf("header.Agents = %v, want [pi]", header.Agents)
+		}
+		if len(header.Features) != 1 || header.Features[0].Name != "git-agent" {
+			t.Errorf("header.Features = %v, want [git-agent]", header.Features)
+		}
+		if resolved != dir {
+			t.Errorf("normalizedPath = %q, want %q", resolved, dir)
+		}
+	})
+
+	t.Run("missing ai-cabin block returns nil header and ErrNoHeader", func(t *testing.T) {
+		dir := t.TempDir()
+		writeTaskfile(t, dir, `version: "3"
+tasks:
+  pi:
+    cmds: ["echo hi"]
+`)
+
+		header, resolved, err := cabin.Header(dir)
+		if err == nil {
+			t.Fatal("Header error = nil, want ErrNoHeader")
+		}
+		if !errors.Is(err, cabin.ErrNoHeader) {
+			t.Errorf("error = %v, want errors.Is(err, ErrNoHeader)", err)
+		}
+		if header != nil {
+			t.Errorf("header = %v, want nil on missing ai-cabin block", header)
+		}
+		// normalizedPath is still populated (same convention as ValidateCabin).
+		if resolved != dir {
+			t.Errorf("normalizedPath = %q, want %q (populated even on error)", resolved, dir)
+		}
+	})
+}
