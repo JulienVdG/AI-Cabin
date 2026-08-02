@@ -34,6 +34,16 @@ func readDest(t *testing.T, destBase, rel string) string {
 	return string(b)
 }
 
+// truncateMat builds a Materializer with TruncateCreator (the deps-facet copy
+// strategy: overwrite on every run). A thin helper so each sub-test stays
+// focused on the behaviour under test, not on struct construction.
+func truncateMat(t *testing.T, merged fs.FS, manifest, dest string, vars map[string]string) *fragments.Materializer {
+	t.Helper()
+	mat, err := fragments.NewMaterializer(merged, manifest, dest, vars, fragments.TruncateCreator{})
+	require.NoError(t, err)
+	return mat
+}
+
 func TestBuildLayers(t *testing.T) {
 	t.Run("LayersOrderedFirstWins", func(t *testing.T) {
 		// conf layer > cabin-local > embed; a file in the conf layer shadows
@@ -108,7 +118,7 @@ func TestMaterialize(t *testing.T) {
 		vars := map[string]string{"SCW_PROJECT_ID": "proj-1"}
 		dest := t.TempDir()
 
-		written, err := fragments.Materialize(merged, "base", "deps.yaml", dest, vars, nil)
+		written, err := truncateMat(t, merged, "deps.yaml", dest, vars).Materialize("base", nil)
 		require.NoError(t, err)
 		sort.Strings(written)
 		assert.Equal(t, []string{"entrypoint.sh", "hooks/10-socat.sh", "models.json"}, written)
@@ -130,14 +140,14 @@ func TestMaterialize(t *testing.T) {
 		dest := t.TempDir()
 
 		// First instance: mariadb:3306.
-		w1, err := fragments.Materialize(merged, "port-forward", "deps.yaml", dest, nil,
+		w1, err := truncateMat(t, merged, "deps.yaml", dest, nil).Materialize("port-forward",
 			map[string]any{"host": "mariadb", "port": "3306"})
 		require.NoError(t, err)
 		sort.Strings(w1)
 		assert.Equal(t, []string{"hooks/50-socat-mariadb-3306.sh", "profile/mariadb-3306.json"}, w1)
 
 		// Second instance: apache:8080 — same bundle, different attrs, no collision.
-		w2, err := fragments.Materialize(merged, "port-forward", "deps.yaml", dest, nil,
+		w2, err := truncateMat(t, merged, "deps.yaml", dest, nil).Materialize("port-forward",
 			map[string]any{"host": "apache", "port": "8080"})
 		require.NoError(t, err)
 		sort.Strings(w2)
@@ -159,7 +169,7 @@ func TestMaterialize(t *testing.T) {
 		vars := map[string]string{"SCW_PROJECT_ID": "proj-9"}
 		dest := t.TempDir()
 
-		written, err := fragments.Materialize(merged, "agent-pi", "setup.yaml", dest, vars, nil)
+		written, err := truncateMat(t, merged, "setup.yaml", dest, vars).Materialize("agent-pi", nil)
 		require.NoError(t, err)
 		sort.Strings(written)
 		assert.Equal(t, []string{".pi/agent/models.json", ".pi/agent/settings.json"}, written)
@@ -176,7 +186,7 @@ func TestMaterialize(t *testing.T) {
 		}
 		dest := t.TempDir()
 
-		written, err := fragments.Materialize(merged, "port-forward", "setup.yaml", dest, nil, nil)
+		written, err := truncateMat(t, merged, "setup.yaml", dest, nil).Materialize("port-forward", nil)
 		require.NoError(t, err)
 		assert.Nil(t, written)
 	})
@@ -187,7 +197,7 @@ func TestMaterialize(t *testing.T) {
 		merged := fstest.MapFS{"base/deps.yaml": {Data: []byte("mirror: deps/\n")}}
 		dest := t.TempDir()
 
-		_, err := fragments.Materialize(merged, "agent-opencode", "deps.yaml", dest, nil, nil)
+		_, err := truncateMat(t, merged, "deps.yaml", dest, nil).Materialize("agent-opencode", nil)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, fs.ErrNotExist)
 		assert.Contains(t, err.Error(), "agent-opencode")
@@ -201,7 +211,7 @@ func TestMaterialize(t *testing.T) {
 		}
 		dest := t.TempDir()
 
-		_, err := fragments.Materialize(merged, "base", "deps.yaml", dest, nil, nil)
+		_, err := truncateMat(t, merged, "deps.yaml", dest, nil).Materialize("base", nil)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, fs.ErrNotExist)
 		assert.Contains(t, err.Error(), "deps/missing.sh")
@@ -220,7 +230,7 @@ func TestMaterialize(t *testing.T) {
 		}
 		dest := t.TempDir()
 
-		written, err := fragments.Materialize(merged, "base", "deps.yaml", dest, nil, nil)
+		written, err := truncateMat(t, merged, "deps.yaml", dest, nil).Materialize("base", nil)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, render.ErrUndefinedVar)
 		// Only the successful file is listed; the broken one is on disk (partial).
@@ -241,7 +251,7 @@ func TestMaterialize(t *testing.T) {
 		}
 		dest := t.TempDir()
 
-		written, err := fragments.Materialize(merged, "base", "deps.yaml", dest, nil, map[string]any{})
+		written, err := truncateMat(t, merged, "deps.yaml", dest, nil).Materialize("base", map[string]any{})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, render.ErrUndefinedVar)
 		// Only the non-templated-dst file was written.
@@ -264,7 +274,7 @@ func TestMaterialize(t *testing.T) {
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
 				merged := fstest.MapFS{"base/deps.yaml": {Data: []byte(tc.yaml)}}
-				_, err := fragments.Materialize(merged, "base", "deps.yaml", t.TempDir(), nil, nil)
+				_, err := truncateMat(t, merged, "deps.yaml", t.TempDir(), nil).Materialize("base", nil)
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErr)
 			})
@@ -293,7 +303,7 @@ func TestMaterialize(t *testing.T) {
 		require.NoError(t, err)
 
 		dest := t.TempDir()
-		_, err = fragments.Materialize(merged, "base", "deps.yaml", dest, nil, nil)
+		_, err = truncateMat(t, merged, "deps.yaml", dest, nil).Materialize("base", nil)
 		require.NoError(t, err)
 
 		// Sentinel: os.Create applies 0666 & ^umask, the same contract as
@@ -319,11 +329,107 @@ func TestMaterialize(t *testing.T) {
 		merged := fstest.MapFS{
 			"base/deps.yaml": {Data: []byte("entries:\n  - src: deps/missing.sh\n    dst: a.sh\n  - src: deps/also-missing.sh\n    dst: b.sh\n")},
 		}
-		_, err := fragments.Materialize(merged, "base", "deps.yaml", t.TempDir(), nil, nil)
+		_, err := truncateMat(t, merged, "deps.yaml", t.TempDir(), nil).Materialize("base", nil)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, fs.ErrNotExist)
 		// Drift is collected, so both missing srcs are reported.
 		assert.Contains(t, err.Error(), "missing.sh")
 		assert.Contains(t, err.Error(), "also-missing")
+	})
+}
+
+// backupMat builds a Materializer with BackupCreator (the setup-facet copy
+// strategy: copy-if-different + backup on diff, no-op on identical).
+func backupMat(t *testing.T, merged fs.FS, manifest, dest string, vars map[string]string) *fragments.Materializer {
+	t.Helper()
+	mat, err := fragments.NewMaterializer(merged, manifest, dest, vars, fragments.BackupCreator{})
+	require.NoError(t, err)
+	return mat
+}
+
+func TestBackupCreator(t *testing.T) {
+	t.Run("AbsentTargetNoBackup", func(t *testing.T) {
+		// First write to a non-existent target: no previous version to back up,
+		// so no .cabin-bak is created. The target gets the new content.
+		merged := fstest.MapFS{
+			"base/setup.yaml":      {Data: []byte("entries:\n  - src: setup/conf.json\n    dst: conf.json\n")},
+			"base/setup/conf.json": {Data: []byte(`{"v":1}`)},
+		}
+		dest := t.TempDir()
+
+		_, err := backupMat(t, merged, "setup.yaml", dest, nil).Materialize("base", nil)
+		require.NoError(t, err)
+
+		assert.Equal(t, `{"v":1}`, readDest(t, dest, "conf.json"))
+		_, statErr := os.Stat(filepath.Join(dest, "conf.json"+fragments.BackupSuffix))
+		assert.True(t, os.IsNotExist(statErr), "no backup on first write")
+	})
+
+	t.Run("NoOpOnIdentical", func(t *testing.T) {
+		// Second run with identical source: no-op (no .cabin-bak, target
+		// unchanged). Idempotent on re-run — no backup churn.
+		merged := fstest.MapFS{
+			"base/setup.yaml":      {Data: []byte("entries:\n  - src: setup/conf.json\n    dst: conf.json\n")},
+			"base/setup/conf.json": {Data: []byte(`{"v":1}`)},
+		}
+		dest := t.TempDir()
+		mat := backupMat(t, merged, "setup.yaml", dest, nil)
+
+		_, err := mat.Materialize("base", nil)
+		require.NoError(t, err)
+
+		// Second run: identical content → no-op, no backup.
+		_, err = mat.Materialize("base", nil)
+		require.NoError(t, err)
+
+		assert.Equal(t, `{"v":1}`, readDest(t, dest, "conf.json"))
+		_, statErr := os.Stat(filepath.Join(dest, "conf.json"+fragments.BackupSuffix))
+		assert.True(t, os.IsNotExist(statErr), "no backup on identical re-run")
+	})
+
+	t.Run("BackupOnDiff", func(t *testing.T) {
+		// Materialize once, change source content, materialize again: the
+		// previous version is backed up (.cabin-bak), target has new content.
+		merged := fstest.MapFS{
+			"base/setup.yaml":      {Data: []byte("entries:\n  - src: setup/conf.json\n    dst: conf.json\n")},
+			"base/setup/conf.json": {Data: []byte(`{"v":1}`)},
+		}
+		dest := t.TempDir()
+		mat := backupMat(t, merged, "setup.yaml", dest, nil)
+
+		_, err := mat.Materialize("base", nil)
+		require.NoError(t, err)
+
+		// Change source content and re-materialize.
+		merged["base/setup/conf.json"].Data = []byte(`{"v":2}`)
+		_, err = mat.Materialize("base", nil)
+		require.NoError(t, err)
+
+		// Target has new content.
+		assert.Equal(t, `{"v":2}`, readDest(t, dest, "conf.json"))
+		// Backup has old content.
+		assert.Equal(t, `{"v":1}`, readDest(t, dest, "conf.json"+fragments.BackupSuffix))
+	})
+
+	t.Run("NoBackupWithTruncateCreator", func(t *testing.T) {
+		// TruncateCreator (deps facet) never creates a backup, even on diff:
+		// the deps destination is throwaway (.deps/), regenerated each build.
+		merged := fstest.MapFS{
+			"base/setup.yaml":      {Data: []byte("entries:\n  - src: setup/conf.json\n    dst: conf.json\n")},
+			"base/setup/conf.json": {Data: []byte(`{"v":1}`)},
+		}
+		dest := t.TempDir()
+		mat := truncateMat(t, merged, "setup.yaml", dest, nil)
+
+		_, err := mat.Materialize("base", nil)
+		require.NoError(t, err)
+
+		merged["base/setup/conf.json"].Data = []byte(`{"v":2}`)
+		_, err = mat.Materialize("base", nil)
+		require.NoError(t, err)
+
+		assert.Equal(t, `{"v":2}`, readDest(t, dest, "conf.json"))
+		_, statErr := os.Stat(filepath.Join(dest, "conf.json"+fragments.BackupSuffix))
+		assert.True(t, os.IsNotExist(statErr), "truncate never backs up")
 	})
 }

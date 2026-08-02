@@ -225,10 +225,39 @@ func stripTmplSuffix(p string) string {
 	return path.Join(dir, strings.TrimSuffix(file, tmplSuffix))
 }
 
-// Materialize reads <bundle>/<manifestName> from merged and writes each declared
-// fragment to destBase/<dst>. The facet (deps vs setup) is carried by
-// manifestName ("deps.yaml" or "setup.yaml"); destBase is the destination root
-// (<cabin>/.deps for deps, $AI_CABIN_HOME for setup — resolved by the caller).
+// Materializer carries the stable inputs to materializing a bundle facet: the
+// merged fallback chain, the facet's manifest + destination + writer, and the
+// resolved vars. Only the bundle name (and per-bundle attrs) vary per call, so
+// the loop in cmd/cabin constructs one Materializer and calls Materialize per
+// active bundle. The facet (deps vs setup) is carried by manifestName
+// ("deps.yaml" or "setup.yaml") and opener (TruncateCreator for deps,
+// BackupCreator for setup); destBase is the destination root (<cabin>/.deps for
+// deps, $AI_CABIN_HOME for setup — resolved by the caller). Constructed via
+// NewMaterializer, which fails fast if the merged FS does not implement
+// ReadDirFS+StatFS (required by WalkDir).
+type Materializer struct {
+	fs           walkFS
+	manifestName string
+	destBase     string
+	vars         map[string]string
+	opener       FileCreator
+}
+
+// NewMaterializer builds a Materializer. Use TruncateCreator for the deps facet
+// (throwaway .deps/) and BackupCreator for the setup facet (persistent
+// $AI_CABIN_HOME). Returns an error if merged does not implement
+// ReadDirFS+StatFS (required by WalkDir) — failing at construction rather than
+// on the first Materialize call.
+func NewMaterializer(merged fs.FS, manifestName, destBase string, vars map[string]string, opener FileCreator) (*Materializer, error) {
+	wfs, ok := merged.(walkFS)
+	if !ok {
+		return nil, errors.New("merged fs does not implement ReadDirFS+StatFS (required by WalkDir)")
+	}
+	return &Materializer{fs: wfs, manifestName: manifestName, destBase: destBase, vars: vars, opener: opener}, nil
+}
+
+// Materialize reads <bundle>/<manifestName> from the merged FS and writes each
+// declared fragment to destBase/<dst>.
 //
 // A src ending in .tmpl is rendered via internal/render; a dst containing {{
 // is rendered with the same vars/attrs (port-forward multi-instance naming).
@@ -246,14 +275,9 @@ func stripTmplSuffix(p string) string {
 // Returns the list of successfully written relpaths (relative to destBase)
 // and an optional aggregated error. It is business-logic-only: the CLI formats
 // progress and the error for the user.
-func Materialize(merged fs.FS, bundle, manifestName, destBase string, vars map[string]string, attrs map[string]any) ([]string, error) {
-	wfs, ok := merged.(walkFS)
-	if !ok {
-		return nil, errors.New("merged fs does not implement ReadDirFS+StatFS (required by WalkDir)")
-	}
-
+func (m *Materializer) Materialize(bundle string, attrs map[string]any) ([]string, error) {
 	// Bundle must exist in at least one layer.
-	if _, err := fs.Stat(wfs, bundle); err != nil {
+	if _, err := fs.Stat(m.fs, bundle); err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil, fmt.Errorf("bundle %q not found in any fragment layer: %w", bundle, err)
 		}
@@ -261,8 +285,8 @@ func Materialize(merged fs.FS, bundle, manifestName, destBase string, vars map[s
 	}
 
 	// Manifest: absent = no-op (bundle has no such facet).
-	manifestPath := path.Join(bundle, manifestName)
-	data, err := fs.ReadFile(wfs, manifestPath)
+	manifestPath := path.Join(bundle, m.manifestName)
+	data, err := fs.ReadFile(m.fs, manifestPath)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil, nil
@@ -270,17 +294,17 @@ func Materialize(merged fs.FS, bundle, manifestName, destBase string, vars map[s
 		return nil, fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	var m manifest
-	if err := yaml.Unmarshal(data, &m); err != nil {
+	var man manifest
+	if err := yaml.Unmarshal(data, &man); err != nil {
 		return nil, fmt.Errorf("parse manifest %q: %w", manifestPath, err)
 	}
-	if err := m.validate(); err != nil {
+	if err := man.validate(); err != nil {
 		return nil, fmt.Errorf("manifest %q: %w", manifestPath, err)
 	}
 
 	// expand resolves modes + collects drift/per-entry issues (no fail-fast):
 	// valid entries are returned alongside the aggregated error.
-	entries, expandErr := m.expand(wfs, bundle, manifestName)
+	entries, expandErr := man.expand(m.fs, bundle, m.manifestName)
 	var errs []error
 	if expandErr != nil {
 		errs = append(errs, fmt.Errorf("manifest %q: %w", manifestPath, expandErr))
@@ -295,7 +319,7 @@ func Materialize(merged fs.FS, bundle, manifestName, destBase string, vars map[s
 		// (the path cannot be resolved) and is collected like any other error.
 		dstRel := e.dst
 		if strings.Contains(dstRel, tmplOpen) {
-			rendered, rerr := render.RenderString(dstRel, vars, attrs)
+			rendered, rerr := render.RenderString(dstRel, m.vars, attrs)
 			if rerr != nil {
 				errs = append(errs, fmt.Errorf("bundle %q dst %q: %w", bundle, e.dst, rerr))
 				continue
@@ -303,19 +327,19 @@ func Materialize(merged fs.FS, bundle, manifestName, destBase string, vars map[s
 			dstRel = rendered
 		}
 
-		dstPath := filepath.Join(destBase, filepath.FromSlash(dstRel))
+		dstPath := filepath.Join(m.destBase, filepath.FromSlash(dstRel))
 		if err := os.MkdirAll(filepath.Dir(dstPath), dirPerm); err != nil {
 			errs = append(errs, fmt.Errorf("mkdir %q: %w", filepath.Dir(dstPath), err))
 			continue
 		}
 
-		// .tmpl renders (Parse streams from merged, Execute streams to the file);
+		// .tmpl renders (Parse streams from FS, Execute streams to the writer);
 		// plain files copy as-is. Either way a partial file is left on error.
 		var ferr error
 		if strings.HasSuffix(e.src, tmplSuffix) {
-			ferr = renderFragment(wfs, srcPath, dstPath, vars, attrs)
+			ferr = m.renderFragment(srcPath, dstPath, attrs)
 		} else {
-			ferr = copyFragment(wfs, srcPath, dstPath)
+			ferr = m.copyFragment(srcPath, dstPath)
 		}
 		if ferr != nil {
 			errs = append(errs, ferr)
@@ -331,23 +355,20 @@ func Materialize(merged fs.FS, bundle, manifestName, destBase string, vars map[s
 }
 
 // renderFragment parses a .tmpl fragment from the merged FS and renders it to
-// dst via internal/render (Parse reads the source, Execute streams to the file
-// writer — no intermediate buffer; the partial-output contract lives in
-// Execute's noValueScanner). The destination is opened with filePerm so the
-// umask reduces it to a writable, idempotent mode; on any error a partial file
-// is left in place (by design, so the user can locate a missing var). Returns
-// an error naming both src and dst.
-func renderFragment(wfs walkFS, srcPath, dstPath string, vars map[string]string, attrs map[string]any) error {
-	tmpl, err := render.Parse(wfs, srcPath)
+// dst via internal/render. The destination is opened via the Materializer's
+// opener. On any error a partial file is left in place. Returns an error
+// naming both src and dst.
+func (m *Materializer) renderFragment(srcPath, dstPath string, attrs map[string]any) error {
+	tmpl, err := render.Parse(m.fs, srcPath)
 	if err != nil {
 		return fmt.Errorf("render %q -> %q: %w", srcPath, dstPath, err)
 	}
-	file, err := os.OpenFile(dstPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, filePerm)
+	w, err := m.opener.Create(dstPath)
 	if err != nil {
 		return fmt.Errorf("render %q -> %q: %w", srcPath, dstPath, err)
 	}
-	defer file.Close()
-	if err := render.Execute(tmpl, vars, attrs, file); err != nil {
+	defer w.Close()
+	if err := render.Execute(tmpl, m.vars, attrs, w); err != nil {
 		return fmt.Errorf("render %q -> %q: %w", srcPath, dstPath, err)
 	}
 	return nil
@@ -356,20 +377,17 @@ func renderFragment(wfs walkFS, srcPath, dstPath string, vars map[string]string,
 // copyFragment streams a plain (non-template) fragment from the merged FS to
 // dst without buffering the whole content in memory. io.Copy uses ReaderFrom
 // / WriterTo when available (sendfile for os.File-to-os.File copies via
-// os.DirFS layers); for fstest.MapFS / embed.FS sources it falls back to a
-// small internal buffer. The destination is opened with filePerm so the umask
-// reduces it to a writable, idempotent mode; both files are closed via defer;
-// a mid-copy error leaves a partial destination in place (consistent with
-// renderFragment — partial files are expected and reported via the returned
-// error).
-func copyFragment(srcFS walkFS, srcPath, dstPath string) error {
-	src, err := srcFS.Open(srcPath)
+// os.DirFS layers). The destination is opened via the Materializer's opener;
+// both files are closed via defer; a mid-copy error leaves a partial
+// destination in place (consistent with renderFragment).
+func (m *Materializer) copyFragment(srcPath, dstPath string) error {
+	src, err := m.fs.Open(srcPath)
 	if err != nil {
 		return fmt.Errorf("copy %q -> %q: %w", srcPath, dstPath, err)
 	}
 	defer src.Close()
 
-	dst, err := os.OpenFile(dstPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, filePerm)
+	dst, err := m.opener.Create(dstPath)
 	if err != nil {
 		return fmt.Errorf("copy %q -> %q: %w", srcPath, dstPath, err)
 	}
