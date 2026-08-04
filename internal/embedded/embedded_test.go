@@ -110,3 +110,21 @@ func splitFirst(p string) (first, rest string, ok bool) {
 	}
 	return p[:idx], p[idx+1:], true
 }
+
+func TestState(t *testing.T) {
+	// State() ships the shared lifecycle Taskfile the cabins include. The
+	// docker-* task names are the contract `cabin up <cabin>` relies on:
+	// dropping one breaks every cabin's lifecycle targets.
+	fsys, err := embedded.State()
+	require.NoError(t, err)
+
+	data, err := fs.ReadFile(fsys, "Taskfile.lifecycle.yml")
+	require.NoError(t, err)
+	content := string(data)
+	for _, task := range []string{
+		"docker-up", "docker-down", "docker-build",
+		"docker-shell", "docker-greyshell", "docker-logs", "docker-restart",
+	} {
+		assert.Contains(t, content, task, "lifecycle Taskfile missing the %q target", task)
+	}
+}

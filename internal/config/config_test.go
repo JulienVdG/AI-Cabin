@@ -74,6 +74,37 @@ func TestGetConfigDir(t *testing.T) {
 	})
 }
 
+func TestGetStateDir(t *testing.T) {
+	t.Run("uses_default_XDG_STATE_HOME_when_not_set", func(t *testing.T) {
+		setupTestConfig(t)
+		t.Setenv("XDG_STATE_HOME", "")
+
+		home, _ := os.UserHomeDir()
+		dir, err := config.GetStateDir()
+		if err != nil {
+			t.Fatalf("GetStateDir() error = %v", err)
+		}
+		expected := filepath.Join(home, ".local", "state", "ai-cabin")
+		if dir != expected {
+			t.Errorf("GetStateDir() = %q, want %q", dir, expected)
+		}
+	})
+
+	t.Run("uses_custom_XDG_STATE_HOME_when_set", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Setenv("XDG_STATE_HOME", tmpDir)
+
+		dir, err := config.GetStateDir()
+		if err != nil {
+			t.Fatalf("GetStateDir() error = %v", err)
+		}
+		expected := filepath.Join(tmpDir, "ai-cabin")
+		if dir != expected {
+			t.Errorf("GetStateDir() = %q, want %q", dir, expected)
+		}
+	})
+}
+
 func TestGetProfilesDir(t *testing.T) {
 	setupTestConfig(t)
 

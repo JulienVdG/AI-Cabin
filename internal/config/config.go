@@ -36,6 +36,23 @@ func GetConfigDir() (string, error) {
 	return filepath.Join(configDir, "ai-cabin"), nil
 }
 
+// GetStateDir returns ~/.local/state/ai-cabin (respects XDG_STATE_HOME). It
+// holds runtime artifacts the CLI materializes (e.g. the lifecycle Taskfile)
+// so they pre-exist before `task` parses a cabin Taskfile. Redirecting
+// XDG_STATE_HOME matters in dev: ~/.local/state is read-only under the
+// greywall sandbox.
+func GetStateDir() (string, error) {
+	stateDir := os.Getenv("XDG_STATE_HOME")
+	if stateDir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get user home directory: %w", err)
+		}
+		stateDir = filepath.Join(home, ".local", "state")
+	}
+	return filepath.Join(stateDir, "ai-cabin"), nil
+}
+
 // ProfilesDirName is the subdirectory of the config dir containing profile files.
 const ProfilesDirName = "profiles"
 

@@ -27,3 +27,13 @@ var rootFS embed.FS
 func Fragments() (fs.FS, error) {
 	return fs.Sub(rootFS, "root/fragments")
 }
+
+// State returns the embedded state artifacts as a rooted fs.FS (paths are
+// "Taskfile.lifecycle.yml", ... without the "root/state/" prefix). These are
+// cross-cabin files the CLI materializes to XDG state (config.GetStateDir)
+// before `task` parses a cabin Taskfile. The tree is flat: an artifact here is
+// cross-cabin and references cabin-owned targets, so it belongs to no bundle.
+// Consumed by internal/state.EnsureArtifact.
+func State() (fs.FS, error) {
+	return fs.Sub(rootFS, "root/state")
+}

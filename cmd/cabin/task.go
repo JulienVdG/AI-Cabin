@@ -2,13 +2,9 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/JulienVdG/AI-Cabin/internal/config"
-	"github.com/JulienVdG/AI-Cabin/internal/task"
 
 	"github.com/spf13/cobra"
 )
@@ -21,6 +17,11 @@ import (
 // process so docker-compose ${VAR} resolves), and forwards extra params to
 // the task's {{.CLI_ARGS}}. A `task` subcommand (not root fallback) keeps
 // internal commands (up/build/ps/...) and Taskfile targets from colliding.
+//
+// The shared runCabinTask helper also materializes the lifecycle Taskfile and
+// injects AI_CABIN_CMD/AI_CABIN_LIFECYCLE_TASKFILE, the same path the
+// `cabin up|down|...` wrappers use, so `cabin task` and the wrappers behave
+// identically.
 var taskCmd = &cobra.Command{
 	Use:   "task <cabin> <task> [params...]",
 	Short: "Run a Taskfile target of a cabin",
@@ -40,38 +41,8 @@ Examples:
 		taskName := args[1]
 		rawArgs := args[2:]
 
-		c, err := config.GetCabin(cabinName)
-		if err != nil {
-			if errors.Is(err, config.ErrCabinNotFound) {
-				fmt.Fprintf(os.Stderr,
-					"Error: cabin %q is not registered.\n"+
-						"Run 'cabin cabin add <path> %s' to register it, or 'cabin cabin list' to see known cabins.\n",
-					cabinName, cabinName)
-			} else {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			}
-			os.Exit(1)
-		}
-
-		vars, err := config.ResolveVars(profileFlag, cliVars)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-
-		// Inject the CLI's own path so the Taskfile can self-delegate via
-		// $AI_CABIN_CMD (e.g. `deps` target runs "$AI_CABIN_CMD internal deps").
-		// An absolute path avoids PATH lookups failing on a freshly built binary.
-		if exe, err := resolveExecutable(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: resolve cabin executable: %v\n", err)
-			os.Exit(1)
-		} else {
-			vars.AsMap()["AI_CABIN_CMD"] = exe
-		}
-
-		if err := task.Run(context.Background(), c.Path, taskName, rawArgs, vars.AsMap(), os.Stdout, os.Stderr); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+		if err := runCabinTask(context.Background(), cabinName, taskName, rawArgs, os.Stdout, os.Stderr); err != nil {
+			exitOnRunError(os.Stderr, cabinName, err)
 		}
 	},
 }

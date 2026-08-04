@@ -4,6 +4,26 @@ ai-cabin:
 
 version: '3'
 
+# Shared lifecycle targets (docker-up/down/build/shell/greyshell/logs/restart)
+# provided by ai-cabin and materialized to XDG state. flatten: true exposes
+# them at the root (task docker-up); optional: true keeps `task` standalone
+# working before the CLI materializes the file.
+includes:
+  lifecycle:
+    taskfile: '{{.AI_CABIN_LIFECYCLE_TASKFILE | default "~/.local/state/ai-cabin/Taskfile.lifecycle.yml"}}'
+    flatten: true
+    optional: true
+
+# Cabin vars: consumed by task templates (not exported). AGENT_SERVICE is the
+# compose service running the agent, referenced by the shared lifecycle tasks
+# (docker-shell/greyshell/logs/restart).
+vars:
+  AGENT_SERVICE: "agent"
+
+# Env: exported to the task subprocess (docker-compose reads ${VAR} from here).
+# CONTAINER_HOME is cabin metadata describing the Dockerfile's in-container user
+# home. AI_CABIN_CMD is the CLI self-delegation path (cabin injects an absolute
+# path at runtime; the default keeps `task` standalone working).
 env:
   CONTAINER_HOME: /home/ai_agent
   AI_CABIN_CMD: '{{.AI_CABIN_CMD | default "cabin"}}'
@@ -53,13 +73,6 @@ tasks:
       - cp ~/.local/bin/greywall .deps/greywall 2>/dev/null || true
       - cp ~/.local/share/greyproxy/ca-cert.pem .deps/greyproxy-ca.crt 2>/dev/null || true
 
-  docker-build:
-    desc: Build the cabin image
-    cmds:
-      - task: setup
-      - task: deps
-      - BUILDKIT_PROGRESS=plain docker compose build
-
   docker-debug-build:
     desc: Build the cabin image without cache
     cmds:
@@ -72,42 +85,10 @@ tasks:
       - task: setup
       - docker compose run --rm --service-ports agent /bin/bash
 
-  docker-up:
-    desc: Start the cabin in background
-    cmds:
-      - task: setup
-      - docker compose up -d
-
-  docker-down:
-    desc: Stop the cabin
-    cmds:
-      - docker compose down
-
-  docker-shell:
-    desc: Get a bash shell inside the already running agent
-    cmds:
-      - docker compose exec agent bash
-
-  docker-greyshell:
-    desc: Get a greywall sandboxed shell inside the agent
-    cmds:
-      - docker compose exec agent greybash
-
   pi:
     desc: Continue pi.dev session (greywall sandboxed TUI)
     cmds:
       - docker compose exec agent greypi -c
-
-  docker-logs:
-    desc: Follow agent logs
-    cmds:
-      - docker compose logs -f agent
-
-  docker-restart-agent:
-    desc: Restart the agent container
-    cmds:
-      - task: setup
-      - docker compose restart agent
 
   up:
     desc: Start the cabin (alias for docker-up + info)
