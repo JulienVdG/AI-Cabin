@@ -1,3 +1,0 @@
-#!/bin/bash
-# Support GREYWALL_ARGS env var for customization
-exec greywall $GREYWALL_ARGS -- bash "$@"

@@ -24,12 +24,6 @@ RUN chmod +x /usr/local/bin/greywall
 COPY .deps/greyproxy-ca.crt /usr/local/share/ca-certificates/greyproxy.crt
 RUN update-ca-certificates
 
-# Greybash wrappers (greywall sandboxed shells)
-COPY greybash /usr/local/bin/greybash
-COPY greyopencode /usr/local/bin/greyopencode
-RUN chmod +x /usr/local/bin/greybash /usr/local/bin/greyopencode
-
-
 # Download and install OpenCode.
 RUN curl -L "https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-linux-x64.tar.gz" -o opencode.tar.gz && \
     tar -xzf opencode.tar.gz && \
@@ -40,25 +34,28 @@ RUN curl -L "https://github.com/anomalyco/opencode/releases/download/v${OPENCODE
 # Create entrypoint.d directory for hooks
 RUN mkdir -p /docker-entrypoint.d
 
-# Copy generic entrypoint from .deps/_common
-COPY .deps/_common/docker-entrypoint.sh /docker-entrypoint.sh
+# Copy generic entrypoint from .deps (base bundle)
+COPY .deps/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
-# Copy entrypoint.d hooks from .deps/_common (git email)
-COPY .deps/_common/docker-entrypoint.d/ /docker-entrypoint.d/
-# Copy entrypoint.d hooks from .deps/_greywall (socat greyproxy)
-COPY .deps/_greywall/docker-entrypoint.d/ /docker-entrypoint.d/
+# Copy entrypoint.d hooks from .deps (socat-greyproxy, git-agent-email, port-forward)
+COPY .deps/docker-entrypoint.d/ /docker-entrypoint.d/
 RUN chmod +x /docker-entrypoint.d/*.sh 2>/dev/null || true
 
+# Copy profile.d env scripts from .deps (go bundle)
+COPY .deps/profile.d/ /etc/profile.d/
+RUN chmod +x /etc/profile.d/ai-cabin-*.sh 2>/dev/null || true
+
 ENTRYPOINT ["/docker-entrypoint.sh"]
+
+# Greybash/greyopencode wrappers from .deps (base + agent-opencode bundles)
+COPY .deps/greybash /usr/local/bin/greybash
+COPY .deps/greyopencode /usr/local/bin/greyopencode
+RUN chmod +x /usr/local/bin/greybash /usr/local/bin/greyopencode
 
 # User setup.
 RUN useradd -m ai_agent
 WORKDIR /home/ai_agent
-
-# --- Setup Bash Completion ---
-# We generate the completion script and place it in the system directory.
-#RUN /opt/opencode completion bash > /etc/bash_completion.d/opencode
 
 # Set ownership.
 RUN chown -R ai_agent:ai_agent /home/ai_agent
@@ -72,7 +69,7 @@ RUN echo 'if [ -f /etc/bash_completion ]; then . /etc/bash_completion; fi' >> /h
 RUN echo 'if [ "$GREYWALL_SANDBOX" = "1" ]; then debian_chroot="🔒"; fi' >> /home/ai_agent/.bashrc
 
 # Create future mount-points so that owner is ai_agent
-RUN mkdir -p .local/share .local/state .config/greywall .config/opencode .local/bin
+RUN mkdir -p .local/share .local/state .local/bin .cache .config/greywall .config/opencode desk go
 
 EXPOSE 9090
 

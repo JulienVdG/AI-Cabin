@@ -1,3 +1,0 @@
-#!/bin/bash
-cd $CONTAINER_WORKDIR
-exec greywall --profile workspace,opencode,go -p 9090 -- /opt/opencode "$@"

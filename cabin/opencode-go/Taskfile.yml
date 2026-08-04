@@ -1,0 +1,136 @@
+ai-cabin:
+  agents: [opencode]
+  features: [git-agent, go]
+
+version: '3'
+
+# Shared lifecycle targets (docker-up/down/build/shell/greyshell/logs/restart)
+# provided by ai-cabin and materialized to XDG state. flatten: true exposes
+# them at the root (task docker-up); optional: true keeps `task` standalone
+# working before the CLI materializes the file.
+includes:
+  lifecycle:
+    taskfile: '{{.AI_CABIN_LIFECYCLE_TASKFILE | default "~/.local/state/ai-cabin/Taskfile.lifecycle.yml"}}'
+    flatten: true
+    optional: true
+
+# Cabin vars: consumed by task templates (not exported). AGENT_SERVICE is the
+# compose service running the agent, referenced by the shared lifecycle tasks
+# (docker-shell/greyshell/logs/restart).
+vars:
+  AGENT_SERVICE: "agent"
+
+# Env: exported to the task subprocess (docker-compose reads ${VAR} from here).
+# CONTAINER_HOME is cabin metadata describing the Dockerfile's in-container user
+# home. AI_CABIN_CMD is the CLI self-delegation path (cabin injects an absolute
+# path at runtime; the default keeps `task` standalone working).
+env:
+  CONTAINER_HOME: /home/ai_agent
+  AI_CABIN_CMD: '{{.AI_CABIN_CMD | default "cabin"}}'
+
+tasks:
+  default:
+    desc: Start the cabin (docker-up + info)
+    cmds:
+      - task: docker-up
+      - task: info
+
+  setup-dirs:
+    desc: Create AI_CABIN_HOME and AI_CABIN_DESK subdirectories
+    preconditions:
+      - sh: '[ -v AI_CABIN_HOME ]'
+        msg: "missing environment variable AI_CABIN_HOME"
+      - sh: '[ -v AI_CABIN_DESK ]'
+        msg: "missing environment variable AI_CABIN_DESK"
+      - sh: '[ -v AI_CABIN_WORKDIR ]'
+        msg: "missing environment variable AI_CABIN_WORKDIR"
+    cmds:
+      # Desk directory (in AI_CABIN_DESK)
+      - mkdir -p {{.AI_CABIN_DESK}}
+      - mkdir -p {{.AI_CABIN_DESK}}/skills
+      # Agent Data directories (in AI_CABIN_HOME)
+      - mkdir -p {{.AI_CABIN_HOME}}/.local/state/ai-cabin/
+      - mkdir -p {{.AI_CABIN_HOME}}/.local/share/opencode
+      - mkdir -p {{.AI_CABIN_HOME}}/.local/state/opencode
+      - mkdir -p {{.AI_CABIN_HOME}}/.config/opencode
+      - mkdir -p {{.AI_CABIN_HOME}}/.config/greywall/learned
+      - mkdir -p {{.AI_CABIN_HOME}}/.cache
+      - mkdir -p {{.AI_CABIN_HOME}}/.cache/opencode
+      - mkdir -p {{.AI_CABIN_HOME}}/go
+      # Go (compatible with greywall go profile)
+      - mkdir -p {{.AI_CABIN_HOME}}/.cache/go-build {{.AI_CABIN_HOME}}/.cache/golangci-lint
+
+  setup:
+    desc: Setup environment (directories + agent configs)
+    cmds:
+      - task: setup-dirs
+      - $AI_CABIN_CMD internal setup
+      - cat "{{.AI_CABIN_DESK}}/AGENTS.md" "{{.AI_CABIN_HOME}}/.cache/ai-cabin/AGENTS-workspace.md" > "{{.AI_CABIN_HOME}}/.config/opencode/AGENTS.md"
+      - touch {{.AI_CABIN_HOME}}/.local/state/ai-cabin/container_bash_history
+
+  deps:
+    desc: Materialize .deps/ from active bundles (CLI) + copy host binaries
+    cmds:
+      - $AI_CABIN_CMD internal deps
+      # Host binaries the CLI cannot ship (best-effort; absent fails at COPY).
+      - cp ~/.local/bin/greywall .deps/greywall 2>/dev/null || true
+      - cp ~/.local/share/greyproxy/ca-cert.pem .deps/greyproxy-ca.crt 2>/dev/null || true
+
+  docker-debug-build:
+    desc: Build the cabin image without cache
+    cmds:
+      - task: setup
+      - BUILDKIT_PROGRESS=plain docker compose build --no-cache
+
+  docker-debug-run:
+    desc: Run a one-off debug container
+    cmds:
+      - task: setup
+      - docker compose run --rm --service-ports agent /bin/bash
+
+  opencode:
+    desc: Continue opencode session (greywall sandboxed TUI)
+    cmds:
+      - docker compose exec agent greyopencode {{.CLI_ARGS}}
+
+  up:
+    desc: Start the cabin (alias for docker-up + info)
+    cmds:
+      - task: docker-up
+      - task: info
+
+  down:
+    desc: Stop the cabin (alias for docker-down)
+    cmds:
+      - task: docker-down
+
+  info:
+    desc: Show cabin access info
+    cmds:
+      - |
+        echo "greyproxy (host):            http://localhost:43080"
+        echo "AI Agent (opencode web):     http://localhost:9090 (use chromium)"
+    silent: true
+
+  help:
+    desc: Show usage
+    cmds:
+      - |
+        echo "Environment variables (must be set before running task):"
+        echo "  AI_CABIN_HOME      : Host home directory (e.g., /home/user/)"
+        echo "  AI_CABIN_DESK      : Shared desk directory (AGENTS.md, skills)"
+        echo "  AI_CABIN_WORKDIR   : Git repositories"
+        echo "  SCW_PROJECT_ID     : Scaleway project ID"
+        echo "  CONTAINER_WORKDIR  : Container workdir (default: AI_CABIN_WORKDIR, advanced)"
+        echo ""
+        echo "Usage:"
+        echo "  task setup             # Setup environment (directories + configs)"
+        echo "  task docker-up         # Start cabin"
+        echo "  task docker-shell      # Get shell inside container"
+        echo "  task opencode          # opencode TUI"
+        echo "  task docker-greyshell  # Greywall sandboxed shell"
+        echo "  task docker-logs       # Follow logs"
+        echo ""
+        echo "Advanced:"
+        echo "  CONTAINER_WORKDIR=/workspace task docker-up  # Remap workdir to /workspace"
+    silent: true
