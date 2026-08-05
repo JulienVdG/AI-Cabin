@@ -1,0 +1,3 @@
+entries:
+  - src: setup/opencode.json.tmpl
+    dst: .config/opencode/opencode.json

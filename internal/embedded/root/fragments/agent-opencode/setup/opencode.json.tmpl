@@ -1,0 +1,20 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+{{- if .Vars.DEFAULT_MODEL }}
+  "model": "{{ if .Vars.DEFAULT_PROVIDER }}{{.Vars.DEFAULT_PROVIDER}}/{{ end }}{{.Vars.DEFAULT_MODEL}}",
+{{- end }}
+  "provider": {
+    "scaleway": {
+      "options": {
+        "apiKey": "{env:SCW_SECRET_KEY}",
+        "baseURL": "https://api.scaleway.ai/{{ if .Vars.SCW_PROJECT_ID }}{{.Vars.SCW_PROJECT_ID}}/{{ end }}v1"
+      }
+    }
+  },
+  "share": "disabled",
+  "permission": {
+    "external_directory": {
+      "~/desk/**": "allow"
+    }
+  }
+}
