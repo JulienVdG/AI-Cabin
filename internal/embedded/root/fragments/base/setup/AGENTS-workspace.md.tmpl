@@ -12,3 +12,7 @@ Reference paths for this workspace:
 - **Cache**: {{.Vars.CONTAINER_HOME}}/.cache/
 
 **Note:** Always use absolute paths (e.g., `{{.Vars.CONTAINER_HOME}}/desk/TODO.md`) not relative paths.
+
+**Path conventions:**
+- The paths above (Home, Desk, Skills, Workdir, Cache) are **in-container** absolute paths — use them for commands and files the agent reads/writes inside the cabin.
+- In prompts, assume paths are relative to the current working directory (CWD) by default, with or without a leading `@`. Look them up from the current context/task (the CWD is typically the bind-mounted Workdir above).
