@@ -1,0 +1,3 @@
+entries:
+  - src: setup/forward.json.tmpl
+    dst: .config/greywall/learned/forward-{{.host}}-{{.port}}.json

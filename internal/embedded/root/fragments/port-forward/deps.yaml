@@ -1,0 +1,3 @@
+entries:
+  - src: deps/50-socat.sh.tmpl
+    dst: docker-entrypoint.d/50-socat-{{.host}}-{{.port}}.sh

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/JulienVdG/AI-Cabin/internal/embedded"
 	"github.com/JulienVdG/AI-Cabin/internal/fragments"
 	"github.com/JulienVdG/AI-Cabin/internal/render"
 
@@ -156,6 +157,58 @@ func TestMaterialize(t *testing.T) {
 		assert.Equal(t, "socat TCP-LISTEN:3306,fork TCP:mariadb:3306\n", readDest(t, dest, "hooks/50-socat-mariadb-3306.sh"))
 		assert.Equal(t, `{"forwardPorts":[3306]}`, readDest(t, dest, "profile/mariadb-3306.json"))
 		assert.Equal(t, "socat TCP-LISTEN:8080,fork TCP:apache:8080\n", readDest(t, dest, "hooks/50-socat-apache-8080.sh"))
+	})
+
+	t.Run("PortForwardBundleFromEmbedded", func(t *testing.T) {
+		// Materialize the real embedded port-forward bundle (not an inline
+		// fixture): this validates the shipped fragments end-to-end through
+		// BuildLayers + Materialize. The bundle has two facets: deps (the
+		// 50-socat entrypoint script, build facet) and setup (the greywall
+		// forward profile, seeded to .config/greywall/learned/ —
+		// greywall profiles are a setup facet, not deps. Two instances
+		// (mariadb:3306, apache:8080) do not collide: the dst encodes
+		// host-port, and the profile carries a forward- prefix to avoid
+		// collisions with agent profiles (pi.json, opencode.json).
+		embedFS, err := embedded.Fragments()
+		require.NoError(t, err)
+		merged, err := fragments.BuildLayers(nil, "", embedFS)
+		require.NoError(t, err)
+
+		// --- deps facet (TruncateCreator): socat entrypoint script into .deps/.
+		depsDest := t.TempDir()
+		depsMat := truncateMat(t, merged, "deps.yaml", depsDest, nil)
+
+		attrs := map[string]any{"host": "mariadb", "port": "3306"}
+		w, err := depsMat.Materialize("port-forward", attrs)
+		require.NoError(t, err)
+		sort.Strings(w)
+		assert.Equal(t, []string{"docker-entrypoint.d/50-socat-mariadb-3306.sh"}, w)
+		assert.Contains(t, readDest(t, depsDest, "docker-entrypoint.d/50-socat-mariadb-3306.sh"),
+			"socat TCP-LISTEN:3306,fork,reuseaddr TCP:mariadb:3306 &")
+
+		// Second instance: same bundle, different attrs, no collision.
+		attrs2 := map[string]any{"host": "apache", "port": "8080"}
+		w2, err := depsMat.Materialize("port-forward", attrs2)
+		require.NoError(t, err)
+		sort.Strings(w2)
+		assert.Equal(t, []string{"docker-entrypoint.d/50-socat-apache-8080.sh"}, w2)
+
+		// --- setup facet (BackupCreator): greywall forward profile into
+		// $AI_CABIN_HOME/.config/greywall/learned/.
+		setupDest := t.TempDir()
+		setupMat := backupMat(t, merged, "setup.yaml", setupDest, nil)
+
+		ws, err := setupMat.Materialize("port-forward", attrs)
+		require.NoError(t, err)
+		sort.Strings(ws)
+		assert.Equal(t, []string{".config/greywall/learned/forward-mariadb-3306.json"}, ws)
+		assert.JSONEq(t, `{"network":{"forwardPorts":[3306]}}`,
+			readDest(t, setupDest, ".config/greywall/learned/forward-mariadb-3306.json"))
+
+		ws2, err := setupMat.Materialize("port-forward", attrs2)
+		require.NoError(t, err)
+		sort.Strings(ws2)
+		assert.Equal(t, []string{".config/greywall/learned/forward-apache-8080.json"}, ws2)
 	})
 
 	t.Run("SetupEntries", func(t *testing.T) {

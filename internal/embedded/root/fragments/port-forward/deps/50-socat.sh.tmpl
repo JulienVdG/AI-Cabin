@@ -1,0 +1,5 @@
+#!/bin/bash
+# Forward localhost:{{.port}} -> {{.host}}:{{.port}}
+# One socat process per forwarded port (fork handles connections).
+echo "[entrypoint] Starting socat forward {{.host}}:{{.port}}..."
+socat TCP-LISTEN:{{.port}},fork,reuseaddr TCP:{{.host}}:{{.port}} &

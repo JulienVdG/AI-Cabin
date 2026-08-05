@@ -13,9 +13,17 @@ import (
 )
 
 // expectedBundles is the public contract: the bundle names referenced by
-// cabin.ActiveBundles (base, git-agent, go, agent-pi, agent-opencode). A
-// rename here must break a test rather than silently orphan a bundle.
-var expectedBundles = []string{"agent-opencode", "agent-pi", "base", "git-agent", "go"}
+// cabin.ActiveBundles (base, git-agent, go, agent-pi, agent-opencode) plus
+// port-forward (the declarative service-forwarding bundle, one instance per
+// forwarded service). A rename
+// here must break a test rather than silently orphan a bundle.
+var expectedBundles = []string{"agent-opencode", "agent-pi", "base", "git-agent", "go", "port-forward"}
+
+// mirrorBundles are the bundles that mirror their deps/ subtree (the v1 default
+// layout). port-forward is excluded: it uses explicit entries: with templated
+// dst (one bundle instance per forwarded service), so it legitimately
+// does not declare mirror: deps/.
+var mirrorBundles = []string{"agent-opencode", "agent-pi", "base", "git-agent", "go"}
 
 // TestFragments verifies the embedded base layer exposes the expected bundles
 // and that the structure is self-consistent, without hardcoding the full file
@@ -38,15 +46,26 @@ func TestFragments(t *testing.T) {
 		assert.Equal(t, expectedBundles, names)
 	})
 
-	t.Run("EveryBundleHasMirrorDepsManifest", func(t *testing.T) {
+	t.Run("EveryBundleHasDepsManifest", func(t *testing.T) {
 		// Each bundle's deps.yaml is the manifest Materialize reads for the
-		// deps facet; it must exist and declare the simple "mirror: deps/"
-		// form (the v1 default bundles all mirror their deps/ subtree).
-		// Asserting the exact content catches a manifest rewritten to
-		// entries: by mistake. setup.yaml is optional (a bundle may have no
-		// setup facet — e.g. git-agent, go); deps.yaml is required for every
-		// bundle (the build facet always contributes).
+		// deps facet; it must exist for every bundle (the build facet always
+		// contributes). setup.yaml is optional (a bundle may have no setup
+		// facet — e.g. git-agent, go, port-forward).
 		for _, b := range expectedBundles {
+			t.Run(b, func(t *testing.T) {
+				_, err := fs.ReadFile(fsys, b+"/deps.yaml")
+				require.NoError(t, err, "bundle %q must have a deps.yaml manifest", b)
+			})
+		}
+	})
+
+	t.Run("MirrorBundlesDeclareMirrorDeps", func(t *testing.T) {
+		// The v1 default bundles all mirror their deps/ subtree. Asserting the
+		// exact content catches a manifest rewritten to entries: by mistake.
+		// port-forward is excluded (it uses explicit entries: with templated dst,
+		// one instance per forwarded service) and is covered by its own Materialize
+		// test in internal/fragments.
+		for _, b := range mirrorBundles {
 			t.Run(b, func(t *testing.T) {
 				data, err := fs.ReadFile(fsys, b+"/deps.yaml")
 				require.NoError(t, err)
