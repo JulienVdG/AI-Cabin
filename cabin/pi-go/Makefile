@@ -122,7 +122,7 @@ docker-greyshell:
 
 # Continue pi.dev session (greywall sandboxed TUI)
 pi:
-	docker compose exec agent greypi -c
+	docker compose exec agent pi -c
 
 # Follow logs
 docker-logs:

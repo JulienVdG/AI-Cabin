@@ -28,12 +28,12 @@ tasks:
   docker-shell:
     desc: Get a bash shell inside the agent container
     cmds:
-      - docker compose exec {{.AGENT_SERVICE}} bash
+      - docker compose exec -e CABIN_REL_PATH="${CABIN_REL_PATH}" {{.AGENT_SERVICE}} bash
 
   docker-greyshell:
     desc: Get a greywall sandboxed shell inside the agent container
     cmds:
-      - docker compose exec {{.AGENT_SERVICE}} greybash
+      - docker compose exec -e CABIN_REL_PATH="${CABIN_REL_PATH}" {{.AGENT_SERVICE}} greybash
 
   docker-logs:
     desc: Follow agent container logs

@@ -50,6 +50,26 @@ func runCabinTask(ctx context.Context, cabinName, taskName string, rawArgs []str
 	}
 	vm["AI_CABIN_CMD"] = exe
 
+	// Compute the host CWD sub-path relative to the workdir and inject it as
+	// CABIN_REL_PATH (path shadowing: the agent launches into the matching
+	// sub-directory inside the greywall sandbox). The Taskfile forwards it to
+	// `docker compose exec -e CABIN_REL_PATH=...` so the container-side
+	// wrapper does a two-step cd (root anchor + relpath inside the sandbox).
+	// Refuses paths outside the workdir (fail-fast, no silent fallback). Empty
+	// when CWD is the workdir root (the agent launches at the root).
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get current working directory: %w", err)
+	}
+	rel, err := config.RelPath(wd, vm[config.WorkdirVar])
+	if err != nil {
+		// Not fatal: log to stderr and fall back to the root (relpath empty)
+		// rather than block the agent on a host-side path quirk. The
+		// container-side cd remains the last line of defense.
+		fmt.Fprintf(os.Stderr, "Warning: %v; launching agent at the workdir root\n", err)
+	}
+	vm["CABIN_REL_PATH"] = rel
+
 	// Ensure the lifecycle Taskfile is materialized to XDG state and inject its
 	// path so the cabin's includes: resolves to where the file was actually
 	// written (matters when XDG_STATE_HOME is redirected, e.g. the dev pattern).

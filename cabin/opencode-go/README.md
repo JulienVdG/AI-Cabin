@@ -44,7 +44,7 @@
 | `make docker-build` | Rebuild container |
 | `make docker-shell` | Get bash shell inside container |
 | `make docker-greyshell` | Get greywall-sandboxed shell |
-| `make opencode` | Continue OpenCode session (via greyopencode) |
+| `make opencode` | Continue OpenCode session (via opencode) |
 | `make docker-logs` | Follow agent logs |
 | `make docker-restart-agent` | Restart agent container |
 
@@ -130,7 +130,7 @@ opencode-go/
 ├── envrc.template            # Environment variables template
 ├── greywall.json             # Greywall config (mounted RO)
 ├── opencode.json             # OpenCode config (model, permissions)
-├── greyopencode              # Wrapper script (cd + greywall)
+├── opencode                  # Wrapper script (cd + greywall)
 ├── greybash                  # Greywall sandboxed shell
 ├── docker-entrypoint.sh      # Container entrypoint
 └── docker-entrypoint.d/      # Optional hooks
@@ -168,7 +168,7 @@ All commands run through `greywall` which enforces:
 - Resource limits (CPU, memory, processes)
 
 **Wrapper scripts:**
-- `greyopencode` - Runs OpenCode in greywall sandbox
+- `opencode` - Runs OpenCode in greywall sandbox
 - `greybash` - Interactive greywall-sandboxed shell
 
 **Configuration:**

@@ -15,7 +15,7 @@ if [ "$GREYWALL_SANDBOX" = "1" ]; then
     cd "$CABIN_DO_REL_CD" || { echo "cabin: cannot cd to $CABIN_DO_REL_CD" >&2; exit 1; }
     unset CABIN_DO_REL_CD
   fi
-  exec bash "$@"
+  exec /opt/opencode "$@"
 else
   # Outer: cd to the workdir root (greywall anchors here), record the relpath,
   # then re-exec self under greywall.

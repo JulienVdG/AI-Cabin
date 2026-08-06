@@ -120,7 +120,7 @@ docker-greyshell:
 
 # Continue opencode session (greywall sandboxed)
 opencode:
-	docker compose exec agent greyopencode
+	docker compose exec agent opencode
 
 # Follow logs
 docker-logs:

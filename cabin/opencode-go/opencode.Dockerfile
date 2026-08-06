@@ -48,10 +48,10 @@ RUN chmod +x /etc/profile.d/ai-cabin-*.sh 2>/dev/null || true
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
-# Greybash/greyopencode wrappers from .deps (base + agent-opencode bundles)
+# Greybash/opencode wrappers from .deps (base + agent-opencode bundles).
 COPY .deps/greybash /usr/local/bin/greybash
-COPY .deps/greyopencode /usr/local/bin/greyopencode
-RUN chmod +x /usr/local/bin/greybash /usr/local/bin/greyopencode
+COPY .deps/opencode /usr/local/bin/opencode
+RUN chmod +x /usr/local/bin/greybash /usr/local/bin/opencode
 
 # User setup.
 RUN useradd -m ai_agent
@@ -74,4 +74,4 @@ RUN mkdir -p .local/share .local/state .local/bin .cache .config/greywall .confi
 EXPOSE 9090
 
 # Default command: Start the web interface with greywall sandbox
-CMD ["greyopencode", "web", "--port", "9090", "--hostname", "0.0.0.0"]
+CMD ["opencode", "web", "--port", "9090", "--hostname", "0.0.0.0"]

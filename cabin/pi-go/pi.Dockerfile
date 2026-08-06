@@ -57,8 +57,8 @@ RUN chmod +x /etc/profile.d/ai-cabin-*.sh 2>/dev/null || true
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
 COPY .deps/greybash /usr/local/bin/greybash
-COPY .deps/greypi /usr/local/bin/greypi
-RUN chmod +x /usr/local/bin/greybash /usr/local/bin/greypi
+COPY .deps/pi /usr/local/bin/pi
+RUN chmod +x /usr/local/bin/greybash /usr/local/bin/pi
 
 # User setup.
 RUN useradd -m ai_agent

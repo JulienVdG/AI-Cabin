@@ -1,8 +1,8 @@
 #!/bin/bash
-# Wrapper to run greypi inside the Docker container
+# Wrapper to run pi inside the Docker container
 # Usage: ./cabin-pi [args...]
 
 # must match dockerfile
 export CONTAINER_HOME=/home/ai_agent
 
-exec docker compose exec agent greypi "$@"
+exec docker compose exec agent pi "$@"

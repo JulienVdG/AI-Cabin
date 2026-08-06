@@ -34,9 +34,10 @@ env:
   # header. Consumed by the grey* wrappers.
   GREYWALL_PROFILE:
     sh: 'echo "${GREYWALL_PROFILE:-$($AI_CABIN_CMD internal greywall-profile)}"'
-  # GREYWALL_ARGS: per-wrapper greywall extras (e.g. --learning). Empty by
-  # default; a cabin may override (e.g. -p for an inbound port).
-  GREYWALL_ARGS: ""
+  # GREYWALL_ARGS: per-wrapper greywall extras. Empty by default; a cabin may
+  # override (e.g. -p for an inbound port). opencode-go exposes the web inbound
+  # port via greywall's --port so the host can reach the agent's web UI.
+  GREYWALL_ARGS: "-p 9090"
 
 tasks:
   default:
@@ -101,7 +102,7 @@ tasks:
   opencode:
     desc: Continue opencode session (greywall sandboxed TUI)
     cmds:
-      - docker compose exec agent greyopencode {{.CLI_ARGS}}
+      - docker compose exec -e CABIN_REL_PATH="${CABIN_REL_PATH}" agent opencode {{.CLI_ARGS}}
 
   up:
     desc: Start the cabin (alias for docker-up + info)
