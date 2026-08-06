@@ -85,12 +85,38 @@ func (f *FeatureRef) UnmarshalYAML(value *yaml.Node) error {
 // (A bare "ai-cabin:" is YAML null == absent in yaml.v3; use "{}" for empty.)
 type taskfileHeader struct {
 	AICabin *AICabinHeader `yaml:"ai-cabin"`
+	Vars    map[string]any `yaml:"vars"`
 }
 
 // TaskfileName is the conventional name of the Taskfile in a cabin directory.
 // task accepts Taskfile.yml / Taskfile.yaml / Taskfile.dist.yml; the cabin
 // contract requires Taskfile.yml specifically (one canonical name).
 const TaskfileName = "Taskfile.yml"
+
+// DefaultAgentService is the v1 convention for the compose service running the
+// agent in a cabin (vars.AGENT_SERVICE in the Taskfile). `cabin ps` matches
+// the agent container via its com.docker.compose.service label against this
+// name when AGENT_SERVICE is not declared in the Taskfile.
+const DefaultAgentService = "agent"
+
+// AgentService extracts the agent compose service name from a Taskfile's
+// top-level vars: block (vars.AGENT_SERVICE). Returns DefaultAgentService when
+// the var is absent, not a string, or empty — a cabin relying on the v1
+// convention. Never errors: this is a lookup with a fallback, not a
+// validation. Used by `cabin ps` to identify the agent container among a
+// compose project's services.
+func AgentService(data []byte) string {
+	var tf taskfileHeader
+	if err := yaml.Unmarshal(data, &tf); err != nil {
+		return DefaultAgentService
+	}
+	if v, ok := tf.Vars["AGENT_SERVICE"]; ok {
+		if s, ok := v.(string); ok && s != "" {
+			return s
+		}
+	}
+	return DefaultAgentService
+}
 
 // ParseHeader parses the ai-cabin metadata from raw Taskfile bytes. It returns
 // a non-nil *AICabinHeader when the "ai-cabin:" block is present (even if

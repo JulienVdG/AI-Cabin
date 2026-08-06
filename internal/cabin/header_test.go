@@ -137,6 +137,72 @@ func TestParseHeader_CompleteFields(t *testing.T) {
 	}
 }
 
+// TestAgentService covers the extraction of vars.AGENT_SERVICE from a Taskfile
+// (used by `cabin ps` to match the agent container via its compose service
+// label). Falls back to the default "agent" when absent or non-string.
+func TestAgentService(t *testing.T) {
+	t.Run("declared service", func(t *testing.T) {
+		data := []byte(`vars:
+  AGENT_SERVICE: my-agent
+ai-cabin: {}
+`)
+		if got := cabin.AgentService(data); got != "my-agent" {
+			t.Errorf("AgentService = %q, want %q", got, "my-agent")
+		}
+	})
+
+	t.Run("absent falls back to default", func(t *testing.T) {
+		data := []byte(`vars:
+  CONTAINER_HOME: /home/ai_agent
+ai-cabin: {}
+`)
+		if got := cabin.AgentService(data); got != cabin.DefaultAgentService {
+			t.Errorf("AgentService = %q, want %q", got, cabin.DefaultAgentService)
+		}
+	})
+
+	t.Run("empty string falls back to default", func(t *testing.T) {
+		// An empty AGENT_SERVICE is treated as unset: an empty service name would
+		// match nothing in `cabin ps`, so the default is safer.
+		data := []byte(`vars:
+  AGENT_SERVICE: ""
+ai-cabin: {}
+`)
+		if got := cabin.AgentService(data); got != cabin.DefaultAgentService {
+			t.Errorf("AgentService = %q, want %q", got, cabin.DefaultAgentService)
+		}
+	})
+
+	t.Run("non-string falls back to default", func(t *testing.T) {
+		// A numeric or structured AGENT_SERVICE is not a usable service name.
+		data := []byte(`vars:
+  AGENT_SERVICE: 42
+ai-cabin: {}
+`)
+		if got := cabin.AgentService(data); got != cabin.DefaultAgentService {
+			t.Errorf("AgentService = %q, want %q", got, cabin.DefaultAgentService)
+		}
+	})
+
+	t.Run("no vars block falls back to default", func(t *testing.T) {
+		data := []byte(`ai-cabin: {}
+`)
+		if got := cabin.AgentService(data); got != cabin.DefaultAgentService {
+			t.Errorf("AgentService = %q, want %q", got, cabin.DefaultAgentService)
+		}
+	})
+
+	t.Run("invalid yaml falls back to default", func(t *testing.T) {
+		// A malformed Taskfile is not fatal for the lookup: `cabin ps` reports the
+		// docker error separately, and a parse failure falls back to the default
+		// rather than dropping the cabin from the listing.
+		data := []byte("vars: [unclosed")
+		if got := cabin.AgentService(data); got != cabin.DefaultAgentService {
+			t.Errorf("AgentService = %q, want %q", got, cabin.DefaultAgentService)
+		}
+	})
+}
+
 // TestParseHeader_Features covers the two accepted YAML forms for a features:
 // entry (bare string and single-key mapping) plus the strict-error cases.
 func TestParseHeader_Features(t *testing.T) {
