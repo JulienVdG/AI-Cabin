@@ -98,7 +98,7 @@ tasks:
   pi:
     desc: Continue pi.dev session (greywall sandboxed TUI)
     cmds:
-      - docker compose exec -e CABIN_REL_PATH="${CABIN_REL_PATH}" agent pi -c
+      - docker compose exec -e CABIN_REL_PATH="${CABIN_REL_PATH}" agent pi {{.CLI_ARGS}}
 
   up:
     desc: Start the cabin (alias for docker-up + info)
