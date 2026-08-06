@@ -1,4 +1,13 @@
 #!/bin/bash
 for f in /etc/profile.d/ai-cabin-*.sh; do [ -r "$f" ] && . "$f"; done
 cd "$CONTAINER_WORKDIR"
-exec greywall --profile workspace,opencode,go -p 9090 -- /opt/opencode "$@"
+gw_args=()
+if [ -n "$GREYWALL_PROFILE" ]; then
+  gw_args+=(--profile "$GREYWALL_PROFILE")
+else
+  echo "cabin: GREYWALL_PROFILE is empty; greywall will auto-detect by command name" >&2
+fi
+# shellcheck disable=SC2086  # intentional word-splitting: GREYWALL_ARGS is a flag list
+gw_args+=( $GREYWALL_ARGS )
+gw_args+=( -p 9090 )
+exec greywall "${gw_args[@]}" -- /opt/opencode "$@"

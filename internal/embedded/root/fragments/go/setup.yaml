@@ -1,0 +1,6 @@
+# The go bundle references greywall's built-in go toolchain profile (shipping
+# no learned fragment — the built-in suffices). This manifest is metadata for
+# greywall-profile resolution (ResolveGreywallProfiles); Materialize is a
+# no-op (greywall_profiles-only writes nothing). The deps facet (deps.yaml,
+# profile.d/ai-cabin-go.sh) is unaffected.
+greywall_profiles: [go]

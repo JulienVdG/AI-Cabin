@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/JulienVdG/AI-Cabin/internal/cabin"
 	"github.com/JulienVdG/AI-Cabin/internal/config"
@@ -176,8 +177,36 @@ var internalSetupCmd = &cobra.Command{
 	},
 }
 
+// internalGreywallProfileCmd resolves the greywall profile list from the
+// cabin's active bundles (header agents:/features:), through the fallback
+// chain. It prints the comma-joined list to stdout (e.g.
+// "workspace,pi,go,forward-mariadb-3306") so the Taskfile can capture it via
+// `env: sh:` on the standalone path. The CLI path (cabin task/cabin up)
+// sets GREYWALL_PROFILE on the process directly, short-circuiting the sh: (no
+// subprocess). This is the hidden command the wrapper's $GREYWALL_PROFILE
+// resolves to when not preset.
+var internalGreywallProfileCmd = &cobra.Command{
+	Use:   "greywall-profile",
+	Short: "Resolve the greywall profile list from the cabin's active bundles",
+	Run: func(cmd *cobra.Command, args []string) {
+		bundles, vars, merged, cabinPath, err := resolveCabinFragments()
+		if err != nil {
+			printValidateError(os.Stderr, err, cabinPath)
+			os.Exit(1)
+		}
+
+		profiles, err := fragments.ResolveGreywallProfiles(merged, bundles, vars.AsMap())
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println(strings.Join(profiles, ","))
+	},
+}
+
 func init() {
 	internalCmd.AddCommand(internalDepsCmd)
 	internalCmd.AddCommand(internalSetupCmd)
+	internalCmd.AddCommand(internalGreywallProfileCmd)
 	rootCmd.AddCommand(internalCmd)
 }

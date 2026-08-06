@@ -8,6 +8,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/JulienVdG/AI-Cabin/internal/cabin"
 	"github.com/JulienVdG/AI-Cabin/internal/embedded"
 	"github.com/JulienVdG/AI-Cabin/internal/fragments"
 	"github.com/JulienVdG/AI-Cabin/internal/render"
@@ -484,5 +485,164 @@ func TestBackupCreator(t *testing.T) {
 		assert.Equal(t, `{"v":2}`, readDest(t, dest, "conf.json"))
 		_, statErr := os.Stat(filepath.Join(dest, "conf.json"+fragments.BackupSuffix))
 		assert.True(t, os.IsNotExist(statErr), "truncate never backs up")
+	})
+}
+
+// TestMaterializeGreywallProfilesOnly covers a setup.yaml declaring only
+// greywall_profiles (built-in references, no entries): validate passes, expand
+// returns no entries, nothing is written, no error. This is the go bundle's
+// setup.yaml shape.
+func TestMaterializeGreywallProfilesOnly(t *testing.T) {
+	t.Run("NoOpWrite", func(t *testing.T) {
+		merged := fstest.MapFS{
+			"go/setup.yaml": {Data: []byte("greywall_profiles: [go]\n")},
+		}
+		dest := t.TempDir()
+
+		written, err := truncateMat(t, merged, "setup.yaml", dest, nil).Materialize("go", nil)
+		require.NoError(t, err)
+		assert.Nil(t, written, "greywall_profiles-only manifest writes nothing")
+	})
+
+	t.Run("EmptyManifestRejected", func(t *testing.T) {
+		// A manifest declaring none of mirror/entries/greywall_profiles is
+		// rejected as useless (validate extended for the new field).
+		merged := fstest.MapFS{
+			"go/setup.yaml": {Data: []byte("--- {}\n")},
+		}
+		dest := t.TempDir()
+
+		_, err := truncateMat(t, merged, "setup.yaml", dest, nil).Materialize("go", nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "neither mirror, entries, nor greywall_profiles")
+	})
+}
+
+// TestResolveGreywallProfiles covers the derivation of the greywall profile
+// list from active bundles: shipped profiles (detected by their learned/
+// destination, name = stem of the rendered dst) plus built-in references
+// (greywall_profiles: manifest field). The list is ordered (bundle order) and
+// deduplicated by first occurrence.
+func TestResolveGreywallProfiles(t *testing.T) {
+	// A merged FS with all bundles' setup.yaml manifests. ResolveGreywallProfiles
+	// reads only the manifests (not the shipped .json src files), so the src
+	// files are omitted from the fixture.
+	fullFS := fstest.MapFS{
+		"base/setup.yaml":           {Data: []byte("entries:\n  - src: setup/greywall_profiles_workspace.json\n    dst: .config/greywall/learned/workspace.json\n")},
+		"agent-pi/setup.yaml":       {Data: []byte("entries:\n  - src: setup/greywall_profiles_pi.json\n    dst: .config/greywall/learned/pi.json\n")},
+		"agent-opencode/setup.yaml": {Data: []byte("entries:\n  - src: setup/greywall_profiles_opencode.json\n    dst: .config/greywall/learned/opencode.json\n")},
+		"go/setup.yaml":             {Data: []byte("greywall_profiles: [go]\n")},
+		"port-forward/setup.yaml":   {Data: []byte("entries:\n  - src: setup/forward.json.tmpl\n    dst: .config/greywall/learned/forward-{{.host}}-{{.port}}.json\n")},
+	}
+
+	t.Run("BaseOnly", func(t *testing.T) {
+		bundles := []cabin.FeatureRef{{Name: "base"}}
+		got, err := fragments.ResolveGreywallProfiles(fullFS, bundles, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"workspace"}, got)
+	})
+
+	t.Run("BasePlusPi", func(t *testing.T) {
+		bundles := []cabin.FeatureRef{{Name: "base"}, {Name: "agent-pi"}}
+		got, err := fragments.ResolveGreywallProfiles(fullFS, bundles, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"workspace", "pi"}, got)
+	})
+
+	t.Run("BasePlusPiPlusGoBuiltIn", func(t *testing.T) {
+		// go references greywall's built-in go profile via greywall_profiles:
+		// it ships no learned fragment, so the name comes from the manifest field.
+		bundles := []cabin.FeatureRef{{Name: "base"}, {Name: "agent-pi"}, {Name: "go"}}
+		got, err := fragments.ResolveGreywallProfiles(fullFS, bundles, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"workspace", "pi", "go"}, got)
+	})
+
+	t.Run("PortForwardTemplatedDst", func(t *testing.T) {
+		// port-forward's dst is templated; the profile name is derived from
+		// the rendered dst (forward-mariadb-3306), proving resolution uses the
+		// rendered destination, not the source path.
+		bundles := []cabin.FeatureRef{
+			{Name: "base"},
+			{Name: "agent-pi"},
+			{Name: "port-forward", Attrs: map[string]any{"host": "mariadb", "port": "3306"}},
+		}
+		got, err := fragments.ResolveGreywallProfiles(fullFS, bundles, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"workspace", "pi", "forward-mariadb-3306"}, got)
+	})
+
+	t.Run("DedupPreservesFirstOccurrence", func(t *testing.T) {
+		// Two bundles contributing the same profile (here base twice) yield
+		// it once, in first-occurrence position. No special base-first handling:
+		// base leads because ActiveBundles puts it first.
+		bundles := []cabin.FeatureRef{{Name: "base"}, {Name: "agent-pi"}, {Name: "base"}}
+		got, err := fragments.ResolveGreywallProfiles(fullFS, bundles, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"workspace", "pi"}, got)
+	})
+
+	t.Run("BundleWithoutSetupIsNoOp", func(t *testing.T) {
+		// git-agent has no setup.yaml in the fixture: contributes nothing, no error.
+		bundles := []cabin.FeatureRef{{Name: "base"}, {Name: "git-agent"}}
+		got, err := fragments.ResolveGreywallProfiles(fullFS, bundles, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"workspace"}, got)
+	})
+
+	t.Run("BothAgentsUnion", func(t *testing.T) {
+		// When both agents are active, the union includes both profiles in
+		// bundle order (subagent pattern: opencode can carry pi).
+		bundles := []cabin.FeatureRef{{Name: "base"}, {Name: "agent-pi"}, {Name: "agent-opencode"}}
+		got, err := fragments.ResolveGreywallProfiles(fullFS, bundles, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"workspace", "pi", "opencode"}, got)
+	})
+
+	t.Run("FromEmbeddedPiGo", func(t *testing.T) {
+		// The real embedded fragments resolved through the full fallback
+		// chain, with bundles derived from a Taskfile header (matching the
+		// real cabin internal greywall-profile path). pi-go's header is
+		// agents:[pi] features:[git-agent, go] -> [workspace, pi, go], which
+		// reproduces the profile list the pi wrapper consumes.
+		embedFS, err := embedded.Fragments()
+		require.NoError(t, err)
+		merged, err := fragments.BuildLayers(nil, "", embedFS)
+		require.NoError(t, err)
+
+		header, err := cabin.ParseHeader([]byte(`ai-cabin:
+  agents: [pi]
+  features: [git-agent, go]
+`))
+		require.NoError(t, err)
+		bundles := cabin.ActiveBundles(header)
+
+		got, err := fragments.ResolveGreywallProfiles(merged, bundles, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"workspace", "pi", "go"}, got)
+	})
+
+	t.Run("FromEmbeddedWithPortForward", func(t *testing.T) {
+		// A cabin declaring port-forward resolves the templated forward
+		// profile name end-to-end through the embedded bundle — the gap
+		// identified in Jalon 2 (forward-* not referenced by wrappers).
+		embedFS, err := embedded.Fragments()
+		require.NoError(t, err)
+		merged, err := fragments.BuildLayers(nil, "", embedFS)
+		require.NoError(t, err)
+
+		header, err := cabin.ParseHeader([]byte(`ai-cabin:
+  agents: [pi]
+  features:
+    - git-agent
+    - go
+    - port-forward: {port: 3306, host: mariadb}
+`))
+		require.NoError(t, err)
+		bundles := cabin.ActiveBundles(header)
+
+		got, err := fragments.ResolveGreywallProfiles(merged, bundles, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"workspace", "pi", "go", "forward-mariadb-3306"}, got)
 	})
 }

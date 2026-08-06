@@ -28,6 +28,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/JulienVdG/AI-Cabin/internal/cabin"
 	"github.com/JulienVdG/AI-Cabin/internal/render"
 	"github.com/JulienVdG/AI-Cabin/internal/unionfs"
 )
@@ -111,8 +112,9 @@ func BuildLayers(dirs []string, cabinDir string, embedFS fs.FS) (fs.FS, error) {
 //   - entries: an explicit src→dst list, for bundles that need templated dst
 //     (port-forward multi-instance) or a non-mirrored layout.
 type manifest struct {
-	Mirror  string          `yaml:"mirror"`
-	Entries []manifestEntry `yaml:"entries"`
+	Mirror           string          `yaml:"mirror"`
+	Entries          []manifestEntry `yaml:"entries"`
+	GreywallProfiles []string        `yaml:"greywall_profiles"`
 }
 
 // manifestEntry maps a fragment source to its destination. Src is relative to
@@ -134,17 +136,135 @@ type resolvedEntry struct {
 	dst string
 }
 
-// validate checks the manifest has exactly one of mirror/entries.
+// validate checks the manifest declares a usable mode: mirror and entries
+// are mutually exclusive (use only one); greywall_profiles is orthogonal and
+// may combine with either (or stand alone, a no-op materialize for a bundle
+// that only references built-in profiles). A manifest declaring none of the
+// three is rejected as useless. Materialize relies on this: a greywall_profiles
+// -only manifest must pass validate, then expand returns an empty entry list
+// (no-op write).
 func (m *manifest) validate() error {
 	hasMirror := m.Mirror != ""
 	hasEntries := len(m.Entries) > 0
+	hasProfiles := len(m.GreywallProfiles) > 0
 	switch {
 	case hasMirror && hasEntries:
 		return errors.New("manifest has both mirror and entries (use only one)")
-	case !hasMirror && !hasEntries:
-		return errors.New("manifest has neither mirror nor entries")
+	case !hasMirror && !hasEntries && !hasProfiles:
+		return errors.New("manifest has neither mirror, entries, nor greywall_profiles")
 	}
 	return nil
+}
+
+// setupManifestName is the manifest name for the setup facet, read by
+// ResolveGreywallProfiles to derive the greywall profile list from a bundle's
+// shipped profiles and built-in references.
+const setupManifestName = "setup.yaml"
+
+// learnedDir is the destination subdir (relative to $AI_CABIN_HOME) where
+// greywall learned profiles are seeded. A setup.yaml entry whose dst contains
+// this marker contributes a shipped profile (the profile name is the stem of
+// the rendered dst). The forward-slash form matches dst paths, which are
+// forward-slash relative to destBase regardless of OS.
+const learnedDir = "greywall/learned/"
+
+// ResolveGreywallProfiles derives the greywall profile list for a cabin from
+// its active bundles: shipped profiles (setup.yaml entries whose dst is under
+// .config/greywall/learned/, name = stem of the rendered dst) plus built-in
+// references (the greywall_profiles: manifest field). The list is ordered
+// (bundle order from cabin.ActiveBundles, base first) and deduplicated by
+// first occurrence — base ships learned/workspace.json so workspace leads
+// naturally, no special-casing. A bundle with no setup.yaml (e.g. git-agent,
+// or a port-forward deps-only variant) contributes nothing and is not an
+// error. Errors are collected per-bundle (no fail-fast): a malformed manifest
+// or an undefined var in a templated dst is reported alongside the profiles
+// resolved so far.
+//
+// Only the entries: mode is scanned for shipped profiles (all current setup
+// manifests use entries:). A bundle that mirrors: a subtree containing learned
+// profiles would not be detected; such a bundle should declare them via
+// greywall_profiles: or use entries: for the profiles.
+func ResolveGreywallProfiles(merged fs.FS, bundles []cabin.FeatureRef, vars map[string]string) ([]string, error) {
+	wfs, ok := merged.(walkFS)
+	if !ok {
+		return nil, errors.New("merged fs does not implement ReadDirFS+StatFS (required to read setup manifests)")
+	}
+
+	var profiles []string
+	seen := make(map[string]bool)
+	var errs []error
+	for _, b := range bundles {
+		names, err := bundleGreywallProfiles(wfs, b, vars)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("bundle %q: %w", b.Name, err))
+			continue
+		}
+		for _, n := range names {
+			if n == "" || seen[n] {
+				continue
+			}
+			seen[n] = true
+			profiles = append(profiles, n)
+		}
+	}
+
+	if len(errs) > 0 {
+		return profiles, errors.Join(errs...)
+	}
+	return profiles, nil
+}
+
+// bundleGreywallProfiles reads a single bundle's setup.yaml and returns the
+// greywall profile names it contributes: built-in references (greywall_profiles:)
+// followed by shipped profiles (entries whose dst is under greywall/learned/,
+// name = stem of the rendered dst). A missing setup.yaml is a no-op (the
+// bundle has no setup facet), not an error. The manifest is not validated here
+// — ResolveGreywallProfiles reads metadata, not the copy mode, and a manifest
+// with greywall_profiles + entries is a valid combination.
+func bundleGreywallProfiles(wfs walkFS, b cabin.FeatureRef, vars map[string]string) ([]string, error) {
+	manifestPath := path.Join(b.Name, setupManifestName)
+	data, err := fs.ReadFile(wfs, manifestPath)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil // no setup facet for this bundle
+		}
+		return nil, fmt.Errorf("read manifest %q: %w", manifestPath, err)
+	}
+
+	var man manifest
+	if err := yaml.Unmarshal(data, &man); err != nil {
+		return nil, fmt.Errorf("parse manifest %q: %w", manifestPath, err)
+	}
+
+	var profiles []string
+	// Built-in references (e.g. go -> built-in greywall go profile).
+	profiles = append(profiles, man.GreywallProfiles...)
+
+	// Shipped profiles: entries whose dst is under greywall/learned/. The dst may
+	// be templated (port-forward: forward-{{.host}}-{{.port}}.json) and is
+	// rendered with the bundle attrs + profile vars before extracting the name.
+	for _, e := range man.Entries {
+		if !strings.Contains(e.Dst, learnedDir) {
+			continue
+		}
+		dst := e.Dst
+		if strings.Contains(dst, tmplOpen) {
+			rendered, rerr := render.RenderString(dst, vars, b.Attrs)
+			if rerr != nil {
+				return nil, fmt.Errorf("render profile dst %q: %w", e.Dst, rerr)
+			}
+			dst = rendered
+		}
+		profiles = append(profiles, profileNameFromDst(dst))
+	}
+	return profiles, nil
+}
+
+// profileNameFromDst extracts the greywall profile name from a learned/ dst
+// path: the stem of the basename (without the .json suffix). E.g.
+// ".config/greywall/learned/forward-mariadb-3306.json" -> "forward-mariadb-3306".
+func profileNameFromDst(dst string) string {
+	return strings.TrimSuffix(path.Base(dst), ".json")
 }
 
 // expand turns the manifest into a flat list of resolved entries (with

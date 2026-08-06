@@ -33,6 +33,11 @@ services:
       - SCW_PROJECT_ID=${SCW_PROJECT_ID}
       # go
       - GOPATH=${CONTAINER_HOME}/go
+      # Greywall profile list (resolved host-side from active bundles) and
+      # per-wrapper extras (e.g. --learning). Pass-through from the task env
+      # (set via env: sh: in the Taskfile or os.Setenv by the CLI).
+      - GREYWALL_PROFILE
+      - GREYWALL_ARGS
 
     volumes:
       # Desk (single mount for desk + skills)
