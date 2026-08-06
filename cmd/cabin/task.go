@@ -41,7 +41,7 @@ Examples:
 		taskName := args[1]
 		rawArgs := args[2:]
 
-		if err := runCabinTask(context.Background(), cabinName, taskName, rawArgs, os.Stdout, os.Stderr); err != nil {
+		if err := runCabinTask(context.Background(), cabinName, taskName, rawArgs, true, os.Stdout, os.Stderr); err != nil {
 			exitOnRunError(os.Stderr, cabinName, err)
 		}
 	},

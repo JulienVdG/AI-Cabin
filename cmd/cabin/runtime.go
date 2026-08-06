@@ -29,7 +29,7 @@ const lifecycleTaskfileName = "Taskfile.lifecycle.yml"
 // Materializing the lifecycle on every cabin task keeps the docker-* targets
 // available to `task` standalone and is idempotent (content-compare no-op when
 // up to date).
-func runCabinTask(ctx context.Context, cabinName, taskName string, rawArgs []string, stdout, stderr io.Writer) error {
+func runCabinTask(ctx context.Context, cabinName, taskName string, rawArgs []string, needRelpath bool, stdout, stderr io.Writer) error {
 	c, err := config.GetCabin(cabinName)
 	if err != nil {
 		return err
@@ -50,23 +50,31 @@ func runCabinTask(ctx context.Context, cabinName, taskName string, rawArgs []str
 	}
 	vm["AI_CABIN_CMD"] = exe
 
-	// Compute the host CWD sub-path relative to the workdir and inject it as
-	// CABIN_REL_PATH (path shadowing: the agent launches into the matching
-	// sub-directory inside the greywall sandbox). The Taskfile forwards it to
-	// `docker compose exec -e CABIN_REL_PATH=...` so the container-side
-	// wrapper does a two-step cd (root anchor + relpath inside the sandbox).
-	// Refuses paths outside the workdir (fail-fast, no silent fallback). Empty
-	// when CWD is the workdir root (the agent launches at the root).
-	wd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("get current working directory: %w", err)
-	}
-	rel, err := config.RelPath(wd, vm[config.WorkdirVar])
-	if err != nil {
-		// Not fatal: log to stderr and fall back to the root (relpath empty)
-		// rather than block the agent on a host-side path quirk. The
-		// container-side cd remains the last line of defense.
-		fmt.Fprintf(os.Stderr, "Warning: %v; launching agent at the workdir root\n", err)
+	// Path shadowing (relpath): inject the host CWD sub-path relative to the
+	// workdir as CABIN_REL_PATH so the agent launches into the matching
+	// sub-directory inside the greywall sandbox (the Taskfile forwards it via
+	// `docker compose exec -e CABIN_REL_PATH=...`; the container-side wrapper
+	// does a two-step cd: root anchor + relpath inside the sandbox).
+	//
+	// Computed only for targets that drop the user into the container (task,
+	// shell, greyshell); skipped for container-level actions (up/down/build/
+	// logs/restart). The user can opt out with --no-relpath to launch at the
+	// workdir root explicitly (e.g. from a CWD outside the workdir tree).
+	//
+	// Fail-fast when CWD is outside the workdir: a silent fallback to the root
+	// would make the agent run in the wrong directory while the user believes
+	// it is in the sub-path. The container-side cd remains the last line of
+	// defense.
+	rel := ""
+	if needRelpath && !noRelpathFlag {
+		wd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("get current working directory: %w", err)
+		}
+		rel, err = config.RelPath(wd, vm[config.WorkdirVar])
+		if err != nil {
+			return fmt.Errorf("%w (cd into the workdir tree, or pass --no-relpath to launch at the workdir root)", err)
+		}
 	}
 	vm["CABIN_REL_PATH"] = rel
 
@@ -105,15 +113,18 @@ func exitOnRunError(w io.Writer, cabinName string, err error) {
 // shared docker-<cmd> Taskfile target. The `docker-` prefix avoids collision
 // with cabin-owned targets: task errors on a flatten include with a duplicate
 // name, so the cabin owns setup/deps/agent targets and the lifecycle owns the
-// docker-* names.
-func lifecycleWrapper(name, target, short string) *cobra.Command {
+// docker-* names. needRelpath selects whether the host CWD sub-path is
+// injected (shell/greyshell drop the user into the container) or skipped
+// (up/down/build/logs/restart are container-level actions with no CWD to
+// propagate).
+func lifecycleWrapper(name, target, short string, needRelpath bool) *cobra.Command {
 	return &cobra.Command{
 		Use:   name + " <cabin>",
 		Short: short,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cabinName := args[0]
-			if err := runCabinTask(cmd.Context(), cabinName, target, nil, os.Stdout, os.Stderr); err != nil {
+			if err := runCabinTask(cmd.Context(), cabinName, target, nil, needRelpath, os.Stdout, os.Stderr); err != nil {
 				exitOnRunError(os.Stderr, cabinName, err)
 			}
 		},
@@ -122,12 +133,12 @@ func lifecycleWrapper(name, target, short string) *cobra.Command {
 
 func init() {
 	rootCmd.AddCommand(
-		lifecycleWrapper("up", "docker-up", "Start the cabin in background"),
-		lifecycleWrapper("down", "docker-down", "Stop the cabin"),
-		lifecycleWrapper("build", "docker-build", "Build the cabin image"),
-		lifecycleWrapper("shell", "docker-shell", "Get a bash shell inside the running agent container"),
-		lifecycleWrapper("greyshell", "docker-greyshell", "Get a greywall sandboxed shell inside the agent container"),
-		lifecycleWrapper("logs", "docker-logs", "Follow agent container logs"),
-		lifecycleWrapper("restart", "docker-restart", "Restart the agent container"),
+		lifecycleWrapper("up", "docker-up", "Start the cabin in background", false),
+		lifecycleWrapper("down", "docker-down", "Stop the cabin", false),
+		lifecycleWrapper("build", "docker-build", "Build the cabin image", false),
+		lifecycleWrapper("shell", "docker-shell", "Get a bash shell inside the running agent container", true),
+		lifecycleWrapper("greyshell", "docker-greyshell", "Get a greywall sandboxed shell inside the agent container", true),
+		lifecycleWrapper("logs", "docker-logs", "Follow agent container logs", false),
+		lifecycleWrapper("restart", "docker-restart", "Restart the agent container", false),
 	)
 }

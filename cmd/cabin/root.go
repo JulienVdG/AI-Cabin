@@ -26,13 +26,15 @@ var rootCmd = &cobra.Command{
 // (SetInterspersed(false)) pass them BEFORE positional args:
 // `cabin --profile x task pi-go pi`.
 var (
-	profileFlag string
-	cliVars     []string
+	profileFlag   string
+	cliVars       []string
+	noRelpathFlag bool
 )
 
 func init() {
 	rootCmd.PersistentFlags().StringVar(&profileFlag, "profile", "", "profile to use (overrides AI_CABIN_PROFILE and config.yaml)")
 	rootCmd.PersistentFlags().StringArrayVar(&cliVars, "var", nil, "var override KEY=VAL (repeatable; highest precedence)")
+	rootCmd.PersistentFlags().BoolVar(&noRelpathFlag, "no-relpath", false, "skip path shadowing (launch the agent at the workdir root instead of the host CWD sub-path)")
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
