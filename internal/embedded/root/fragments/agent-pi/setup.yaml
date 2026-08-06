@@ -3,5 +3,5 @@ entries:
     dst: .pi/agent/models.json
   - src: setup/settings.json.tmpl
     dst: .pi/agent/settings.json
-  - src: setup/learned/pi.json
+  - src: setup/greywall_profiles_pi.json
     dst: .config/greywall/learned/pi.json

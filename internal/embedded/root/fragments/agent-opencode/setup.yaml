@@ -1,5 +1,5 @@
 entries:
   - src: setup/opencode.json.tmpl
     dst: .config/opencode/opencode.json
-  - src: setup/learned/opencode.json
+  - src: setup/greywall_profiles_opencode.json
     dst: .config/greywall/learned/opencode.json
