@@ -122,6 +122,8 @@ func lifecycleWrapper(name, target, short string, needRelpath bool) *cobra.Comma
 		Use:   name + " <cabin>",
 		Short: short,
 		Args:  cobra.ExactArgs(1),
+		// <cabin> is completed from the registry (config.ListCabins).
+		ValidArgsFunction: completeCabinNames,
 		Run: func(cmd *cobra.Command, args []string) {
 			cabinName := args[0]
 			if err := runCabinTask(cmd.Context(), cabinName, target, nil, needRelpath, os.Stdout, os.Stderr); err != nil {

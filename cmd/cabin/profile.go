@@ -53,6 +53,8 @@ var profileShowCmd = &cobra.Command{
 	Short: "Show profile details",
 	Long:  `Show details of a specific profile. If no name is provided, shows the current profile.`,
 	Args:  cobra.MaximumNArgs(1),
+	// <name> is completed from the available profiles.
+	ValidArgsFunction: completeProfileNames,
 	Run: func(cmd *cobra.Command, args []string) {
 		var profileName string
 		if len(args) > 0 {
@@ -79,6 +81,8 @@ var profileUseCmd = &cobra.Command{
 	Short: "Select active profile",
 	Long:  `Select which profile to use as the default for AI-Cabin commands.`,
 	Args:  cobra.ExactArgs(1),
+	// <name> is completed from the available profiles.
+	ValidArgsFunction: completeProfileNames,
 	Run: func(cmd *cobra.Command, args []string) {
 		profileName := args[0]
 

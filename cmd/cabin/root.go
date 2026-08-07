@@ -35,6 +35,16 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&profileFlag, "profile", "", "profile to use (overrides AI_CABIN_PROFILE and config.yaml)")
 	rootCmd.PersistentFlags().StringArrayVar(&cliVars, "var", nil, "var override KEY=VAL (repeatable; highest precedence)")
 	rootCmd.PersistentFlags().BoolVar(&noRelpathFlag, "no-relpath", false, "skip path shadowing (launch the agent at the workdir root instead of the host CWD sub-path)")
+
+	// Dynamic completion: --profile <TAB> suggests available profiles. Registered
+	// on root so every subcommand (task, up, ...) inherits it. The completion
+	// subcommand itself is Cobra's default (bash/zsh/fish script generation).
+	if err := rootCmd.RegisterFlagCompletionFunc("profile", completeProfileNames); err != nil {
+		// Non-fatal: completion is a UX nicety, not a core function. The binary
+		// still works without it; surface the misconfiguration on stderr.
+		fmt.Fprintf(os.Stderr, "Warning: could not register --profile completion: %v\n", err)
+	}
+	rootCmd.InitDefaultCompletionCmd()
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
