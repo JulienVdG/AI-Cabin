@@ -81,17 +81,26 @@ func runCabinTask(ctx context.Context, cabinName, taskName string, rawArgs []str
 	// Ensure the lifecycle Taskfile is materialized to XDG state and inject its
 	// path so the cabin's includes: resolves to where the file was actually
 	// written (matters when XDG_STATE_HOME is redirected, e.g. the dev pattern).
-	stateFS, err := embedded.State()
-	if err != nil {
-		return fmt.Errorf("load embedded state: %w", err)
-	}
-	lifecyclePath, err := state.EnsureArtifact(stateFS, lifecycleTaskfileName)
+	lifecyclePath, err := ensureLifecycleArtifact()
 	if err != nil {
 		return fmt.Errorf("materialize lifecycle taskfile: %w", err)
 	}
 	vm["AI_CABIN_LIFECYCLE_TASKFILE"] = lifecyclePath
 
 	return task.Run(ctx, c.Path, taskName, rawArgs, vm, stdout, stderr)
+}
+
+// ensureLifecycleArtifact materializes the embedded lifecycle Taskfile to XDG
+// state (idempotent: no-op when the on-disk copy is up to date) and returns its
+// absolute path. Shared by runCabinTask (sets it on the task subprocess env) and
+// task-target completion (sets it on the process env so Setup() resolves the
+// lifecycle include and the docker-* targets appear).
+func ensureLifecycleArtifact() (string, error) {
+	stateFS, err := embedded.State()
+	if err != nil {
+		return "", fmt.Errorf("load embedded state: %w", err)
+	}
+	return state.EnsureArtifact(stateFS, lifecycleTaskfileName)
 }
 
 // exitOnRunError prints a run error to stderr with actionable guidance and

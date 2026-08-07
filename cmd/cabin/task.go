@@ -36,10 +36,10 @@ Examples:
   cabin task blog opencode web --port 9090
 `,
 	Args: cobra.MinimumNArgs(2),
-	// <cabin> (1st positional) is completed from the registry; the <task>
-	// positional and trailing agent params are not completed in v1 (see §7 —
-	// wiring task's own target completion is a future enhancement).
-	ValidArgsFunction: completeTaskCabin,
+	// <cabin> (1st positional) and <task> (2nd positional) are completed; the
+	// 3rd+ positional (agent params) is forwarded raw via {{.CLI_ARGS}} and is
+	// not completed.
+	ValidArgsFunction: completeTaskArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		cabinName := args[0]
 		taskName := args[1]

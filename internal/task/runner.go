@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
+	"sort"
 
 	tasklib "github.com/go-task/task/v3"
 	"github.com/go-task/task/v3/args"
@@ -51,6 +53,32 @@ func Run(ctx context.Context, cabinPath, taskName string, rawArgs []string, envV
 		return fmt.Errorf("run task %q: %w", taskName, err)
 	}
 	return nil
+}
+
+// ListTargets parses the Taskfile at cabinPath and returns the names of all
+// its targets (after includes are merged by Setup, so flattened lifecycle
+// docker-* targets appear too). Used for shell completion of `cabin task
+// <cabin> <TAB>` — a read-only parse, it does not execute any target.
+//
+// The caller is responsible for the env Setup() needs to resolve includes:
+// AI_CABIN_LIFECYCLE_TASKFILE (the materialized lifecycle Taskfile path) must
+// be set in the process env, otherwise the lifecycle include is skipped
+// (optional: true) and only cabin-local targets are returned.
+func ListTargets(cabinPath string) ([]string, error) {
+	exec := tasklib.NewExecutor(
+		tasklib.WithDir(cabinPath),
+		tasklib.WithStdout(io.Discard),
+		tasklib.WithStderr(io.Discard),
+	)
+	if err := exec.Setup(); err != nil {
+		return nil, fmt.Errorf("setup taskfile in %s: %w", cabinPath, err)
+	}
+	if exec.Taskfile == nil || exec.Taskfile.Tasks == nil {
+		return []string{}, nil
+	}
+	targets := slices.Collect(exec.Taskfile.Tasks.Keys(nil))
+	sort.Strings(targets)
+	return targets, nil
 }
 
 // injectCLIArgs forwards agent params as CLI_ARGS / CLI_ARGS_LIST on the parsed
