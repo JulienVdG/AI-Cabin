@@ -6,7 +6,7 @@
 #
 # What it does:
 #   - Creates directories for AI_CABIN_HOME, AI_CABIN_DESK, AI_CABIN_WORKDIR
-#   - Copies desk/ from templates/desk/ (complete desk with AGENTS.md, skills/, etc.)
+#   - Copies desk/ from skeletons/desk/ (complete desk with AGENTS.md, skills/, etc.)
 #   - Creates .envrc with the configured paths
 #
 # What it does NOT do:
@@ -64,7 +64,7 @@ GIT_AGENT_EMAIL=$(git config --global user.email 2>/dev/null || echo "ai-agent@v
 # Source paths (from workspace)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_DIR="$(dirname "$(dirname "${SCRIPT_DIR}")")"
-DESK_SOURCE="${WORKSPACE_DIR}/templates/desk"
+DESK_SOURCE="${WORKSPACE_DIR}/skeletons/desk"
 
 # Colors for output
 RED='\033[0;31m'

@@ -531,7 +531,7 @@ bash command="git commit -m 'msg'"
 
 > **Purpose:** Index linking code locations to documentation. Avoids re-explaining patterns in every prompt.
 >
-> **Scope:** AI-Cabin (cabin/, templates/, desk/)
+> **Scope:** AI-Cabin (cabin/, skeletons/, desk/)
 >
 > **Update:** End of session via `skill:retro-process` when new patterns are discovered.
 

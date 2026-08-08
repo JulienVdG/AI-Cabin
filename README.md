@@ -56,7 +56,7 @@ git clone https://github.com/JulienVdG/AI-Cabin.git
 cd AI-Cabin
 
 # Bootstrap a new environment (creates desk, workdir, home directories)
-./templates/bin/bootstrap-cabin.sh /home/user/ai-cabin-prod
+./skeletons/bin/bootstrap-cabin.sh /home/user/ai-cabin-prod
 ```
 
 This creates:
@@ -303,7 +303,7 @@ curl --connect-timeout 2 http://<your-IP>:43080/api/health
 
 ## Documentation
 
-- **[Bootstrap Script](templates/bin/README.md)** - Environment setup guide
+- **[Bootstrap Script](skeletons/bin/README.md)** - Environment setup guide
 - **[Cabin Docs](cabin/opencode-go/README.md)** - Detailed cabin configuration
 
 ---
