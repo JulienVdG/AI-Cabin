@@ -34,6 +34,16 @@ type FileCreator interface {
 	Create(name string) (io.WriteCloser, error)
 }
 
+// ErrSkip is returned by a FileCreator to signal that a destination file was
+// not written because the policy decided to skip it (SkipCreator: the file
+// already exists; a future InteractiveCreator: the user answered "skip"). It is
+// non-fatal: the copy/template engine treats it as "this file was not written"
+// (excluded from the written list) and continues, distinct from an I/O error
+// which is collected for the aggregated error. On ErrSkip the returned writer is
+// non-nil (so a caller that defers Close before checking the error is safe) but
+// need not be used.
+var ErrSkip = errors.New("destination file skipped by the write policy")
+
 // TruncateCreator opens the destination with O_CREATE|O_WRONLY|O_TRUNC.
 type TruncateCreator struct{}
 
@@ -41,6 +51,31 @@ type TruncateCreator struct{}
 func (TruncateCreator) Create(name string) (io.WriteCloser, error) {
 	return os.OpenFile(name, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, FilePerm)
 }
+
+// SkipCreator is the no-overwrite policy: Create returns ErrSkip (with a no-op
+// writer) when the destination already exists, so the caller can continue
+// without clobbering an existing file. When the destination is absent it opens
+// for writing like TruncateCreator. Used by internal/skeletons as the default
+// (no-overwrite) policy; --force selects TruncateCreator instead.
+type SkipCreator struct{}
+
+// Create returns a no-op writer and ErrSkip when name already exists; otherwise
+// opens name for writing (truncate), like TruncateCreator.
+func (SkipCreator) Create(name string) (io.WriteCloser, error) {
+	if _, err := os.Stat(name); err == nil {
+		return skipWriter{}, ErrSkip
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("stat %q: %w", name, err)
+	}
+	return os.OpenFile(name, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, FilePerm)
+}
+
+// skipWriter is a no-op WriteCloser returned by SkipCreator on an existing
+// target: Write discards (the file is not modified), Close is a no-op.
+type skipWriter struct{}
+
+func (skipWriter) Write(p []byte) (int, error) { return len(p), nil }
+func (skipWriter) Close() error                { return nil }
 
 // BackupSuffix is appended to the target name to form the single-slot backup
 // path (<name>.cabin-bak).

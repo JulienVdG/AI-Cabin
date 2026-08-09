@@ -148,3 +148,36 @@ func TestBackupWriter_WriteAfterClose(t *testing.T) {
 	_, err = w.Write([]byte("late"))
 	assert.Error(t, err, "Write after Close must error")
 }
+
+func TestSkipCreator(t *testing.T) {
+	t.Run("SkipsExisting", func(t *testing.T) {
+		// An existing destination is not overwritten: Create returns ErrSkip (with
+		// a no-op writer), the file keeps its content. This is the no-overwrite
+		// default of internal/skeletons.Apply (cabin profile init without --force).
+		dest := t.TempDir()
+		name := filepath.Join(dest, "out.txt")
+		require.NoError(t, os.WriteFile(name, []byte("keep"), 0o644))
+
+		w, err := writestrategy.SkipCreator{}.Create(name)
+		assert.ErrorIs(t, err, writestrategy.ErrSkip)
+		// Write is a no-op (discards) so a caller that defers Close before checking
+		// the error is safe and leaves the existing file untouched.
+		n, werr := w.Write([]byte("ignored"))
+		assert.NoError(t, werr, "skip writer Write must not error")
+		assert.Equal(t, len("ignored"), n, "skip writer Write reports full length")
+		require.NoError(t, w.Close(), "skip writer Close is a no-op")
+
+		assert.Equal(t, "keep", readTarget(t, name), "existing content must not change")
+	})
+
+	t.Run("CreatesAbsent", func(t *testing.T) {
+		// An absent destination is created like TruncateCreator: no skip, content
+		// written. A skeleton's first copy lands every file this way.
+		dest := t.TempDir()
+		name := filepath.Join(dest, "out.txt")
+
+		writeAll(t, writestrategy.SkipCreator{}, name, "new")
+
+		assert.Equal(t, "new", readTarget(t, name))
+	})
+}
