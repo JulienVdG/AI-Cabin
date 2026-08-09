@@ -2,6 +2,7 @@ package embedded_test
 
 import (
 	"io/fs"
+	"path"
 	"sort"
 	"strings"
 	"testing"
@@ -146,4 +147,77 @@ func TestState(t *testing.T) {
 	} {
 		assert.Contains(t, content, task, "lifecycle Taskfile missing the %q target", task)
 	}
+}
+
+// expectedDesks is the public contract for the embedded desk skeletons. The
+// `minimal` desk skeleton is the zero-config default of `cabin setup` (copied
+// to AI_CABIN_DESK); a rename here breaks a test rather than silently
+// orphaning a skeleton.
+var expectedDesks = []string{"minimal"}
+
+// minimalDeskFiles are the files the minimal desk skeleton must ship: the base
+// agent rules, a minimal TODO, the retro process doc, and the retro-process
+// skill. `cabin setup` copies this whole tree to AI_CABIN_DESK. The list is
+// exhaustive: a stray file (.swp, .DS_Store, ...) breaks the
+// MinimalDeskHasNoStrayFiles sub-case rather than being silently embedded.
+var minimalDeskFiles = []string{
+	"AGENTS.md",
+	"TODO.md",
+	"retro.md",
+	"skills/retro-process/SKILL.md",
+}
+
+func TestSkeletons(t *testing.T) {
+	// Skeletons() ships the embedded Class 1 scaffolding trees, typed by
+	// concern. `desks/minimal/` is the contract `cabin setup` / `cabin profile
+	// init` (default skeleton) relies on: dropping a file breaks the
+	// zero-config onboarding.
+	fsys, err := embedded.Skeletons()
+	require.NoError(t, err)
+
+	t.Run("DesksRootMatchesContract", func(t *testing.T) {
+		entries, err := fs.ReadDir(fsys, "desks")
+		require.NoError(t, err)
+		var names []string
+		for _, e := range entries {
+			assert.True(t, e.IsDir(), "desks entry %q is not a directory", e.Name())
+			names = append(names, e.Name())
+		}
+		sort.Strings(names)
+		assert.Equal(t, expectedDesks, names)
+	})
+
+	t.Run("MinimalDeskShipsRequiredFiles", func(t *testing.T) {
+		for _, f := range minimalDeskFiles {
+			p := path.Join("desks", "minimal", f)
+			_, err := fs.ReadFile(fsys, p)
+			require.NoError(t, err, "minimal desk missing required file %q", p)
+		}
+	})
+
+	t.Run("MinimalDeskHasNoStrayFiles", func(t *testing.T) {
+		// Walk the minimal desk and assert every file is in minimalDeskFiles.
+		// Catches a stray editor swap file (.swp) or OS file (.DS_Store) that
+		// //go:embed all:root would silently ship — a clean tree is the contract.
+		want := make(map[string]bool, len(minimalDeskFiles))
+		for _, f := range minimalDeskFiles {
+			want[f] = true
+		}
+		var stray []string
+		err := fs.WalkDir(fsys, "desks/minimal", func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
+				return nil
+			}
+			rel := strings.TrimPrefix(p, "desks/minimal/")
+			if !want[rel] {
+				stray = append(stray, rel)
+			}
+			return nil
+		})
+		require.NoError(t, err)
+		assert.Empty(t, stray, "minimal desk has stray files not in the contract: %v", stray)
+	})
 }

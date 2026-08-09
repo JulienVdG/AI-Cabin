@@ -37,3 +37,14 @@ func Fragments() (fs.FS, error) {
 func State() (fs.FS, error) {
 	return fs.Sub(rootFS, "root/state")
 }
+
+// Skeletons returns the embedded Class 1 scaffolding trees as a rooted fs.FS
+// (paths are "desks/minimal/..." without the "root/skeletons/" prefix). Typed
+// by concern: `desks/` holds desk skeletons copied to the profile's
+// AI_CABIN_DESK by `cabin setup` / `cabin profile init`. The embedded tree
+// ships the `minimal` desk skeleton (the zero-config default of `cabin setup`);
+// richer skeletons live in the repo under skeletons/desks/ and are resolved
+// via --skeleton <path>. Consumed by internal/skeletons.Apply.
+func Skeletons() (fs.FS, error) {
+	return fs.Sub(rootFS, "root/skeletons")
+}
