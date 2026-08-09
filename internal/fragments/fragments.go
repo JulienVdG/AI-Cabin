@@ -31,6 +31,7 @@ import (
 	"github.com/JulienVdG/AI-Cabin/internal/cabin"
 	"github.com/JulienVdG/AI-Cabin/internal/render"
 	"github.com/JulienVdG/AI-Cabin/internal/unionfs"
+	"github.com/JulienVdG/AI-Cabin/internal/writestrategy"
 )
 
 // walkFS is the contract Materialize needs from the merged fallback chain:
@@ -53,18 +54,6 @@ const (
 	// rendered as a template (port-forward multi-instance naming).
 	tmplOpen = "{{"
 )
-
-// filePerm is the mode used to create destination files: a plain 0666 so the
-// umask reduces it to 0644 (writable by the owner, idempotent on re-run). The
-// source mode is not preserved (embed.FS exposes every embedded file as 0444,
-// an artifact of the Go embed package; the executable bit is the Dockerfile's
-// authority via RUN chmod +x, blueprint facet).
-const filePerm os.FileMode = 0o666
-
-// dirPerm is the mode used to create destination directories: a plain 0777 so
-// the umask reduces it to 0755. Symmetric with filePerm (0666/umask for files,
-// 0777/umask for dirs).
-const dirPerm os.FileMode = 0o777
 
 // BuildLayers constructs the fallback chain as a union fs.FS, ordered highest
 // priority first (first-wins like $PATH): the conf dirs, then the cabin-local
@@ -127,7 +116,7 @@ type manifestEntry struct {
 
 // resolvedEntry is a fragment ready to materialize: src is relative to the
 // bundle root in the merged FS, dst is the raw destination path (relative to
-// destBase, before name templating). The destination mode is always filePerm
+// destBase, before name templating). The destination mode is always writestrategy.FilePerm
 // (umask-applied): the source mode is not preserved (embed.FS exposes every
 // file as 0444, an artifact; the executable bit is the Dockerfile's
 // authority, blueprint facet).
@@ -360,7 +349,7 @@ type Materializer struct {
 	manifestName string
 	destBase     string
 	vars         map[string]string
-	opener       FileCreator
+	opener       writestrategy.FileCreator
 }
 
 // NewMaterializer builds a Materializer. Use TruncateCreator for the deps facet
@@ -368,7 +357,7 @@ type Materializer struct {
 // $AI_CABIN_HOME). Returns an error if merged does not implement
 // ReadDirFS+StatFS (required by WalkDir) — failing at construction rather than
 // on the first Materialize call.
-func NewMaterializer(merged fs.FS, manifestName, destBase string, vars map[string]string, opener FileCreator) (*Materializer, error) {
+func NewMaterializer(merged fs.FS, manifestName, destBase string, vars map[string]string, opener writestrategy.FileCreator) (*Materializer, error) {
 	wfs, ok := merged.(walkFS)
 	if !ok {
 		return nil, errors.New("merged fs does not implement ReadDirFS+StatFS (required by WalkDir)")
@@ -448,7 +437,7 @@ func (m *Materializer) Materialize(bundle string, attrs map[string]any) ([]strin
 		}
 
 		dstPath := filepath.Join(m.destBase, filepath.FromSlash(dstRel))
-		if err := os.MkdirAll(filepath.Dir(dstPath), dirPerm); err != nil {
+		if err := os.MkdirAll(filepath.Dir(dstPath), writestrategy.DirPerm); err != nil {
 			errs = append(errs, fmt.Errorf("mkdir %q: %w", filepath.Dir(dstPath), err))
 			continue
 		}

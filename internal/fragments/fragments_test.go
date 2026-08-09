@@ -12,6 +12,7 @@ import (
 	"github.com/JulienVdG/AI-Cabin/internal/embedded"
 	"github.com/JulienVdG/AI-Cabin/internal/fragments"
 	"github.com/JulienVdG/AI-Cabin/internal/render"
+	"github.com/JulienVdG/AI-Cabin/internal/writestrategy"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -41,7 +42,7 @@ func readDest(t *testing.T, destBase, rel string) string {
 // focused on the behaviour under test, not on struct construction.
 func truncateMat(t *testing.T, merged fs.FS, manifest, dest string, vars map[string]string) *fragments.Materializer {
 	t.Helper()
-	mat, err := fragments.NewMaterializer(merged, manifest, dest, vars, fragments.TruncateCreator{})
+	mat, err := fragments.NewMaterializer(merged, manifest, dest, vars, writestrategy.TruncateCreator{})
 	require.NoError(t, err)
 	return mat
 }
@@ -336,7 +337,7 @@ func TestMaterialize(t *testing.T) {
 	})
 
 	t.Run("UsesUmaskMode", func(t *testing.T) {
-		// The destination mode is always filePerm (0666 & ^umask): the source
+		// The destination mode is always writestrategy.FilePerm (0666 & ^umask): the source
 		// mode is not preserved (embed.FS exposes every file as 0444, an
 		// artifact; the executable bit is the Dockerfile's authority via
 		// RUN chmod +x). So a 0755 wrapper and a 0644 plain file both land at
@@ -396,7 +397,7 @@ func TestMaterialize(t *testing.T) {
 // strategy: copy-if-different + backup on diff, no-op on identical).
 func backupMat(t *testing.T, merged fs.FS, manifest, dest string, vars map[string]string) *fragments.Materializer {
 	t.Helper()
-	mat, err := fragments.NewMaterializer(merged, manifest, dest, vars, fragments.BackupCreator{})
+	mat, err := fragments.NewMaterializer(merged, manifest, dest, vars, writestrategy.BackupCreator{})
 	require.NoError(t, err)
 	return mat
 }
@@ -415,7 +416,7 @@ func TestBackupCreator(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, `{"v":1}`, readDest(t, dest, "conf.json"))
-		_, statErr := os.Stat(filepath.Join(dest, "conf.json"+fragments.BackupSuffix))
+		_, statErr := os.Stat(filepath.Join(dest, "conf.json"+writestrategy.BackupSuffix))
 		assert.True(t, os.IsNotExist(statErr), "no backup on first write")
 	})
 
@@ -437,7 +438,7 @@ func TestBackupCreator(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, `{"v":1}`, readDest(t, dest, "conf.json"))
-		_, statErr := os.Stat(filepath.Join(dest, "conf.json"+fragments.BackupSuffix))
+		_, statErr := os.Stat(filepath.Join(dest, "conf.json"+writestrategy.BackupSuffix))
 		assert.True(t, os.IsNotExist(statErr), "no backup on identical re-run")
 	})
 
@@ -462,7 +463,7 @@ func TestBackupCreator(t *testing.T) {
 		// Target has new content.
 		assert.Equal(t, `{"v":2}`, readDest(t, dest, "conf.json"))
 		// Backup has old content.
-		assert.Equal(t, `{"v":1}`, readDest(t, dest, "conf.json"+fragments.BackupSuffix))
+		assert.Equal(t, `{"v":1}`, readDest(t, dest, "conf.json"+writestrategy.BackupSuffix))
 	})
 
 	t.Run("NoBackupWithTruncateCreator", func(t *testing.T) {
@@ -483,7 +484,7 @@ func TestBackupCreator(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, `{"v":2}`, readDest(t, dest, "conf.json"))
-		_, statErr := os.Stat(filepath.Join(dest, "conf.json"+fragments.BackupSuffix))
+		_, statErr := os.Stat(filepath.Join(dest, "conf.json"+writestrategy.BackupSuffix))
 		assert.True(t, os.IsNotExist(statErr), "truncate never backs up")
 	})
 }

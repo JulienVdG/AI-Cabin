@@ -12,6 +12,7 @@ import (
 	"github.com/JulienVdG/AI-Cabin/internal/config"
 	"github.com/JulienVdG/AI-Cabin/internal/embedded"
 	"github.com/JulienVdG/AI-Cabin/internal/fragments"
+	"github.com/JulienVdG/AI-Cabin/internal/writestrategy"
 
 	"github.com/spf13/cobra"
 )
@@ -106,7 +107,7 @@ var internalDepsCmd = &cobra.Command{
 		// all errors (no fail-fast) so the user sees every issue in one run;
 		// we aggregate per-bundle and continue across bundles the same way.
 		depsDir := filepath.Join(cabinPath, ".deps")
-		mat, err := fragments.NewMaterializer(merged, depsManifest, depsDir, vars.AsMap(), fragments.TruncateCreator{})
+		mat, err := fragments.NewMaterializer(merged, depsManifest, depsDir, vars.AsMap(), writestrategy.TruncateCreator{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
@@ -149,7 +150,7 @@ var internalSetupCmd = &cobra.Command{
 		}
 
 		destBase := vars[config.HomeVar]
-		mat, err := fragments.NewMaterializer(merged, setupManifest, destBase, vars.AsMap(), fragments.BackupCreator{})
+		mat, err := fragments.NewMaterializer(merged, setupManifest, destBase, vars.AsMap(), writestrategy.BackupCreator{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
