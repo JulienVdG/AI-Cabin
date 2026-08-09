@@ -20,6 +20,12 @@ const ProfileEnvVar = "AI_CABIN_PROFILE"
 // only on an explicitly selected missing/unparseable profile, or a malformed
 // --var. The whole process env is included, so system vars (PATH, HOME, ...)
 // are preserved; the runner sets the view via os.Setenv without clearing.
+//
+// InitProfile follows the same precedence rule (--var > env > existing >
+// defaults) but is not a caller of ResolveVars: it loads the named profile under
+// creation/update (not the selected one) and persists a bounded key set (env
+// overrides values but does not enlarge the set), whereas this view includes
+// the whole env. See ConfigService.InitProfile for the persistence rule.
 func (s *ConfigService) ResolveVars(profileFlag string, cliVars []string) (Vars, error) {
 	view := make(Vars)
 

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -198,22 +199,6 @@ func (s *ConfigService) GetActiveProfile(name string) (*Profile, error) {
 	return profile, nil
 }
 
-// CreateDefaultProfile creates a default profile with values derived from the environment.
-// TODO: AI_CABIN_HOME/DESK/WORKDIR should be templated or passed as parameters to `cabin profile init`.
-// For now, we use the user's home as a base, but this needs to be customized per bootstrap-cabin.sh pattern.
-func (s *ConfigService) CreateDefaultProfile(name string) (*Profile, error) {
-	profile, err := s.BuildDefaultProfile(name)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := s.SaveProfile(profile); err != nil {
-		return nil, err
-	}
-
-	return profile, nil
-}
-
 // BuildDefaultProfile creates a Profile object without writing it to disk.
 // This allows testing the profile construction logic separately from I/O.
 func (s *ConfigService) BuildDefaultProfile(name string) (*Profile, error) {
@@ -253,6 +238,94 @@ func (s *ConfigService) BuildDefaultProfile(name string) (*Profile, error) {
 		},
 	}
 
+	return profile, nil
+}
+
+// InitProfile creates or overwrites a profile with a bounded set of resolved
+// vars and returns the persisted profile (so the caller, `cabin profile
+// init`, can read AI_CABIN_DESK to copy the desk skeleton).
+//
+// The persisted key set is bounded — never the whole env:
+//   - defaults (BuildDefaultProfile: AI_CABIN_HOME/DESK/WORKDIR + GIT_AGENT_*)
+//   - the --var keys (cliVars), which act as the initial `set` of the profile
+//     CRUD and DO enlarge the set (e.g. --var AI_CABIN_DESK=/custom)
+//   - on --force with an existing profile, the existing profile's keys
+//
+// Values are resolved with ResolveVars precedence (--var > env > existing >
+// defaults): an env override on a bounded key (e.g. AI_CABIN_DESK in env) is
+// picked up for the value, but env vars outside the bounded set are dropped
+// (no PATH, no stray SCW_PROJECT_ID unless passed as --var).
+//
+// On a new profile (does not exist, force ignored): persisted = defaults ∪
+// --var. On --force with an existing profile: persisted = defaults ∪ --var ∪
+// existing. On an existing profile without --force: no-op, returns the existing
+// profile (the CLI warns + exit 0, mirroring `cabin add`).
+//
+// The merge precedence mirrors ResolveVars (--var > env > existing > defaults)
+// but is not delegated to it: ResolveVars loads the *selected* profile (axis A)
+// and includes the whole env in its view, whereas InitProfile loads the named
+// profile under creation/update and persists only a bounded key set (env
+// overrides values but does not enlarge the set). The two share the same
+// precedence rule by design; a future refactor could extract the shared merge
+// if the bounded-set concern is factored out, but inlining keeps InitProfile
+// readable and decoupled from the profile-selection axis.
+func (s *ConfigService) InitProfile(name string, cliVars []string, force bool) (*Profile, error) {
+	if name == "" {
+		name = "default"
+	}
+
+	exists, err := s.ProfileExists(name)
+	if err != nil {
+		return nil, fmt.Errorf("check profile existence: %w", err)
+	}
+	if exists && !force {
+		// No-op: return the existing profile so the CLI can skip the skeleton
+		// copy too. The caller owns the warn + exit 0 UX (pattern cabin add).
+		return s.LoadProfile(name)
+	}
+
+	// Defaults (the bounded base set).
+	defaults, err := s.BuildDefaultProfile(name)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build the persisted var map with ResolveVars precedence:
+	// --var > env > existing (force) > defaults.
+	persisted := make(Vars, len(defaults.Vars))
+	setIfAbsent(persisted, defaults.Vars) // defaults first (lowest precedence)
+
+	if force && exists {
+		existing, err := s.LoadProfile(name)
+		if err != nil {
+			return nil, fmt.Errorf("load existing profile: %w", err)
+		}
+		setIfAbsent(persisted, existing.Vars) // existing wins over defaults
+	}
+
+	// Env: only the keys already in `persisted` (the bounded set) are updated
+	// from env — env overrides default/existing values but does NOT enlarge the
+	// set (no PATH stray). Precedence so far: env > existing > defaults.
+	for k := range persisted {
+		if v, ok := os.LookupEnv(k); ok {
+			persisted[k] = v
+		}
+	}
+
+	// --var (cliVars): highest precedence and DOES enlarge the set (a --var key
+	// not in defaults/existing is added — the initial `set` of the CRUD).
+	for _, kv := range cliVars {
+		k, v, ok := strings.Cut(kv, "=")
+		if !ok || k == "" {
+			return nil, fmt.Errorf("invalid --var %q: expected KEY=VAL", kv)
+		}
+		persisted[k] = v
+	}
+
+	profile := &Profile{Name: name, Vars: persisted}
+	if err := s.SaveProfile(profile); err != nil {
+		return nil, err
+	}
 	return profile, nil
 }
 

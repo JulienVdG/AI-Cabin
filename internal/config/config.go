@@ -122,9 +122,10 @@ func ResolveVars(profileFlag string, cliVars []string) (Vars, error) {
 	return configService.ResolveVars(profileFlag, cliVars)
 }
 
-// CreateDefaultProfile creates a default profile with values derived from the environment.
-// TODO: AI_CABIN_HOME/DESK/WORKDIR should be templated or passed as parameters to `cabin profile init`.
-// For now, we use the user's home as a base, but this needs to be customized per bootstrap-cabin.sh pattern.
-func CreateDefaultProfile(name string) (*Profile, error) {
-	return configService.CreateDefaultProfile(name)
+// InitProfile creates or overwrites a profile with a bounded set of resolved
+// vars (defaults ∪ --var ∪ existing-on-force) and returns the persisted profile.
+// On an existing profile without force it is a no-op returning the existing
+// profile. See ConfigService.InitProfile for the persistence rule.
+func InitProfile(name string, cliVars []string, force bool) (*Profile, error) {
+	return configService.InitProfile(name, cliVars, force)
 }
