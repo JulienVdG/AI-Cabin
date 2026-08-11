@@ -54,7 +54,15 @@ Agent-config materialization stays lazy, triggered on the first cabin task.`,
 			fmt.Fprintf(os.Stderr, "Error: AI_CABIN_DESK is not set in the profile\n")
 			os.Exit(1)
 		}
-		written, err := applyDeskSkeleton("minimal", desk, profile.Vars, false)
+		// Resolve the runtime view (env included) for the skeleton catalogue:
+		// AI_CABIN_SKELETON_DIRS is read from env/--var, not persisted to the
+		// bounded profile, so profile.Vars alone would miss repo skeletons.
+		resolvedVars, err := config.ResolveVars(profileFlag, cliVars)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		written, err := applyDeskSkeleton("minimal", desk, resolvedVars.AsMap(), false)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)

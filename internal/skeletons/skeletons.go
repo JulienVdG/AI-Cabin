@@ -1,168 +1,71 @@
-// Package skeletons copies a Class 1 skeleton (a flat directory tree) to a
-// destination, rendering .tmpl files via internal/render. It shares the
-// writestrategy.FileCreator policy with internal/fragments so the overwrite
-// behaviour (no-overwrite default, --force, future interactive) is selected at
-// the call site, not baked into the engine.
+// Package skeletons is the Class 1 scaffolding facade over the fragments
+// engine. A skeleton is a fragment with a mandatory skeleton.yaml manifest:
+// desks mirror a content/ subtree (flat copy), project skeletons use entries:
+// (templated destination names and per-instance attrs). The concern (desk vs
+// project) drives the destination via the caller; the copy/template mechanism
+// is the shared fragments Materializer, so skeleton and bundle authoring stay
+// one engine.
 //
-// Unlike fragments, a skeleton has no manifest (no deps.yaml/setup.yaml): it
-// is a plain tree to copy, with .tmpl files rendered and the suffix stripped
-// from the destination name. A desk skeleton (copied to AI_CABIN_DESK) and a
-// project skeleton (copied to ~/projects/<name>) both use this engine; the
-// concern (desk vs project) drives the destination, not the copy mechanism.
+// The manifest is mandatory (absent = error): a directory without skeleton.yaml
+// is not a skeleton. Desks use mirror: content (the manifest itself lives
+// outside content/, so it is not copied); project skeletons use entries: when
+// they need templated destination names (cmd/{{.project}}/main.go) or
+// per-instance attrs ({{.module}}).
 package skeletons
 
 import (
-	"errors"
 	"fmt"
-	"io"
 	"io/fs"
-	"os"
 	"path"
-	"path/filepath"
-	"strings"
 
-	"github.com/JulienVdG/AI-Cabin/internal/render"
+	"github.com/JulienVdG/AI-Cabin/internal/fragments"
 	"github.com/JulienVdG/AI-Cabin/internal/writestrategy"
 )
 
-// walkFS is the contract Apply needs from the source tree: fs.FS for Open
-// and fs.ReadDirFS for ReadDir. fs.WalkDir only requires these two in
-// practice (it derives DirEntry info from ReadDir; the fs.StatFS method is
-// only consulted on a ReadDir error path that an embed.FS does not hit), so
-// a plain fs.Sub(embed.FS, ...) satisfies the contract — unlike
-// internal/fragments, which declares fs.StatFS too because it always wraps its
-// FS in internal/unionfs (a layer that implements all three). Making the
-// contract explicit avoids a hidden runtime assertion: a caller passing a
-// plain fs.FS gets a clear error instead of a WalkDir panic.
-type walkFS interface {
-	fs.FS
-	fs.ReadDirFS
+// ManifestName is the mandatory manifest file at the skeleton root. Reuses the
+// fragments manifest syntax (mirror:/entries: + optional greywall_profiles:),
+// read by fragments.Materializer. A skeleton without it is rejected.
+const ManifestName = "skeleton.yaml"
+
+// BuildLayers constructs the skeleton fallback chain as a union fs.FS, ordered
+// highest priority first (first-wins like $PATH): the conf dirs, then the
+// embedded base layer. It reuses fragments.BuildLayers (same unionfs assembly);
+// skeletons have no cabin-local layer, so the cabin dir is empty. The conf dirs
+// come pre-resolved from config.Vars.SkeletonDirs (which parses
+// AI_CABIN_SKELETON_DIRS); a missing dir is a strict error.
+func BuildLayers(dirs []string, embedFS fs.FS) (fs.FS, error) {
+	return fragments.BuildLayers(dirs, "", embedFS)
 }
 
-// tmplSuffix marks a file whose content is rendered via internal/render. The
-// suffix is stripped from the destination filename (Ansible .j2 convention,
-// same as internal/fragments).
-const tmplSuffix = ".tmpl"
-
-// Apply copies the source tree rooted at srcRoot in srcFS to dest, rendering
-// .tmpl files via internal/render (vars namespaced as {{.Vars.X}}, no attrs —
-// a Class 1 skeleton has no per-instance attributes) and copying the rest
-// as-is. The destination name of a .tmpl file has the suffix stripped.
+// Apply copies a Class 1 skeleton to dest via the fragments engine. The
+// skeleton.yaml manifest is mandatory (absent = error); its mirror:/entries:
+// mode drives the copy, .tmpl contents are rendered via internal/render (attrs
+// top-level as {{.attr}}, profile vars namespaced as {{.Vars.X}}), and a
+// destination name containing {{ is rendered the same way.
 //
-// The write policy (no-overwrite default, --force overwrite, future
-// interactive) is carried by creator: SkipCreator skips an existing
-// destination (returns writestrategy.ErrSkip, non-fatal — the file is excluded
-// from the written list and the walk continues); TruncateCreator overwrites.
-// Other errors (read, render, I/O) are collected via errors.Join (no fail-fast,
-// mirroring internal/fragments) so the user sees every issue in one run;
-// partial files are left on disk for discoverability.
+// merged must implement ReadDirFS+StatFS (required by WalkDir); BuildLayers
+// (unionfs.New) and os.DirFS on go1.21+ both satisfy it. creator carries the
+// write policy (SkipCreator no-overwrite default, TruncateCreator for --force).
+// attrs are the per-instance values (e.g. project, module) from the caller
+// (CLI flags + positional); nil is valid for desks that take no attrs.
 //
 // Returns the list of successfully written relpaths (relative to dest) and an
-// optional aggregated error. It is business-logic-only: the CLI formats
-// progress and the error for the user.
-func Apply(srcFS fs.FS, srcRoot, dest string, vars map[string]string, creator writestrategy.FileCreator) ([]string, error) {
-	wfs, ok := srcFS.(walkFS)
-	if !ok {
-		return nil, errors.New("source fs does not implement ReadDirFS+StatFS (required by WalkDir)")
-	}
-
-	var written []string
-	var errs []error
-	walkErr := fs.WalkDir(wfs, srcRoot, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
-		// rel is the destination path relative to srcRoot, forward-slash.
-		rel := pathRel(srcRoot, p)
-		dstRel := stripTmplSuffix(rel)
-		dstPath := filepath.Join(dest, filepath.FromSlash(dstRel))
-
-		if err := os.MkdirAll(filepath.Dir(dstPath), writestrategy.DirPerm); err != nil {
-			errs = append(errs, fmt.Errorf("mkdir %q: %w", filepath.Dir(dstPath), err))
-			return nil
-		}
-
-		if ferr := copyOrRender(wfs, p, dstPath, vars, creator); ferr != nil {
-			if errors.Is(ferr, writestrategy.ErrSkip) {
-				return nil // Skipped: non-fatal, not added to written.
-			}
-			errs = append(errs, ferr)
-			return nil
-		}
-		written = append(written, dstRel)
-		return nil
-	})
-	if walkErr != nil {
-		errs = append(errs, fmt.Errorf("walk %q: %w", srcRoot, walkErr))
-	}
-	if len(errs) > 0 {
-		return written, errors.Join(errs...)
-	}
-	return written, nil
-}
-
-// copyOrRender renders a .tmpl file from the source FS to dst, or copies a
-// plain file as-is. The write policy is carried by creator. On
-// writestrategy.ErrSkip the caller treats the file as not written (non-fatal).
-func copyOrRender(wfs walkFS, srcPath, dstPath string, vars map[string]string, creator writestrategy.FileCreator) error {
-	if strings.HasSuffix(srcPath, tmplSuffix) {
-		return renderFile(wfs, srcPath, dstPath, vars, creator)
-	}
-	return copyFile(wfs, srcPath, dstPath, creator)
-}
-
-// renderFile parses a .tmpl from the source FS and renders it to dst via
-// internal/render (vars namespaced as {{.Vars.X}}, no attrs). The destination
-// is opened via creator. On any error a partial file is left in place.
-func renderFile(wfs walkFS, srcPath, dstPath string, vars map[string]string, creator writestrategy.FileCreator) error {
-	tmpl, err := render.Parse(wfs, srcPath)
+// optional aggregated error. It is business-logic-only: the CLI formats progress
+// and the error for the user.
+func Apply(merged fs.FS, skeletonName, dest string, vars map[string]string, attrs map[string]any, creator writestrategy.FileCreator) ([]string, error) {
+	// The manifest is mandatory: a directory without skeleton.yaml is not a
+	// skeleton. Open (not Stat) so the check works on any fs.FS that can Open,
+	// before delegating to NewMaterializer (which asserts ReadDirFS+StatFS).
+	manifestPath := path.Join(skeletonName, ManifestName)
+	f, err := merged.Open(manifestPath)
 	if err != nil {
-		return fmt.Errorf("render %q -> %q: %w", srcPath, dstPath, err)
+		return nil, fmt.Errorf("skeleton %q has no %s manifest (required): %w", skeletonName, ManifestName, err)
 	}
-	w, err := creator.Create(dstPath)
-	if err != nil {
-		return fmt.Errorf("render %q -> %q: %w", srcPath, dstPath, err)
-	}
-	defer w.Close()
-	if err := render.Execute(tmpl, vars, nil, w); err != nil {
-		return fmt.Errorf("render %q -> %q: %w", srcPath, dstPath, err)
-	}
-	return nil
-}
+	f.Close()
 
-// copyFile streams a plain (non-template) file from the source FS to dst via
-// io.Copy. The destination is opened via creator.
-func copyFile(wfs walkFS, srcPath, dstPath string, creator writestrategy.FileCreator) error {
-	src, err := wfs.Open(srcPath)
+	mat, err := fragments.NewMaterializer(merged, ManifestName, dest, vars, creator)
 	if err != nil {
-		return fmt.Errorf("copy %q -> %q: %w", srcPath, dstPath, err)
+		return nil, err
 	}
-	defer src.Close()
-	dst, err := creator.Create(dstPath)
-	if err != nil {
-		return fmt.Errorf("copy %q -> %q: %w", srcPath, dstPath, err)
-	}
-	defer dst.Close()
-	if _, err := io.Copy(dst, src); err != nil {
-		return fmt.Errorf("copy %q -> %q: %w", srcPath, dstPath, err)
-	}
-	return nil
-}
-
-// pathRel returns the relative path of target under base, both forward-slash
-// paths relative to an fs.FS root. WalkDir only produces paths under root, so
-// TrimPrefix always strips the prefix — no unreachable defensive branch.
-func pathRel(base, target string) string {
-	return strings.TrimPrefix(target, base+"/")
-}
-
-// stripTmplSuffix removes a trailing .tmpl from the last path component. The
-// .tmpl marker means "render the content"; the destination file does not keep
-// it. TrimSuffix is a no-op when the suffix is absent.
-func stripTmplSuffix(p string) string {
-	dir, file := path.Split(p)
-	return path.Join(dir, strings.TrimSuffix(file, tmplSuffix))
+	return mat.Materialize(skeletonName, attrs)
 }

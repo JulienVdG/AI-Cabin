@@ -1,0 +1,16 @@
+# go_makefile: a Go project layout with a Makefile (go.mod, Makefile,
+# cmd/<name>/main.go, .golangci.yml, .gitignore, README.md).
+# project: binary and cmd directory name. module: Go module path.
+entries:
+  - src: content/go.mod.tmpl
+    dst: go.mod
+  - src: content/Makefile.tmpl
+    dst: Makefile
+  - src: content/README.md.tmpl
+    dst: README.md
+  - src: content/.golangci.yml.tmpl
+    dst: .golangci.yml
+  - src: content/.gitignore.tmpl
+    dst: .gitignore
+  - src: content/cmd/project/main.go
+    dst: cmd/{{.project}}/main.go

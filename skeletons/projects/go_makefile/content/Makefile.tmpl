@@ -1,5 +1,8 @@
 OUTDIR = .
 
+# override with `make project=other run` to build a different cmd binary from the same tree.
+project ?= {{.project}}
+
 # Default target
 .PHONY: all
 all: run
@@ -37,7 +40,7 @@ lint:
 # Format imports
 .PHONY: fmt
 fmt:
-	go tool goimports -local $(module) -w .
+	go tool goimports -local {{.module}} -w .
 
 # Auto-fix lint issues
 .PHONY: lint-auto-fix

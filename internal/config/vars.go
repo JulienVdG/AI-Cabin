@@ -10,6 +10,15 @@ import "strings"
 // can override it), so it reaches Vars via the standard ResolveVars path.
 const FragmentsDirsEnvVar = "AI_CABIN_FRAGMENTS_DIRS"
 
+// SkeletonDirsEnvVar is the comma-separated list of skeleton directories (the
+// conf layer of the Class 1 skeleton fallback chain, highest priority). Each
+// entry is ~-expanded; first in the list wins (like $PATH). Unset/empty means
+// no conf layer (BuildLayers then falls back to the embedded catalogue alone,
+// e.g. the `minimal` desk). Resolved as a profile var so it reaches Vars via
+// the standard ResolveVars path. Skeletons are resolved by name from the union
+// of these dirs and embedded.Skeletons(); there is no path mode.
+const SkeletonDirsEnvVar = "AI_CABIN_SKELETON_DIRS"
+
 // CredentialInjectEnvVar is the list of credential labels greywall asks greyproxy
 // to inject into the sandbox (greywall.json "credentials.inject"). It is set
 // as a profile var in a permissive form (CSV, JSON array, or bracketed CSV —
@@ -93,6 +102,14 @@ func (v Vars) AsMap() map[string]string { return v }
 // validated by BuildLayers when it builds the os.DirFS layers.
 func (v Vars) FragmentsDirs() []string {
 	return SplitPathList(v[FragmentsDirsEnvVar])
+}
+
+// SkeletonDirs resolves the skeleton directories from AI_CABIN_SKELETON_DIRS in
+// the view. Each entry is ~-expanded via SplitPathList. Returns nil when the var
+// is unset/empty (BuildLayers then falls back to the embedded catalogue alone).
+// Pure: no stat, no disk — existence is validated by BuildLayers.
+func (v Vars) SkeletonDirs() []string {
+	return SplitPathList(v[SkeletonDirsEnvVar])
 }
 
 // SplitPathList splits a comma-separated path list, trims whitespace, and

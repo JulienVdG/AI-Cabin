@@ -451,6 +451,10 @@ func (m *Materializer) Materialize(bundle string, attrs map[string]any) ([]strin
 			ferr = m.copyFragment(srcPath, dstPath)
 		}
 		if ferr != nil {
+			// ErrSkip: not written by policy, not an error (see writestrategy.ErrSkip).
+			if errors.Is(ferr, writestrategy.ErrSkip) {
+				continue
+			}
 			errs = append(errs, ferr)
 			continue
 		}

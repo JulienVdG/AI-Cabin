@@ -1,13 +1,13 @@
-# ${ProjectName}
+# {{.project}}
 
 Brief description of the project.
 
 ## Structure
 
 ```
-project/
+{{.project}}/
 ├── cmd/
-│   └── ${project}/
+│   └── {{.project}}/
 │       └── main.go      # Application entry point
 ├── internal/             # Private code (not importable by other modules)
 │   └── .gitkeep          # Empty by default
@@ -35,7 +35,7 @@ project/
 
 ```bash
 # Run the application
-make project=${project} run
+make run
 
 # Run tests
 make test
@@ -44,13 +44,13 @@ make test
 make test run=TestName
 
 # Build binary
-make project=${project} build
+make build
 
 # Lint code
 make lint
 
 # Format imports
-make module=${module} fmt
+make fmt
 ```
 
 ## Development
@@ -64,32 +64,8 @@ This project uses an AI-assisted workflow with:
 - Validation checkpoints before commits
 - Skills in `skills/` for consistent patterns
 
-See `rules/agent.md` in the AI Cabin workspace for AI agent instructions.
-
-## Example Project Layout
-
-For a complete example, see the AI Cabin project structure in `desk/ai-cabin.md` (AI Cabin workspace).
-
-**Typical layout:**
-```
-myapp/
-├── cmd/
-│   └── myapp/
-│       └── main.go       # Entry point
-├── internal/
-│   ├── converter/        # Business logic
-│   │   ├── converter.go
-│   │   └── converter_test.go
-│   └── validator/
-│       └── validator.go
-├── pkg/
-│   └── simplenode/       # Public library (optional)
-│       └── simplenode.go
-├── Makefile
-├── go.mod
-└── README.md
-```
+See `desk/AGENTS.md` in the AI Cabin workspace for AI agent instructions.
 
 ## License
 
-MIT
+Please select a licence, and replace this line.

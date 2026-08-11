@@ -155,10 +155,11 @@ func TestState(t *testing.T) {
 // orphaning a skeleton.
 var expectedDesks = []string{"minimal"}
 
-// minimalDeskFiles are the files the minimal desk skeleton must ship: the base
-// agent rules, a minimal TODO, the retro process doc, and the retro-process
-// skill. `cabin setup` copies this whole tree to AI_CABIN_DESK. The list is
-// exhaustive: a stray file (.swp, .DS_Store, ...) breaks the
+// minimalDeskFiles are the content files the minimal desk skeleton must ship
+// under content/: the base agent rules, a minimal TODO, the retro process doc,
+// and the retro-process skill. `cabin setup` copies this whole content/ tree
+// to AI_CABIN_DESK (the manifest declares mirror: content). The list is
+// exhaustive of the content/: a stray file (.swp, .DS_Store, ...) breaks the
 // MinimalDeskHasNoStrayFiles sub-case rather than being silently embedded.
 var minimalDeskFiles = []string{
 	"AGENTS.md",
@@ -188,20 +189,26 @@ func TestSkeletons(t *testing.T) {
 	})
 
 	t.Run("MinimalDeskShipsRequiredFiles", func(t *testing.T) {
+		// The mandatory manifest at the skeleton root.
+		_, err := fs.ReadFile(fsys, path.Join("desks", "minimal", "skeleton.yaml"))
+		require.NoError(t, err, "minimal desk missing required manifest skeleton.yaml")
+		// The content/ files declared by mirror: content.
 		for _, f := range minimalDeskFiles {
-			p := path.Join("desks", "minimal", f)
+			p := path.Join("desks", "minimal", "content", f)
 			_, err := fs.ReadFile(fsys, p)
 			require.NoError(t, err, "minimal desk missing required file %q", p)
 		}
 	})
 
 	t.Run("MinimalDeskHasNoStrayFiles", func(t *testing.T) {
-		// Walk the minimal desk and assert every file is in minimalDeskFiles.
+		// Walk the minimal desk and assert every file is either the manifest
+		// (skeleton.yaml at the root) or a content/ file in minimalDeskFiles.
 		// Catches a stray editor swap file (.swp) or OS file (.DS_Store) that
 		// //go:embed all:root would silently ship — a clean tree is the contract.
-		want := make(map[string]bool, len(minimalDeskFiles))
+		want := make(map[string]bool, len(minimalDeskFiles)+1)
+		want["skeleton.yaml"] = true
 		for _, f := range minimalDeskFiles {
-			want[f] = true
+			want["content/"+f] = true
 		}
 		var stray []string
 		err := fs.WalkDir(fsys, "desks/minimal", func(p string, d fs.DirEntry, err error) error {
