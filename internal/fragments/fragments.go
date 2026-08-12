@@ -104,6 +104,12 @@ type manifest struct {
 	Mirror           string          `yaml:"mirror"`
 	Entries          []manifestEntry `yaml:"entries"`
 	GreywallProfiles []string        `yaml:"greywall_profiles"`
+	// Delims optionally sets custom template action delimiters for this
+	// manifest (e.g. ["{<", ">}"]). A skeleton whose content legitimately
+	// contains "{{" (a Taskfile runtime var) declares custom delims so its
+	// scaffold-time substitutions do not collide. An entry may override via
+	// its own delims. Empty/absent keeps the text/template default.
+	Delims []string `yaml:"delims"`
 }
 
 // manifestEntry maps a fragment source to its destination. Src is relative to
@@ -112,6 +118,9 @@ type manifest struct {
 type manifestEntry struct {
 	Src string `yaml:"src"`
 	Dst string `yaml:"dst"`
+	// Delims optionally overrides the manifest-level delims for this entry
+	// only. Empty/absent inherits the manifest delims (or the default).
+	Delims []string `yaml:"delims"`
 }
 
 // resolvedEntry is a fragment ready to materialize: src is relative to the
@@ -121,8 +130,9 @@ type manifestEntry struct {
 // file as 0444, an artifact; the executable bit is the Dockerfile's
 // authority, blueprint facet).
 type resolvedEntry struct {
-	src string
-	dst string
+	src    string
+	dst    string
+	delims render.Delims
 }
 
 // validate checks the manifest declares a usable mode: mirror and entries
@@ -142,7 +152,45 @@ func (m *manifest) validate() error {
 	case !hasMirror && !hasEntries && !hasProfiles:
 		return errors.New("manifest has neither mirror, entries, nor greywall_profiles")
 	}
+	if err := validateDelims(m.Delims); err != nil {
+		return fmt.Errorf("manifest delims: %w", err)
+	}
+	for i, e := range m.Entries {
+		if err := validateDelims(e.Delims); err != nil {
+			return fmt.Errorf("entry %d (%s) delims: %w", i, e.Src, err)
+		}
+	}
 	return nil
+}
+
+// validateDelims accepts an empty slice (default delims) or a 2-element slice
+// of non-empty [left, right]. Any other shape is a manifest error caught at
+// validate time rather than as a confusing text/template parse error.
+func validateDelims(d []string) error {
+	switch len(d) {
+	case 0:
+		return nil
+	case 2:
+		if d[0] == "" || d[1] == "" {
+			return errors.New("delims must have both left and right non-empty")
+		}
+		return nil
+	default:
+		return fmt.Errorf("delims must be a 2-element [left, right] array, got %d", len(d))
+	}
+}
+
+// resolveDelims picks the per-entry delims when set, else the manifest-level
+// delims, else the zero Delims (text/template default). Called per entry so a
+// manifest can mix a custom-delim entry with default-delim entries.
+func resolveDelims(manifestDelims, entryDelims []string) render.Delims {
+	if len(entryDelims) == 2 {
+		return render.Delims{Left: entryDelims[0], Right: entryDelims[1]}
+	}
+	if len(manifestDelims) == 2 {
+		return render.Delims{Left: manifestDelims[0], Right: manifestDelims[1]}
+	}
+	return render.Delims{}
 }
 
 // setupManifestName is the manifest name for the setup facet, read by
@@ -238,7 +286,7 @@ func bundleGreywallProfiles(wfs walkFS, b cabin.FeatureRef, vars map[string]stri
 		}
 		dst := e.Dst
 		if strings.Contains(dst, tmplOpen) {
-			rendered, rerr := render.RenderString(dst, vars, b.Attrs)
+			rendered, rerr := render.RenderString(dst, vars, b.Attrs, render.Delims{})
 			if rerr != nil {
 				return nil, fmt.Errorf("render profile dst %q: %w", e.Dst, rerr)
 			}
@@ -267,7 +315,7 @@ func profileNameFromDst(dst string) string {
 // and never stats again.
 func (m *manifest) expand(wfs walkFS, bundle, manifestName string) ([]resolvedEntry, error) {
 	if m.Mirror != "" {
-		return expandMirror(wfs, bundle, m.Mirror)
+		return expandMirror(wfs, bundle, m.Mirror, resolveDelims(m.Delims, nil))
 	}
 	out := make([]resolvedEntry, 0, len(m.Entries))
 	var errs []error
@@ -290,7 +338,7 @@ func (m *manifest) expand(wfs walkFS, bundle, manifestName string) ([]resolvedEn
 			errs = append(errs, fmt.Errorf("stat fragment %q: %w", srcPath, err))
 			continue
 		}
-		out = append(out, resolvedEntry{src: e.Src, dst: e.Dst})
+		out = append(out, resolvedEntry{src: e.Src, dst: e.Dst, delims: resolveDelims(m.Delims, e.Delims)})
 	}
 	return out, errors.Join(errs...)
 }
@@ -299,7 +347,7 @@ func (m *manifest) expand(wfs walkFS, bundle, manifestName string) ([]resolvedEn
 // file. A WalkDir error (e.g. unreadable subdir) yields the entries collected
 // so far plus the error, so a partial mirror still materializes and the error
 // is reported alongside the rest.
-func expandMirror(wfs walkFS, bundle, mirrorDir string) ([]resolvedEntry, error) {
+func expandMirror(wfs walkFS, bundle, mirrorDir string, delims render.Delims) ([]resolvedEntry, error) {
 	root := path.Join(bundle, mirrorDir)
 	out := make([]resolvedEntry, 0)
 	err := fs.WalkDir(wfs, root, func(p string, d fs.DirEntry, err error) error {
@@ -311,8 +359,9 @@ func expandMirror(wfs walkFS, bundle, mirrorDir string) ([]resolvedEntry, error)
 		}
 		rel := pathRel(root, p)
 		out = append(out, resolvedEntry{
-			src: path.Join(mirrorDir, rel),
-			dst: stripTmplSuffix(rel),
+			src:    path.Join(mirrorDir, rel),
+			dst:    stripTmplSuffix(rel),
+			delims: delims,
 		})
 		return nil
 	})
@@ -424,11 +473,12 @@ func (m *Materializer) Materialize(bundle string, attrs map[string]any) ([]strin
 		srcPath := path.Join(bundle, e.src)
 
 		// Resolve the dst name first: if it contains {{, render it (port-forward
-		// multi-instance naming). An undefined var in the name skips this file
-		// (the path cannot be resolved) and is collected like any other error.
+		// multi-instance naming, or a skeleton cmd/{{.project}}). An undefined var
+		// in the name skips this file (the path cannot be resolved) and is
+		// collected like any other error.
 		dstRel := e.dst
 		if strings.Contains(dstRel, tmplOpen) {
-			rendered, rerr := render.RenderString(dstRel, m.vars, attrs)
+			rendered, rerr := render.RenderString(dstRel, m.vars, attrs, render.Delims{})
 			if rerr != nil {
 				errs = append(errs, fmt.Errorf("bundle %q dst %q: %w", bundle, e.dst, rerr))
 				continue
@@ -446,7 +496,7 @@ func (m *Materializer) Materialize(bundle string, attrs map[string]any) ([]strin
 		// plain files copy as-is. Either way a partial file is left on error.
 		var ferr error
 		if strings.HasSuffix(e.src, tmplSuffix) {
-			ferr = m.renderFragment(srcPath, dstPath, attrs)
+			ferr = m.renderFragment(srcPath, dstPath, attrs, e.delims)
 		} else {
 			ferr = m.copyFragment(srcPath, dstPath)
 		}
@@ -471,8 +521,8 @@ func (m *Materializer) Materialize(bundle string, attrs map[string]any) ([]strin
 // dst via internal/render. The destination is opened via the Materializer's
 // opener. On any error a partial file is left in place. Returns an error
 // naming both src and dst.
-func (m *Materializer) renderFragment(srcPath, dstPath string, attrs map[string]any) error {
-	tmpl, err := render.Parse(m.fs, srcPath)
+func (m *Materializer) renderFragment(srcPath, dstPath string, attrs map[string]any, delims render.Delims) error {
+	tmpl, err := render.Parse(m.fs, srcPath, delims)
 	if err != nil {
 		return fmt.Errorf("render %q -> %q: %w", srcPath, dstPath, err)
 	}

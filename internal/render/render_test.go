@@ -18,7 +18,7 @@ import (
 func parseString(t *testing.T, name, content string) *template.Template {
 	t.Helper()
 	fsys := fstest.MapFS{name: {Data: []byte(content)}}
-	tmpl, err := render.Parse(fsys, name)
+	tmpl, err := render.Parse(fsys, name, render.Delims{})
 	require.NoError(t, err)
 	return tmpl
 }
@@ -26,14 +26,14 @@ func parseString(t *testing.T, name, content string) *template.Template {
 func TestParse(t *testing.T) {
 	t.Run("ValidTemplate", func(t *testing.T) {
 		fsys := fstest.MapFS{"t.tmpl": {Data: []byte("hello {{.X}}")}}
-		tmpl, err := render.Parse(fsys, "t.tmpl")
+		tmpl, err := render.Parse(fsys, "t.tmpl", render.Delims{})
 		require.NoError(t, err)
 		assert.NotNil(t, tmpl)
 	})
 
 	t.Run("InvalidSyntax", func(t *testing.T) {
 		fsys := fstest.MapFS{"t.tmpl": {Data: []byte("{{.X")}}
-		_, err := render.Parse(fsys, "t.tmpl")
+		_, err := render.Parse(fsys, "t.tmpl", render.Delims{})
 		require.Error(t, err)
 	})
 
@@ -43,7 +43,7 @@ func TestParse(t *testing.T) {
 		// ("incomplete or empty template"). Parse must return a template whose
 		// Execute works regardless of the name's path.
 		fsys := fstest.MapFS{"base/deps/t.tmpl": {Data: []byte("hi {{.Vars.X}}")}}
-		tmpl, err := render.Parse(fsys, "base/deps/t.tmpl")
+		tmpl, err := render.Parse(fsys, "base/deps/t.tmpl", render.Delims{})
 		require.NoError(t, err)
 		var buf bytes.Buffer
 		err = render.Execute(tmpl, map[string]string{"X": "v"}, nil, &buf)
@@ -52,8 +52,22 @@ func TestParse(t *testing.T) {
 	})
 
 	t.Run("MissingFile", func(t *testing.T) {
-		_, err := render.Parse(fstest.MapFS{}, "missing.tmpl")
+		_, err := render.Parse(fstest.MapFS{}, "missing.tmpl", render.Delims{})
 		require.Error(t, err)
+	})
+
+	t.Run("CustomDelims", func(t *testing.T) {
+		// Custom delims ({</>}) resolve the scaffold-time action while a
+		// standard {{.X}} passes through literally (a Taskfile runtime var).
+		// This is the go_taskfile case: {<.project>} is baked at copy time,
+		// {{.project}} is left for task to resolve at runtime.
+		fsys := fstest.MapFS{"t.tmpl": {Data: []byte("baked={<.project>} runtime={{.project}}")}}
+		tmpl, err := render.Parse(fsys, "t.tmpl", render.Delims{Left: "{<", Right: ">}"})
+		require.NoError(t, err)
+		var buf bytes.Buffer
+		err = render.Execute(tmpl, nil, map[string]any{"project": "mysvc"}, &buf)
+		require.NoError(t, err)
+		assert.Equal(t, "baked=mysvc runtime={{.project}}", buf.String())
 	})
 }
 
@@ -174,21 +188,29 @@ func TestRenderString(t *testing.T) {
 	attrs := map[string]any{"host": "mariadb", "port": "3306"}
 
 	t.Run("FilenameTemplating", func(t *testing.T) {
-		out, err := render.RenderString("50-socat-{{.host}}-{{.port}}.sh", vars, attrs)
+		out, err := render.RenderString("50-socat-{{.host}}-{{.port}}.sh", vars, attrs, render.Delims{})
 		require.NoError(t, err)
 		assert.Equal(t, "50-socat-mariadb-3306.sh", out)
 	})
 
 	t.Run("UndefinedVarReturnsPartial", func(t *testing.T) {
-		out, err := render.RenderString("p-{{.host}}-{{.port}}", vars, map[string]any{"host": "mariadb"})
+		out, err := render.RenderString("p-{{.host}}-{{.port}}", vars, map[string]any{"host": "mariadb"}, render.Delims{})
 		require.ErrorIs(t, err, render.ErrUndefinedVar)
 		assert.Equal(t, "p-mariadb-<no value>", out)
 	})
 
 	t.Run("NoTemplateVars", func(t *testing.T) {
 		// A plain string with no {{ renders to itself.
-		out, err := render.RenderString("models.json", vars, nil)
+		out, err := render.RenderString("models.json", vars, nil, render.Delims{})
 		require.NoError(t, err)
 		assert.Equal(t, "models.json", out)
+	})
+
+	t.Run("CustomDelims", func(t *testing.T) {
+		// Custom delims resolve the {<.host>} action; the standard {{.port}}
+		// passes through literally (the consumer resolves it later).
+		out, err := render.RenderString("50-socat-{<.host>}-{{.port}}.sh", vars, attrs, render.Delims{Left: "{<", Right: ">}"})
+		require.NoError(t, err)
+		assert.Equal(t, "50-socat-mariadb-{{.port}}.sh", out)
 	})
 }

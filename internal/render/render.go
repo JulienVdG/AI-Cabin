@@ -59,24 +59,40 @@ var funcMap = template.FuncMap{
 }
 
 // newTemplate returns a template configured with the package funcMap and the
-// missingkey=invalid option. Shared by Parse (template source in an fs.FS) and
-// RenderString (template source already in memory, rendered to a string).
-func newTemplate(name string) *template.Template {
-	return template.New(name).Funcs(funcMap).Option("missingkey=invalid")
+// missingkey=invalid option, applying custom delims when set. Shared by Parse
+// (template source in an fs.FS) and RenderString (template source already in
+// memory, rendered to a string).
+func newTemplate(name string, delims Delims) *template.Template {
+	t := template.New(name).Funcs(funcMap).Option("missingkey=invalid")
+	if delims.Left != "" && delims.Right != "" {
+		t = t.Delims(delims.Left, delims.Right)
+	}
+	return t
+}
+
+// Delims selects the action delimiters a template is parsed with. The zero
+// value keeps the text/template default ("{{" / "}}"). A skeleton whose
+// content legitimately contains "{{" (e.g. a Taskfile runtime var) declares
+// custom delims so its scaffold-time substitutions do not collide with the
+// embedded template syntax: {<.module>} is resolved at copy time while a
+// literal {{.project}} passes through to the runtime consumer (task).
+type Delims struct {
+	Left  string
+	Right string
 }
 
 // Parse reads the template at name from src and returns a parsed template
-// configured with the "default" func and missingkey=invalid, ready to Execute.
-// It reads the file content and parses it as the body of the template named name
-// (rather than template.ParseFS, which names the parsed body by the file's base
-// name — a mismatch that leaves the returned template unexecutable when name
-// contains a directory component).
-func Parse(src fs.FS, name string) (*template.Template, error) {
+// configured with the "default" func, missingkey=invalid, and the given delims,
+// ready to Execute. It reads the file content and parses it as the body of the
+// template named name (rather than template.ParseFS, which names the parsed
+// body by the file's base name — a mismatch that leaves the returned template
+// unexecutable when name contains a directory component).
+func Parse(src fs.FS, name string, delims Delims) (*template.Template, error) {
 	content, err := fs.ReadFile(src, name)
 	if err != nil {
 		return nil, fmt.Errorf("read template %q: %w", name, err)
 	}
-	return newTemplate(name).Parse(string(content))
+	return newTemplate(name, delims).Parse(string(content))
 }
 
 // Execute renders tmpl into dst with the given profile vars and feature attrs.
@@ -125,13 +141,14 @@ func (s *noValueScanner) Write(p []byte) (int, error) {
 
 // RenderString renders a template text (typically a dst path containing
 // {{.host}} or {{.port}} vars for port-forward multi-instance naming) with
-// vars and attrs, returning the rendered string. It is the string-output
-// counterpart to Execute (which writes to an io.Writer): a filename is a value,
-// not a writable destination, so it is built by rendering to a buffer. On
-// ErrUndefinedVar the partial string (with "<no value>") is returned alongside
-// the error; callers using the result as a path should not use it on error.
-func RenderString(text string, vars map[string]string, attrs map[string]any) (string, error) {
-	tmpl, err := newTemplate("string").Parse(text)
+// vars, attrs, and the given delims, returning the rendered string. It is the
+// string-output counterpart to Execute (which writes to an io.Writer): a
+// filename is a value, not a writable destination, so it is built by rendering
+// to a buffer. On ErrUndefinedVar the partial string (with "<no value>") is
+// returned alongside the error; callers using the result as a path should not
+// use it on error.
+func RenderString(text string, vars map[string]string, attrs map[string]any, delims Delims) (string, error) {
+	tmpl, err := newTemplate("string", delims).Parse(text)
 	if err != nil {
 		return "", fmt.Errorf("parse template string: %w", err)
 	}
