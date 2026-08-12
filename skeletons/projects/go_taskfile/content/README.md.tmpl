@@ -1,0 +1,73 @@
+# {{.project}}
+
+Brief description of the project.
+
+## Structure
+
+```
+{{.project}}/
+├── cmd/
+│   └── {{.project}}/
+│       └── main.go      # Application entry point
+├── internal/             # Private code (not importable by other modules)
+│   └── .gitkeep          # Empty by default
+├── pkg/                  # Public code (importable by other modules)
+│   └── .gitkeep          # Empty by default
+├── Taskfile.yml
+├── go.mod
+├── .golangci.yml
+└── README.md
+```
+
+**Directory usage:**
+
+- `cmd/` - Application entry points (thin wrappers around internal logic)
+- `internal/` - Private application code (cannot be imported by other modules)
+  - Use for business logic, domain models, services
+  - Enforces encapsulation at compile time
+- `pkg/` - Public library code (can be imported by other modules)
+  - Use for shared utilities, public APIs
+  - Keep minimal - most code should be in `internal/`
+
+**Note:** Both `internal/` and `pkg/` are empty by default. Add packages as needed.
+
+## Quick Start
+
+Requires [Task](https://taskfile.dev) (`go install github.com/go-task/task/v3/cmd/task@latest`).
+
+```bash
+# Run the application
+task run
+
+# Override the cmd binary (defaults to the scaffolded name)
+task run project=other
+
+# Run tests
+task test
+
+# Build binary
+task build
+
+# Lint code
+task lint
+
+# Format imports
+task fmt
+```
+
+## Development
+
+See `desk/DEVELOPMENT.md` in the AI Cabin workspace for development workflow, debugging tips, and testing patterns.
+
+## Project Workflow
+
+This project uses an AI-assisted workflow with:
+- Task tracking in `desk/TODO.md` (AI Cabin workspace)
+- Validation checkpoints before commits
+- Skills in `skills/` for consistent patterns
+
+See `desk/AGENTS.md` in the AI Cabin workspace for AI agent instructions.
+
+## License
+
+Please select a licence, and replace this line.

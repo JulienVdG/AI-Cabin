@@ -1,0 +1,52 @@
+version: '3'
+
+# project defaults to the scaffolded name (templated at copy time); override at
+# runtime with `task run project=other` to build a different cmd binary.
+vars:
+  project: '{<.project>}'
+
+tasks:
+  default:
+    cmds:
+      - task: run
+
+  run:
+    desc: Run the application
+    cmds:
+      - go run ./cmd/{{.project}}/
+
+  build:
+    desc: Build the binary
+    cmds:
+      - go build -o {{.project}} ./cmd/{{.project}}/
+
+  test:
+    desc: Run tests
+    cmds:
+      - go test ./...
+
+  cover:
+    desc: Run tests with coverage
+    cmds:
+      - go test -coverprofile=coverage.out ./...
+      - go tool cover -html=coverage.out -o coverage.html
+
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - go tool golangci-lint run ./...
+
+  fmt:
+    desc: Format Go code with goimports
+    cmds:
+      - go tool goimports -local {<.module>} -w .
+
+  lint-auto-fix:
+    desc: Auto-fix lint issues
+    cmds:
+      - go tool golangci-lint run --fix ./...
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -f {{.project}} coverage.out coverage.html
