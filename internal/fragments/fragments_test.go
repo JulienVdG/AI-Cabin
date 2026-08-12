@@ -391,6 +391,72 @@ func TestMaterialize(t *testing.T) {
 		assert.Contains(t, err.Error(), "missing.sh")
 		assert.Contains(t, err.Error(), "also-missing")
 	})
+
+	t.Run("SkipCreatorNoOverwrite", func(t *testing.T) {
+		// The FileCreator.ErrSkip contract: a creator that declines to write
+		// (SkipCreator skips existing files; a future InteractiveCreator may
+		// decline per user choice) is non-fatal. The skipped file is neither in
+		// the written list nor in the aggregated error, and materialization
+		// continues for the rest. This is the no-overwrite default of the
+		// skeletons facade (re-running `cabin profile init` without --force is a
+		// silent no-op, not an error). deps/setup use
+		// TruncateCreator/BackupCreator and never trip ErrSkip, so the contract
+		// is exercised here via SkipCreator.
+		merged := fstest.MapFS{
+			"base/deps.yaml":  {Data: []byte("entries:\n  - src: deps/a.txt\n    dst: a.txt\n  - src: deps/b.txt\n    dst: b.txt\n")},
+			"base/deps/a.txt": {Data: []byte("a")},
+			"base/deps/b.txt": {Data: []byte("b")},
+		}
+		dest := t.TempDir()
+
+		// First pass with TruncateCreator lands both files.
+		mat := truncateMat(t, merged, "deps.yaml", dest, nil)
+		written, err := mat.Materialize("base", nil)
+		require.NoError(t, err)
+		sort.Strings(written)
+		assert.Equal(t, []string{"a.txt", "b.txt"}, written)
+
+		// Second pass with SkipCreator: both files already exist -> both skipped.
+		// ErrSkip is non-fatal: written is empty, err is nil (a no-overwrite
+		// re-run is a silent no-op, matching the SkipCreator contract).
+		skipMat, err := fragments.NewMaterializer(merged, "deps.yaml", dest, nil, writestrategy.SkipCreator{})
+		require.NoError(t, err)
+		written, err = skipMat.Materialize("base", nil)
+		require.NoError(t, err, "ErrSkip is non-fatal")
+		assert.Empty(t, written, "skipped files are excluded from written")
+		// Original content survives (not clobbered).
+		assert.Equal(t, "a", readDest(t, dest, "a.txt"))
+		assert.Equal(t, "b", readDest(t, dest, "b.txt"))
+	})
+
+	t.Run("GreywallProfilesOnly", func(t *testing.T) {
+		// A setup.yaml declaring only greywall_profiles (built-in references,
+		// no entries) is the go bundle's setup.yaml shape: validate passes,
+		// expand returns no entries, nothing is written, no error.
+		t.Run("NoOpWrite", func(t *testing.T) {
+			merged := fstest.MapFS{
+				"go/setup.yaml": {Data: []byte("greywall_profiles: [go]\n")},
+			}
+			dest := t.TempDir()
+
+			written, err := truncateMat(t, merged, "setup.yaml", dest, nil).Materialize("go", nil)
+			require.NoError(t, err)
+			assert.Nil(t, written, "greywall_profiles-only manifest writes nothing")
+		})
+
+		t.Run("EmptyManifestRejected", func(t *testing.T) {
+			// A manifest declaring none of mirror/entries/greywall_profiles is
+			// rejected as useless (validate extended for the new field).
+			merged := fstest.MapFS{
+				"go/setup.yaml": {Data: []byte("--- {}\n")},
+			}
+			dest := t.TempDir()
+
+			_, err := truncateMat(t, merged, "setup.yaml", dest, nil).Materialize("go", nil)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "neither mirror, entries, nor greywall_profiles")
+		})
+	})
 }
 
 // backupMat builds a Materializer with BackupCreator (the setup-facet copy
@@ -486,72 +552,6 @@ func TestBackupCreator(t *testing.T) {
 		assert.Equal(t, `{"v":2}`, readDest(t, dest, "conf.json"))
 		_, statErr := os.Stat(filepath.Join(dest, "conf.json"+writestrategy.BackupSuffix))
 		assert.True(t, os.IsNotExist(statErr), "truncate never backs up")
-	})
-}
-
-// TestMaterializeSkipCreator covers the FileCreator.ErrSkip contract: a creator
-// that declines to write (SkipCreator skips existing files; a future
-// InteractiveCreator may decline per user choice) is non-fatal. The skipped
-// file is neither in the written list nor in the aggregated error, and
-// materialization continues for the rest. This is the no-overwrite default of
-// the skeletons facade (re-running `cabin profile init` without --force is a
-// silent no-op, not an error). deps/setup use TruncateCreator/BackupCreator
-// and never trip ErrSkip, so the contract is exercised here via SkipCreator.
-func TestMaterializeSkipCreator(t *testing.T) {
-	merged := fstest.MapFS{
-		"base/deps.yaml":  {Data: []byte("entries:\n  - src: deps/a.txt\n    dst: a.txt\n  - src: deps/b.txt\n    dst: b.txt\n")},
-		"base/deps/a.txt": {Data: []byte("a")},
-		"base/deps/b.txt": {Data: []byte("b")},
-	}
-	dest := t.TempDir()
-
-	// First pass with TruncateCreator lands both files.
-	mat := truncateMat(t, merged, "deps.yaml", dest, nil)
-	written, err := mat.Materialize("base", nil)
-	require.NoError(t, err)
-	sort.Strings(written)
-	assert.Equal(t, []string{"a.txt", "b.txt"}, written)
-
-	// Second pass with SkipCreator: both files already exist -> both skipped.
-	// ErrSkip is non-fatal: written is empty, err is nil (a no-overwrite re-run
-	// is a silent no-op, matching the SkipCreator contract).
-	skipMat, err := fragments.NewMaterializer(merged, "deps.yaml", dest, nil, writestrategy.SkipCreator{})
-	require.NoError(t, err)
-	written, err = skipMat.Materialize("base", nil)
-	require.NoError(t, err, "ErrSkip is non-fatal")
-	assert.Empty(t, written, "skipped files are excluded from written")
-	// Original content survives (not clobbered).
-	assert.Equal(t, "a", readDest(t, dest, "a.txt"))
-	assert.Equal(t, "b", readDest(t, dest, "b.txt"))
-}
-
-// TestMaterializeGreywallProfilesOnly covers a setup.yaml declaring only
-// greywall_profiles (built-in references, no entries): validate passes, expand
-// returns no entries, nothing is written, no error. This is the go bundle's
-// setup.yaml shape.
-func TestMaterializeGreywallProfilesOnly(t *testing.T) {
-	t.Run("NoOpWrite", func(t *testing.T) {
-		merged := fstest.MapFS{
-			"go/setup.yaml": {Data: []byte("greywall_profiles: [go]\n")},
-		}
-		dest := t.TempDir()
-
-		written, err := truncateMat(t, merged, "setup.yaml", dest, nil).Materialize("go", nil)
-		require.NoError(t, err)
-		assert.Nil(t, written, "greywall_profiles-only manifest writes nothing")
-	})
-
-	t.Run("EmptyManifestRejected", func(t *testing.T) {
-		// A manifest declaring none of mirror/entries/greywall_profiles is
-		// rejected as useless (validate extended for the new field).
-		merged := fstest.MapFS{
-			"go/setup.yaml": {Data: []byte("--- {}\n")},
-		}
-		dest := t.TempDir()
-
-		_, err := truncateMat(t, merged, "setup.yaml", dest, nil).Materialize("go", nil)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "neither mirror, entries, nor greywall_profiles")
 	})
 }
 
