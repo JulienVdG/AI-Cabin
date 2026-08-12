@@ -17,48 +17,12 @@ RUN apt-get update && apt-get install -y \
     netcat-openbsd iproute2 iputils-ping \
     && rm -rf /var/lib/apt/lists/*
 
-COPY .deps/greywall /usr/local/bin/greywall
-RUN chmod +x /usr/local/bin/greywall
-
-# Greyproxy CA certificate for HTTPS inspection
-COPY .deps/greyproxy-ca.crt /usr/local/share/ca-certificates/greyproxy.crt
-RUN update-ca-certificates
-
-# Download and install ripgrep (for Pi search)
-RUN curl -L "https://github.com/BurntSushi/ripgrep/releases/download/14.1.1/ripgrep-14.1.1-x86_64-unknown-linux-musl.tar.gz" -o rg.tar.gz && \
-    tar -xzf rg.tar.gz && \
-    mv ripgrep-*/rg /usr/local/bin/rg && \
-    chmod +x /usr/local/bin/rg && \
-    rm -rf rg.tar.gz ripgrep-*
-
-# Download and install fd (for Pi file search)
-RUN curl -L "https://github.com/sharkdp/fd/releases/download/v10.2.0/fd-v10.2.0-x86_64-unknown-linux-gnu.tar.gz" -o fd.tar.gz && \
-    tar -xzf fd.tar.gz && \
-    mv fd-v*/fd /usr/local/bin/fd && \
-    chmod +x /usr/local/bin/fd && \
-    rm -rf fd.tar.gz fd-v*
-
-# Download and install Pi.
-RUN curl -L "https://github.com/badlogic/pi-mono/releases/download/${PI_VERSION}/pi-linux-x64.tar.gz" -o pi.tar.gz && \
-    mkdir -p /opt && \
-    tar -xzf pi.tar.gz -C /opt && \
-    rm pi.tar.gz
-
-# Create entrypoint.d directory for hooks
-RUN mkdir -p /docker-entrypoint.d
-
-COPY .deps/docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
-COPY .deps/docker-entrypoint.d/ /docker-entrypoint.d/
-RUN chmod +x /docker-entrypoint.d/*.sh 2>/dev/null || true
-COPY .deps/profile.d/ /etc/profile.d/
-RUN chmod +x /etc/profile.d/ai-cabin-*.sh 2>/dev/null || true
+# Copy the deps fragments to a build dir and run the numbered install steps.
+COPY .deps/ /opt/ai-cabin-deps/
+RUN /bin/sh /opt/ai-cabin-deps/install.sh \
+ && rm -rf /opt/ai-cabin-deps
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
-
-COPY .deps/greybash /usr/local/bin/greybash
-COPY .deps/pi /usr/local/bin/pi
-RUN chmod +x /usr/local/bin/greybash /usr/local/bin/pi
 
 # User setup.
 RUN useradd -m ai_agent
@@ -68,10 +32,6 @@ WORKDIR /home/ai_agent
 RUN chown -R ai_agent:ai_agent /home/ai_agent
 USER ai_agent
 WORKDIR /home/ai_agent
-
-# Ensure bash-completion is sourced in the agent's shell.
-# already present in source image
-#RUN echo 'if [ -f /etc/bash_completion ]; then . /etc/bash_completion; fi' >> /home/ai_agent/.bashrc
 
 # Add greywall sandbox indicator to prompt
 RUN echo 'if [ "$GREYWALL_SANDBOX" = "1" ]; then debian_chroot="🔒"; fi' >> /home/ai_agent/.bashrc

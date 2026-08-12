@@ -17,41 +17,12 @@ RUN apt-get update && apt-get install -y \
     netcat-openbsd iproute2 iputils-ping \
     && rm -rf /var/lib/apt/lists/*
 
-COPY .deps/greywall /usr/local/bin/greywall
-RUN chmod +x /usr/local/bin/greywall
-
-# Greyproxy CA certificate for HTTPS inspection
-COPY .deps/greyproxy-ca.crt /usr/local/share/ca-certificates/greyproxy.crt
-RUN update-ca-certificates
-
-# Download and install OpenCode.
-RUN curl -L "https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-linux-x64.tar.gz" -o opencode.tar.gz && \
-    tar -xzf opencode.tar.gz && \
-    mv opencode /opt/opencode && \
-    chmod +x /opt/opencode && \
-    rm opencode.tar.gz
-
-# Create entrypoint.d directory for hooks
-RUN mkdir -p /docker-entrypoint.d
-
-# Copy generic entrypoint from .deps (base bundle)
-COPY .deps/docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
-
-# Copy entrypoint.d hooks from .deps (socat-greyproxy, git-agent-email, port-forward)
-COPY .deps/docker-entrypoint.d/ /docker-entrypoint.d/
-RUN chmod +x /docker-entrypoint.d/*.sh 2>/dev/null || true
-
-# Copy profile.d env scripts from .deps (go bundle)
-COPY .deps/profile.d/ /etc/profile.d/
-RUN chmod +x /etc/profile.d/ai-cabin-*.sh 2>/dev/null || true
+# Copy the deps fragments to a build dir and run the numbered install steps.
+COPY .deps/ /opt/ai-cabin-deps/
+RUN /bin/sh /opt/ai-cabin-deps/install.sh \
+ && rm -rf /opt/ai-cabin-deps
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
-
-# Greybash/opencode wrappers from .deps (base + agent-opencode bundles).
-COPY .deps/greybash /usr/local/bin/greybash
-COPY .deps/opencode /usr/local/bin/opencode
-RUN chmod +x /usr/local/bin/greybash /usr/local/bin/opencode
 
 # User setup.
 RUN useradd -m ai_agent
@@ -61,9 +32,6 @@ WORKDIR /home/ai_agent
 RUN chown -R ai_agent:ai_agent /home/ai_agent
 USER ai_agent
 WORKDIR /home/ai_agent
-
-# Ensure bash-completion is sourced in the agent's shell.
-RUN echo 'if [ -f /etc/bash_completion ]; then . /etc/bash_completion; fi' >> /home/ai_agent/.bashrc
 
 # Add greywall sandbox indicator to prompt
 RUN echo 'if [ "$GREYWALL_SANDBOX" = "1" ]; then debian_chroot="🔒"; fi' >> /home/ai_agent/.bashrc
