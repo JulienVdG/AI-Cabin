@@ -350,3 +350,22 @@ func (s *ConfigService) SaveProfile(profile *Profile) error {
 
 	return nil
 }
+
+// SetProfileVar sets a single variable on a profile and persists it atomically.
+// The profile is resolved like GetActiveProfile: an empty name selects the
+// current profile. It is the runtime continuation of the `--var` CRUD (of which
+// `profile init --var` is the initial set). It returns the updated profile.
+func (s *ConfigService) SetProfileVar(name, key, value string) (*Profile, error) {
+	profile, err := s.GetActiveProfile(name)
+	if err != nil {
+		return nil, err
+	}
+	if profile.Vars == nil {
+		profile.Vars = map[string]string{}
+	}
+	profile.Vars[key] = value
+	if err := s.SaveProfile(profile); err != nil {
+		return nil, fmt.Errorf("failed to save profile %q: %w", profile.Name, err)
+	}
+	return profile, nil
+}

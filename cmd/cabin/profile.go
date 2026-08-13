@@ -109,6 +109,27 @@ var profileUseCmd = &cobra.Command{
 	},
 }
 
+// profileSetCmd sets a single profile variable and persists it atomically. It
+// targets the profile selected by --profile (default: the current profile),
+// matching the other runtime commands. It is the CRUD continuation of `profile init --var` (the initial set).
+var profileSetCmd = &cobra.Command{
+	Use:   "set <key> <value>",
+	Short: "Set a variable on a profile",
+	Long:  `Set a variable on the profile selected by --profile (default: the current profile) and persist it atomically. Any key is allowed; it is the runtime continuation of the --var CRUD (of which profile init --var is the initial set).`,
+	Args:  cobra.ExactArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		key, value := args[0], args[1]
+
+		profile, err := config.SetProfileVar(profileFlag, key, value)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("Set %s=%s on profile %q\n", key, value, profile.Name)
+	},
+}
+
 // profileInitForce overwrites an existing profile (and re-copies the desk
 // skeleton) when set by --force. Without it, init on an existing profile is a
 // no-op (warn + exit 0, mirroring `cabin add`).
@@ -233,6 +254,7 @@ func init() {
 	profileCmd.AddCommand(profileListCmd)
 	profileCmd.AddCommand(profileShowCmd)
 	profileCmd.AddCommand(profileUseCmd)
+	profileCmd.AddCommand(profileSetCmd)
 	profileCmd.AddCommand(profileInitCmd)
 	rootCmd.AddCommand(profileCmd)
 }

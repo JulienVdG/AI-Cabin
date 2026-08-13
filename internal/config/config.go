@@ -129,3 +129,10 @@ func ResolveVars(profileFlag string, cliVars []string) (Vars, error) {
 func InitProfile(name string, cliVars []string, force bool) (*Profile, error) {
 	return configService.InitProfile(name, cliVars, force)
 }
+
+// SetProfileVar sets a single variable on a profile (resolved via
+// GetActiveProfile if name is empty -> current profile) and persists it
+// atomically. It delegates to the global ConfigService.
+func SetProfileVar(name, key, value string) (*Profile, error) {
+	return configService.SetProfileVar(name, key, value)
+}

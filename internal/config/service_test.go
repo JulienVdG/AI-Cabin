@@ -649,6 +649,70 @@ func TestConfigService_GetActiveProfile(t *testing.T) {
 	})
 }
 
+func TestConfigService_SetProfileVar(t *testing.T) {
+	t.Run("sets var on explicit profile", func(t *testing.T) {
+		svc := newTestService(t)
+		profilesDir, _ := config.GetProfilesDir()
+		if err := os.MkdirAll(profilesDir, 0o755); err != nil {
+			t.Fatalf("failed to create profiles dir: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(profilesDir, "perso.yaml"), []byte("name: perso\nvars:\n  A: b"), 0o644); err != nil {
+			t.Fatalf("failed to write profile: %v", err)
+		}
+
+		profile, err := svc.SetProfileVar("perso", "OPENCODE_SERVER_PASSWORD", "secret")
+		if err != nil {
+			t.Fatalf("SetProfileVar() error = %v", err)
+		}
+		if profile.Name != "perso" {
+			t.Errorf("SetProfileVar() Name = %q, want %q", profile.Name, "perso")
+		}
+		if profile.Vars["OPENCODE_SERVER_PASSWORD"] != "secret" {
+			t.Errorf("SetProfileVar() var not set: %q", profile.Vars["OPENCODE_SERVER_PASSWORD"])
+		}
+		if profile.Vars["A"] != "b" {
+			t.Errorf("SetProfileVar() lost existing var A: %q", profile.Vars["A"])
+		}
+
+		reloaded, err := svc.LoadProfile("perso")
+		if err != nil {
+			t.Fatalf("reload error = %v", err)
+		}
+		if reloaded.Vars["OPENCODE_SERVER_PASSWORD"] != "secret" {
+			t.Errorf("reloaded var not persisted: %q", reloaded.Vars["OPENCODE_SERVER_PASSWORD"])
+		}
+	})
+
+	t.Run("uses current profile when name is empty", func(t *testing.T) {
+		svc := newTestService(t)
+		configDir, _ := config.GetConfigDir()
+		profilesDir, _ := config.GetProfilesDir()
+		os.MkdirAll(configDir, 0o755)
+		os.MkdirAll(profilesDir, 0o755)
+		os.WriteFile(filepath.Join(profilesDir, "perso.yaml"), []byte("name: perso"), 0o644)
+		os.WriteFile(filepath.Join(configDir, config.ConfigFileName), []byte("currentProfile: perso"), 0o644)
+
+		profile, err := svc.SetProfileVar("", "K", "v")
+		if err != nil {
+			t.Fatalf("SetProfileVar() error = %v", err)
+		}
+		if profile.Name != "perso" {
+			t.Errorf("SetProfileVar() Name = %q, want %q", profile.Name, "perso")
+		}
+		if profile.Vars["K"] != "v" {
+			t.Errorf("SetProfileVar() K = %q, want v", profile.Vars["K"])
+		}
+	})
+
+	t.Run("nonexistent profile returns error", func(t *testing.T) {
+		svc := newTestService(t)
+		_, err := svc.SetProfileVar("nope", "K", "v")
+		if err == nil {
+			t.Fatal("SetProfileVar() expected error, got nil")
+		}
+	})
+}
+
 func TestConfigService_GetCabin(t *testing.T) {
 	svc := newTestService(t)
 	if err := svc.AddCabin("blog", "/blog/path"); err != nil {
