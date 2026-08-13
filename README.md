@@ -303,9 +303,6 @@ curl --connect-timeout 2 http://<your-IP>:43080/api/health
 
 ## Documentation
 
-- **[Bootstrap Script](skeletons/bin/README.md)** - Environment setup guide
-- **[Cabin Docs](cabin/opencode-go/README.md)** - Detailed cabin configuration
-
 ---
 
 ## Troubleshooting
