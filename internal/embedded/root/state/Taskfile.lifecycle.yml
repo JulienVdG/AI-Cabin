@@ -1,29 +1,77 @@
 version: '3'
 
 # Shared lifecycle targets included by every cabin Taskfile (flatten: true,
-# optional: true). The cabin owns setup, deps, and agent
-# targets (pi, opencode); these targets depend on the cabin's setup (and deps
-# for the build) via cross-file task references. AGENT_SERVICE (default: agent)
-# is declared by the cabin's vars/env.
+# optional: true). This file holds the static, never-overridden cabin plumbing:
+# the setup orchestrator (prepare), deps materialization, the debug build/run
+# helpers, and the docker-* lifecycle. The cabin's root Taskfile owns the
+# agent-specific bits (the root `setup` task: agent dirs + configs) and the
+# agent run targets (pi, opencode); `prepare` reaches them via a cross-file
+# task reference. AGENT_SERVICE (default: agent) is declared by the cabin's
+# vars. AGENT_SERVICE stays cabin-owned.
 
 tasks:
+  prepare:
+    desc: Full cabin setup (common dirs + rendered configs + agent setup)
+    preconditions:
+      - sh: '[ -v AI_CABIN_HOME ]'
+        msg: "missing environment variable AI_CABIN_HOME"
+      - sh: '[ -v AI_CABIN_DESK ]'
+        msg: "missing environment variable AI_CABIN_DESK"
+      - sh: '[ -v AI_CABIN_WORKDIR ]'
+        msg: "missing environment variable AI_CABIN_WORKDIR"
+    cmds:
+      # Desk directory (in AI_CABIN_DESK)
+      - mkdir -p {{.AI_CABIN_DESK}}
+      - mkdir -p {{.AI_CABIN_DESK}}/skills
+      # Agent Data directories (in AI_CABIN_HOME)
+      - mkdir -p {{.AI_CABIN_HOME}}/.local/state/ai-cabin/
+      - mkdir -p {{.AI_CABIN_HOME}}/.config/greywall/learned
+      - mkdir -p {{.AI_CABIN_HOME}}/.cache
+      # Agent configs (setup facet) rendered by the CLI from the active bundles.
+      - $AI_CABIN_CMD internal setup
+      # Agent-specific dirs + configs, defined in the cabin root Taskfile.
+      - task: setup
+
+  deps:
+    desc: Materialize .deps/ from active bundles (CLI) + copy host binaries
+    cmds:
+      - $AI_CABIN_CMD internal deps
+      # Host binaries the CLI cannot ship (best-effort; absent fails at COPY).
+      - cp ~/.local/bin/greywall .deps/greywall 2>/dev/null || true
+      - cp ~/.local/share/greyproxy/ca-cert.pem .deps/greyproxy-ca.crt 2>/dev/null || true
+
+
+  docker-build:
+    desc: Build the cabin image
+    cmds:
+      - task: prepare
+      - task: deps
+      - BUILDKIT_PROGRESS=plain docker compose build
+
+
+  docker-debug-build:
+    desc: Build the cabin image without cache
+    cmds:
+      - task: prepare
+      - task: deps
+      - BUILDKIT_PROGRESS=plain docker compose build --no-cache
+
+  docker-debug-run:
+    desc: Run a one-off debug container
+    cmds:
+      - task: prepare
+      - docker compose run --rm --service-ports agent /bin/bash
+
   docker-up:
     desc: Start the cabin in background
     cmds:
-      - task: setup
+      - task: prepare
       - docker compose up -d
 
   docker-down:
     desc: Stop the cabin
     cmds:
       - docker compose down
-
-  docker-build:
-    desc: Build the cabin image
-    cmds:
-      - task: setup
-      - task: deps
-      - BUILDKIT_PROGRESS=plain docker compose build
 
   docker-shell:
     desc: Get a bash shell inside the agent container
@@ -43,5 +91,5 @@ tasks:
   docker-restart:
     desc: Restart the agent container
     cmds:
-      - task: setup
+      - task: prepare
       - docker compose restart {{.AGENT_SERVICE}}

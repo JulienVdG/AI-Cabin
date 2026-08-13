@@ -4,38 +4,26 @@ ai-cabin:
 
 version: '3'
 
-# Shared lifecycle targets (docker-up/down/build/shell/greyshell/logs/restart)
-# provided by ai-cabin and materialized to XDG state. flatten: true exposes
-# them at the root (task docker-up); optional: true keeps `task` standalone
-# working before the CLI materializes the file.
+# Shared lifecycle targets provided by ai-cabin and materialized to XDG state;
+# flatten: true exposes them at the root (task docker-up), optional: true keeps
+# `task` standalone working before the CLI materializes the file. The shared
+# `prepare` target runs this cabin's `setup` for its agent dirs and configs.
 includes:
   lifecycle:
     taskfile: '{{.AI_CABIN_LIFECYCLE_TASKFILE | default "~/.local/state/ai-cabin/Taskfile.lifecycle.yml"}}'
     flatten: true
     optional: true
 
-# Cabin vars: consumed by task templates (not exported). AGENT_SERVICE is the
-# compose service running the agent, referenced by the shared lifecycle tasks
-# (docker-shell/greyshell/logs/restart).
+# Cabin vars: AGENT_SERVICE is the compose service running the agent, required
+# by the shared lifecycle targets.
 vars:
   AGENT_SERVICE: "agent"
 
 # Env: exported to the task subprocess (docker-compose reads ${VAR} from here).
-# CONTAINER_HOME is cabin metadata describing the Dockerfile's in-container user
-# home. AI_CABIN_CMD is the CLI self-delegation path (cabin injects an absolute
-# path at runtime; the default keeps `task` standalone working).
 env:
+  # In-container user home (matches the Dockerfile's USER).
   CONTAINER_HOME: /home/ai_agent
-  AI_CABIN_CMD: '{{.AI_CABIN_CMD | default "cabin"}}'
-  # GREYWALL_PROFILE: resolved greywall profile list (derived from active
-  # bundles by the CLI). Lazy via env: sh: — preset on the process (cabin
-  # task/up path via os.Setenv) short-circuits; unset (task standalone path)
-  # resolves via $AI_CABIN_CMD internal greywall-profile from the CWD cabin
-  # header. Consumed by the grey* wrappers.
-  GREYWALL_PROFILE:
-    sh: 'echo "${GREYWALL_PROFILE:-$($AI_CABIN_CMD internal greywall-profile)}"'
-  # GREYWALL_ARGS: per-wrapper greywall extras (e.g. --learning). Empty by
-  # default; a cabin may override (e.g. -p for an inbound port).
+  # Per-wrapper greywall extras (e.g. -p for an inbound port).
   GREYWALL_ARGS: ""
 
 tasks:
@@ -45,8 +33,8 @@ tasks:
       - task: docker-up
       - task: info
 
-  setup-dirs:
-    desc: Create AI_CABIN_HOME and AI_CABIN_DESK subdirectories
+  setup:
+    desc: Agent-specific setup (pi dirs + configs)
     preconditions:
       - sh: '[ -v AI_CABIN_HOME ]'
         msg: "missing environment variable AI_CABIN_HOME"
@@ -55,45 +43,12 @@ tasks:
       - sh: '[ -v AI_CABIN_WORKDIR ]'
         msg: "missing environment variable AI_CABIN_WORKDIR"
     cmds:
-      # Desk directory (in AI_CABIN_DESK)
-      - mkdir -p {{.AI_CABIN_DESK}}
-      - mkdir -p {{.AI_CABIN_DESK}}/skills
-      # Agent Data directories (in AI_CABIN_HOME)
-      - mkdir -p {{.AI_CABIN_HOME}}/.local/state/ai-cabin/
       - mkdir -p {{.AI_CABIN_HOME}}/.pi/agent
-      - mkdir -p {{.AI_CABIN_HOME}}/.config/greywall/learned
-      - mkdir -p {{.AI_CABIN_HOME}}/.cache
-      - mkdir -p {{.AI_CABIN_HOME}}/go
-      # Go (compatible with greywall go profile)
-      - mkdir -p {{.AI_CABIN_HOME}}/.cache/go-build {{.AI_CABIN_HOME}}/.cache/golangci-lint
-
-  setup:
-    desc: Setup environment (directories + agent configs)
-    cmds:
-      - task: setup-dirs
-      - $AI_CABIN_CMD internal setup
       - cat "{{.AI_CABIN_DESK}}/AGENTS.md" "{{.AI_CABIN_HOME}}/.cache/ai-cabin/AGENTS-workspace.md" > "{{.AI_CABIN_HOME}}/.pi/agent/AGENTS.md"
+      # go feature dirs (greywall go profile)
+      - mkdir -p {{.AI_CABIN_HOME}}/go
+      - mkdir -p {{.AI_CABIN_HOME}}/.cache/go-build {{.AI_CABIN_HOME}}/.cache/golangci-lint
       - touch {{.AI_CABIN_HOME}}/.local/state/ai-cabin/container_bash_history
-
-  deps:
-    desc: Materialize .deps/ from active bundles (CLI) + copy host binaries
-    cmds:
-      - $AI_CABIN_CMD internal deps
-      # Host binaries the CLI cannot ship (best-effort; absent fails at COPY).
-      - cp ~/.local/bin/greywall .deps/greywall 2>/dev/null || true
-      - cp ~/.local/share/greyproxy/ca-cert.pem .deps/greyproxy-ca.crt 2>/dev/null || true
-
-  docker-debug-build:
-    desc: Build the cabin image without cache
-    cmds:
-      - task: setup
-      - BUILDKIT_PROGRESS=plain docker compose build --no-cache
-
-  docker-debug-run:
-    desc: Run a one-off debug container
-    cmds:
-      - task: setup
-      - docker compose run --rm --service-ports agent /bin/bash
 
   pi:
     desc: Continue pi.dev session (greywall sandboxed TUI)
@@ -131,12 +86,12 @@ tasks:
         echo "  CONTAINER_WORKDIR  : Container workdir (default: AI_CABIN_WORKDIR, advanced)"
         echo ""
         echo "Usage:"
-        echo "  task setup             # Setup environment (directories + configs)"
-        echo "  task docker-up         # Start cabin"
-        echo "  task docker-shell      # Get shell inside container"
-        echo "  task pi                # pi.dev TUI"
-        echo "  task docker-greyshell  # Greywall sandboxed shell"
-        echo "  task docker-logs       # Follow logs"
+        echo "  task prepare         # Full setup (common dirs + agent configs)"
+        echo "  task docker-up       # Start cabin"
+        echo "  task docker-shell    # Get shell inside container"
+        echo "  task pi              # pi.dev TUI"
+        echo "  task docker-greyshell # Greywall sandboxed shell"
+        echo "  task docker-logs     # Follow logs"
         echo ""
         echo "Advanced:"
         echo "  CONTAINER_WORKDIR=/workspace task docker-up  # Remap workdir to /workspace"
