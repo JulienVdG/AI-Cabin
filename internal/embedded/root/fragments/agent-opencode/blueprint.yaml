@@ -1,0 +1,47 @@
+args: |
+  ARG OPENCODE_VERSION=1.4.9
+dockerfile: |
+  # Agent opencode: web UI (install.d/50-opencode reads OPENCODE_VERSION)
+  RUN mkdir -p .config/opencode
+  EXPOSE 9090
+  CMD ["opencode", "web", "--port", "9090", "--hostname", "0.0.0.0"]
+compose:
+  environment:
+    - OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD}
+  volumes:
+    - ${AI_CABIN_HOME}/.local/share/opencode:${CONTAINER_HOME}/.local/share/opencode:rw
+    - ${AI_CABIN_HOME}/.local/state/opencode:${CONTAINER_HOME}/.local/state/opencode:rw
+    - ${AI_CABIN_HOME}/.config/opencode:${CONTAINER_HOME}/.config/opencode:rw
+    - ${AI_CABIN_DESK}/skills:${CONTAINER_HOME}/.config/opencode/skills:ro
+  ports:
+    - "127.0.0.1:9090:9090"
+    - "[::1]:9090:9090"
+taskfile:
+  env:
+    GREYWALL_ARGS: "-p 9090"
+  tasks:
+    setup:
+      cmds:
+        - mkdir -p {{.AI_CABIN_HOME}}/.local/share/opencode
+        - mkdir -p {{.AI_CABIN_HOME}}/.local/state/opencode
+        - mkdir -p {{.AI_CABIN_HOME}}/.config/opencode
+        - mkdir -p {{.AI_CABIN_HOME}}/.cache/opencode
+        - cat "{{.AI_CABIN_DESK}}/AGENTS.md" "{{.AI_CABIN_HOME}}/.cache/ai-cabin/AGENTS-workspace.md" > "{{.AI_CABIN_HOME}}/.config/opencode/AGENTS.md"
+    opencode:
+      desc: Continue opencode session (greywall sandboxed TUI)
+      cmds:
+        - docker compose exec -e CABIN_REL_PATH="${CABIN_REL_PATH}" agent opencode {{.CLI_ARGS}}
+    info:
+      cmds:
+        - 'echo "AI Agent (opencode web):     http://localhost:9090 (use chromium)"'
+    help:
+      cmds:
+        - |
+          echo "  task opencode [args...]  # opencode CLI/TUI, args transmitted verbatim"
+help: |
+  agent-opencode installs the opencode agent via the 50-opencode install step,
+  reading OPENCODE_VERSION from the build env (declare the ARG above the
+  install step). It exposes the 9090 web UI (compose ports + EXPOSE/CMD) and
+  requires OPENCODE_SERVER_PASSWORD; its Taskfile env override sets
+  GREYWALL_ARGS=-p 9090 so the host can reach the web UI through greywall.
+  Select via agents: [opencode].

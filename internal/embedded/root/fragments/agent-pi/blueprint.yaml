@@ -1,0 +1,41 @@
+args: |
+  # Define the agent version as a build argument
+  ARG PI_VERSION=v0.72.1
+dockerfile: |
+  # Agent pi: pi-dev session + ripgrep + fd (install.d/50-pi reads PI_VERSION)
+  RUN mkdir -p .pi/agent
+compose:
+  environment:
+    # Disable Pi.dev telemetry and version checks
+    - PI_SKIP_VERSION_CHECK=1
+    - PI_OFFLINE=0
+  volumes:
+    # Pi.dev sessions, config, extensions
+    - ${AI_CABIN_HOME}/.pi:${CONTAINER_HOME}/.pi:rw
+    - ${AI_CABIN_DESK}/skills:${CONTAINER_HOME}/.pi/agent/skills:ro
+taskfile:
+  tasks:
+    setup:
+      cmds:
+        - mkdir -p {{.AI_CABIN_HOME}}/.pi/agent
+        - cat "{{.AI_CABIN_DESK}}/AGENTS.md" "{{.AI_CABIN_HOME}}/.cache/ai-cabin/AGENTS-workspace.md" > "{{.AI_CABIN_HOME}}/.pi/agent/AGENTS.md"
+    pi:
+      desc: Continue pi.dev session (greywall sandboxed TUI)
+      cmds:
+        - docker compose exec -e CABIN_REL_PATH="${CABIN_REL_PATH}" agent pi {{.CLI_ARGS}}
+    info:
+      cmds:
+        - 'echo "AI Agent (pi.dev TUI):        Use ''task pi'''
+    help:
+      cmds:
+        - |
+          echo "  task pi [args...]     # pi.dev CLI/TUI, args transmitted verbatim"
+help: |
+  agent-pi installs the pi agent (pi binary + ripgrep + fd) via the 50-pi
+  install step, reading PI_VERSION from the build env (declare the ARG above
+  the install step — the assembly engine places args before the apt RUN). The
+  compose env disables pi telemetry/version checks. The host SCW_PROJECT_ID is
+  baked into the models.json baseUrl at install by the setup template (not
+  passed as a runtime env); the mounts carry pi sessions/config and the desk
+  skills. Its Taskfile contribution adds the setup cmds, the pi run target and
+  the info line. Select via agents: [pi].

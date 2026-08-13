@@ -46,6 +46,31 @@ const setupManifest = "setup.yaml"
 // embedded root/fragments/ tree.
 const fragmentsSubdir = "fragments"
 
+// buildFragmentLayers builds the merged fragment fallback chain for a cabin:
+// the cabin-local override layer (<cabin>/fragments when it exists) layered
+// over the configured fragment dirs and the embedded fragments, resolved with
+// the given vars. Returns the merged FS and the cabin-local layer path (empty
+// when the cabin has none). Shared by the cabin runtime resolution and
+// `cabin authoring`.
+func buildFragmentLayers(cabinPath string, vars config.Vars) (fs.FS, string, error) {
+	cabinLocal := ""
+	if cabinPath != "" {
+		p := filepath.Join(cabinPath, fragmentsSubdir)
+		if info, err := os.Stat(p); err == nil && info.IsDir() {
+			cabinLocal = p
+		}
+	}
+	embedFS, err := embedded.Fragments()
+	if err != nil {
+		return nil, cabinLocal, err
+	}
+	merged, err := fragments.BuildLayers(vars.FragmentsDirs(), cabinLocal, embedFS)
+	if err != nil {
+		return nil, cabinLocal, err
+	}
+	return merged, cabinLocal, nil
+}
+
 // resolveCabinFragments resolves the cabin from CWD and builds the fragment
 // fallback chain.
 // Returns the active bundles, resolved vars, merged FS, and cabin path. The
@@ -65,19 +90,8 @@ func resolveCabinFragments() ([]cabin.FeatureRef, config.Vars, fs.FS, string, er
 		return nil, nil, nil, cabinPath, err
 	}
 
-	// Cabin-local override layer: <cabin>/fragments/ if it exists.
-	cabinLocal := ""
-	fragmentsDir := filepath.Join(cabinPath, fragmentsSubdir)
-	if info, err := os.Stat(fragmentsDir); err == nil && info.IsDir() {
-		cabinLocal = fragmentsDir
-	}
-
 	// Build the fallback chain (conf dirs > cabin-local > embedded).
-	embedFS, err := embedded.Fragments()
-	if err != nil {
-		return nil, nil, nil, cabinPath, err
-	}
-	merged, err := fragments.BuildLayers(vars.FragmentsDirs(), cabinLocal, embedFS)
+	merged, _, err := buildFragmentLayers(cabinPath, vars)
 	if err != nil {
 		return nil, nil, nil, cabinPath, err
 	}

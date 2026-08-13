@@ -1,0 +1,10 @@
+compose:
+  environment:
+    # Git agent name and email (consumed by the git-agent entrypoint hook)
+    - GIT_AGENT_NAME=${GIT_AGENT_NAME:-AI Agent}
+    - GIT_AGENT_EMAIL=${GIT_AGENT_EMAIL:-ai-agent@vdg.name}
+help: |
+  git-agent adds the git identity env vars consumed by the
+  90-git-agent-email.sh entrypoint hook. Opt in via features: [git-agent]
+  (the reference cabins enable it); a cabin that does not need git identity
+  can leave it out.

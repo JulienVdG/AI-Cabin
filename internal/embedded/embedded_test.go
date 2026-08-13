@@ -95,8 +95,9 @@ func TestFragments(t *testing.T) {
 			require.True(t, ok, "file %q is not under a bundle dir", p)
 			assert.Contains(t, expectedBundles, bundle, "file %q under unknown bundle %q", p, bundle)
 			switch rest {
-			case "deps.yaml", "setup.yaml":
-				// Manifests sit at the bundle root.
+			case "deps.yaml", "setup.yaml", "blueprint.yaml":
+				// Manifests sit at the bundle root (blueprint is the display-only
+				// authoring facet read by cabin authoring show/new).
 			default:
 				top, _, _ := strings.Cut(rest, "/")
 				assert.Contains(t, []string{"deps", "setup"}, top,

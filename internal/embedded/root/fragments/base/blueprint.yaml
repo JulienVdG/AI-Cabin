@@ -1,0 +1,141 @@
+# Blueprints for the base bundle (always active): the sandbox + plumbing layer
+# and the default cabin structure (this is the minimal state the other bundles
+# deep-merge into — base is always parsed first). Targets Debian-based
+# images (greywall CA install uses the Debian update-ca-certificates);
+# alpine/redhat distros are a future refinement.
+apt:
+  - git
+  - sqlite3
+  - curl
+  - vim
+  - ca-certificates
+  - bash-completion
+  - less
+  - bubblewrap
+  - socat
+  - strace
+dockerfile: |
+  # Copy the materialized fragments to a build dir and run the numbered install steps
+  COPY .deps/ /opt/ai-cabin-deps/
+  RUN /bin/sh /opt/ai-cabin-deps/install.sh \
+   && rm -rf /opt/ai-cabin-deps
+  ENTRYPOINT ["/docker-entrypoint.sh"]
+
+  # User setup (the root-to-user transition stays visible here on purpose)
+  RUN useradd -m ai_agent
+  WORKDIR /home/ai_agent
+  # Own the whole home so the agent can write anywhere it needs
+  RUN chown -R ai_agent:ai_agent /home/ai_agent
+  USER ai_agent
+  WORKDIR /home/ai_agent
+
+  # Add a greywall sandbox indicator to the prompt
+  RUN echo 'if [ "$GREYWALL_SANDBOX" = "1" ]; then debian_chroot="🔒"; fi' >> /home/ai_agent/.bashrc
+
+  # Create future mount-points so their owner is ai_agent
+  RUN mkdir -p .local/share .local/state .local/bin .cache .config/greywall desk go
+compose:
+  # Required for bubblewrap (greywall)
+  privileged: true
+  stdin_open: true
+  tty: true
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  environment:
+    # Terminal / sandbox
+    - TERM=xterm-256color
+    # Host paths (bind-mounted)
+    - AI_CABIN_DESK=${AI_CABIN_DESK}
+    - AI_CABIN_WORKDIR=${AI_CABIN_WORKDIR}
+    - CONTAINER_HOME=/home/ai_agent
+    # Container workdir path (transparent by default, remapped in advanced mode)
+    - CONTAINER_WORKDIR=${CONTAINER_WORKDIR:-${AI_CABIN_WORKDIR}}
+    # Greywall profile + per-wrapper extras (pass-through from the task env)
+    - GREYWALL_PROFILE
+    - GREYWALL_ARGS
+  volumes:
+    # Desk (single mount for desk + skills)
+    - ${AI_CABIN_DESK}:${CONTAINER_HOME}/desk:rw
+    # Cache
+    - ${AI_CABIN_HOME}/.cache:${CONTAINER_HOME}/.cache:rw
+    # Workdir (transparent by default, remapped in advanced mode)
+    - ${AI_CABIN_WORKDIR}:${CONTAINER_WORKDIR:-${AI_CABIN_WORKDIR}}:rw
+    # bash_history (eases greywall setup debugging)
+    - ${AI_CABIN_HOME}/.local/state/ai-cabin/container_bash_history:${CONTAINER_HOME}/.bash_history:rw
+    # Greywall config (learning persists across up/down)
+    - ${AI_CABIN_HOME}/.config/greywall:${CONTAINER_HOME}/.config/greywall:rw
+taskfile:
+  version: '3'
+  # Shared docker-* lifecycle targets (optional; materialized to XDG state by the CLI)
+  includes:
+    lifecycle:
+      taskfile: '{{.AI_CABIN_LIFECYCLE_TASKFILE | default "~/.local/state/ai-cabin/Taskfile.lifecycle.yml"}}'
+      flatten: true
+      optional: true
+  vars:
+    # Name of the agent service in docker-compose
+    AGENT_SERVICE: "agent"
+  env:
+    # Container-side shared env (bind paths / greywall args; agent bundles override)
+    CONTAINER_HOME: /home/ai_agent
+    GREYWALL_ARGS: ""
+  tasks:
+    # Alias + agent targets (agent bundles add their run/setup tasks here)
+    default:
+      desc: Start the cabin (docker-up + info)
+      cmds:
+        - task: docker-up
+        - task: info
+    setup:
+      desc: Agent-specific setup (agent dirs + configs)
+      preconditions:
+        - sh: '[ -v AI_CABIN_HOME ]'
+          msg: "missing environment variable AI_CABIN_HOME"
+        - sh: '[ -v AI_CABIN_DESK ]'
+          msg: "missing environment variable AI_CABIN_DESK"
+        - sh: '[ -v AI_CABIN_WORKDIR ]'
+          msg: "missing environment variable AI_CABIN_WORKDIR"
+      cmds:
+        - touch {{.AI_CABIN_HOME}}/.local/state/ai-cabin/container_bash_history
+    up:
+      desc: Start the cabin (alias for docker-up + info)
+      cmds:
+        - task: docker-up
+        - task: info
+    down:
+      desc: Stop the cabin (alias for docker-down)
+      cmds:
+        - task: docker-down
+    info:
+      desc: Show cabin access info
+      cmds:
+        - 'echo "greyproxy (host):            http://localhost:43080"'
+      silent: true
+    help:
+      desc: Show usage
+      cmds:
+        - |
+          echo "Environment variables (must be set before running task):"
+          echo "  AI_CABIN_HOME      : Host home directory (e.g., /home/user/)"
+          echo "  AI_CABIN_DESK      : Shared desk directory (AGENTS.md, skills)"
+          echo "  AI_CABIN_WORKDIR   : Git repositories"
+          echo ""
+          echo "Usage:"
+          echo "  task prepare          # Full setup (common dirs + agent configs)"
+          echo "  task docker-up        # Start cabin"
+          echo "  task docker-shell     # Get shell inside container"
+          echo "  task docker-greyshell # Greywall sandboxed shell"
+          echo "  task docker-logs      # Follow logs"
+      silent: true
+help: |
+  Base is always active: it installs the greywall sandbox, the greyproxy CA,
+  the entrypoint and the greybash/agent wrappers, and carries the default
+  compose agent service and Taskfile structure the other bundles merge into.
+
+  The apt list and install step target Debian-based images (they assume Debian
+  apt-get and update-ca-certificates). Non-Debian distros (apk add / dnf install,
+  update-ca-trust on redhat) are a future refinement.
+
+  The install steps run as root before USER ai_agent; do not reorder the
+  useradd below it (the entrypoint switches user per hook, showing the
+  privilege boundary explicitly).

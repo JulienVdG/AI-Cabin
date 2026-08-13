@@ -1,0 +1,18 @@
+compose:
+  environment:
+    # Go
+    - GOPATH=${CONTAINER_HOME}/go
+  volumes:
+    # Go module cache (shared bind mount)
+    - ${AI_CABIN_HOME}/go:${CONTAINER_HOME}/go:rw
+taskfile:
+  tasks:
+    setup:
+      cmds:
+        - mkdir -p {{.AI_CABIN_HOME}}/go
+        - mkdir -p {{.AI_CABIN_HOME}}/.cache/go-build {{.AI_CABIN_HOME}}/.cache/golangci-lint
+help: |
+  go adds the GOPATH env var and a shared Go module cache mount, and ships the
+  profile.d PATH setup (ai-cabin-go.sh) installed by the base 30-profile step.
+  Its setup cmds create the go dirs the greywall go profile binds.
+  Select it for a cabin whose agent works on Go code; it is off by default.
