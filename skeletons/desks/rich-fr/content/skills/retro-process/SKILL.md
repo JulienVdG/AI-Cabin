@@ -24,7 +24,7 @@ I run session retrospectives following the process in **desk/retro.md**.
 3. **Priority 1:** Update AGENTS.md (Workflow + Project Memory sections)
 4. **Priority 2:** Create/update skills (multi-step workflows only)
 5. **Priority 3:** Update project docs (ARCHITECTURE.md, DEVELOPMENT.md, etc.)
-6. Remind user of actions (make setup, restart)
+6. Remind user of actions (cabin task <name> prepare, restart)
 
 ## Critical Rules
 
@@ -53,12 +53,12 @@ I run session retrospectives following the process in **desk/retro.md**.
 
 **Remind user (priority order):**
 1. `git diff` AGENTS.md → commit → propagate
-   - **opencode:** `make setup` then `make docker-restart-agent`
+   - **opencode:** `cabin task <name> prepare` then `cabin restart <name>`
      - ⚠️ **Restart required** — opencode loads AGENTS.md only at startup
-   - **pi.dev:** `make setup` is sufficient
+   - **pi.dev:** `cabin task <name> prepare` is sufficient
      - ✅ **No restart needed** — reads at each session start
 2. `git diff` skills → commit → restart (only if skills created/updated)
-   - **opencode:** `make docker-restart-agent` or exit + `make opencode`
+   - **opencode:** `cabin restart <name>` or exit + `cabin task <name> opencode`
      - ⚠️ **Critical for Web UI** - skills NOT discovered without restart
    - **pi.dev:** End session (`/quit`) and start new `pi` session
      - 💡 **Workaround:** Tell agent to `ls desk/skills/` to discover without restart

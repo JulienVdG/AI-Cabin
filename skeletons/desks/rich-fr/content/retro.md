@@ -103,9 +103,7 @@ Run the skill sync command for your AI tool, then restart the session.
    **DO NOT commit** - user reviews with `git diff`
 2. **User action**: `git diff` to review changes
 3. `git commit` with semantic message (after user approval)
-4. **User action**: Run `make setup` in cabin to regenerate `~/.config/opencode/AGENTS.md`
-
-**Why `make setup`?** The cabin copies `desk/AGENTS.md` to `~/.config/opencode/AGENTS.md` at startup.
+4. **User action**: Run `cabin task <name> prepare` to regenerate `~/.config/opencode/AGENTS.md` (read by opencode at startup)
 
 #### 3.2. Skills (`desk/skills/` - WRITABLE)
 
@@ -188,7 +186,7 @@ AI: [writes all proposals in respective files]
 
 User: 
 - Git diff AGENTS.md → commits
-- Runs `make setup` in cabin to regenerate AGENTS.md
+- Runs `cabin task <name> prepare` to regenerate AGENTS.md
 - Git diff skills → commits
 - Restarts cabin for new skills to load
 - Commits project documentation (README.md, ARCHITECTURE.md, desk/*.md) changes
@@ -225,7 +223,7 @@ Before closing a session, review:
 - [ ] Complex features? → Update feature-specific docs
 - [ ] Task status changes? → Update `desk/TODO.md`
 - [ ] Process improvements? → Update `desk/retro.md` (this file)
-- [ ] **AGENTS.md modified?** → Remind user to run `make setup` in cabin
+- [ ] **AGENTS.md modified?** → Remind user to run `cabin task <name> prepare`
 - [ ] **Skills modified?** → Remind user to restart cabin
 - [ ] **Session title proposed?** → See `skill:task-closing` Step 6
 - [ ] **Workflow Protocol followed?** → Check `AGENTS.md` ## Workflow Protocol (7 steps)
