@@ -76,26 +76,29 @@ func buildFragmentLayers(cabinPath string, vars config.Vars) (fs.FS, string, err
 // Returns the active bundles, resolved vars, merged FS, and cabin path. The
 // caller handles error printing (printValidateError formats ErrNoHeader
 // specifically and falls back to a generic message otherwise).
-func resolveCabinFragments() ([]cabin.FeatureRef, config.Vars, fs.FS, string, error) {
-	// Resolve the cabin from CWD to derive active bundles.
-	header, cabinPath, err := cabin.Header(".")
+// resolveCabinFragments resolves the active bundles for the cabin at cabinPath
+// (header agents:/features:), the resolved vars, and the merged fallback chain.
+// Hidden internal commands pass "." (CWD); the task runner passes the
+// registered cabin's path so behavior is independent of the caller's CWD.
+func resolveCabinFragments(cabinPath string) ([]cabin.FeatureRef, config.Vars, fs.FS, string, error) {
+	header, resolvedPath, err := cabin.Header(cabinPath)
 	if err != nil {
-		return nil, nil, nil, cabinPath, err
+		return nil, nil, nil, resolvedPath, err
 	}
 	bundles := cabin.ActiveBundles(header)
 
 	// Resolve vars (profile + env + --var) for template rendering.
 	vars, err := config.ResolveVars(profileFlag, cliVars)
 	if err != nil {
-		return nil, nil, nil, cabinPath, err
+		return nil, nil, nil, resolvedPath, err
 	}
 
 	// Build the fallback chain (conf dirs > cabin-local > embedded).
-	merged, _, err := buildFragmentLayers(cabinPath, vars)
+	merged, _, err := buildFragmentLayers(resolvedPath, vars)
 	if err != nil {
-		return nil, nil, nil, cabinPath, err
+		return nil, nil, nil, resolvedPath, err
 	}
-	return bundles, vars, merged, cabinPath, nil
+	return bundles, vars, merged, resolvedPath, nil
 }
 
 // internalDepsCmd materializes <cabin>/.deps/ from the active bundles declared
@@ -111,7 +114,7 @@ var internalDepsCmd = &cobra.Command{
 	Use:   "deps",
 	Short: "Materialize <cabin>/.deps/ from active bundles",
 	Run: func(cmd *cobra.Command, args []string) {
-		bundles, vars, merged, cabinPath, err := resolveCabinFragments()
+		bundles, vars, merged, cabinPath, err := resolveCabinFragments(".")
 		if err != nil {
 			printValidateError(os.Stderr, err, cabinPath)
 			os.Exit(1)
@@ -157,7 +160,7 @@ var internalSetupCmd = &cobra.Command{
 	Use:   "setup",
 	Short: "Materialize agent configs into $AI_CABIN_HOME from active bundles",
 	Run: func(cmd *cobra.Command, args []string) {
-		bundles, vars, merged, cabinPath, err := resolveCabinFragments()
+		bundles, vars, merged, cabinPath, err := resolveCabinFragments(".")
 		if err != nil {
 			printValidateError(os.Stderr, err, cabinPath)
 			os.Exit(1)
@@ -204,7 +207,7 @@ var internalGreywallProfileCmd = &cobra.Command{
 	Use:   "greywall-profile",
 	Short: "Resolve the greywall profile list from the cabin's active bundles",
 	Run: func(cmd *cobra.Command, args []string) {
-		bundles, vars, merged, cabinPath, err := resolveCabinFragments()
+		bundles, vars, merged, cabinPath, err := resolveCabinFragments(".")
 		if err != nil {
 			printValidateError(os.Stderr, err, cabinPath)
 			os.Exit(1)

@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/JulienVdG/AI-Cabin/internal/config"
 	"github.com/JulienVdG/AI-Cabin/internal/embedded"
+	"github.com/JulienVdG/AI-Cabin/internal/fragments"
 	"github.com/JulienVdG/AI-Cabin/internal/state"
 	"github.com/JulienVdG/AI-Cabin/internal/task"
 
@@ -86,6 +88,16 @@ func runCabinTask(ctx context.Context, cabinName, taskName string, rawArgs []str
 		return fmt.Errorf("materialize lifecycle taskfile: %w", err)
 	}
 	vm["AI_CABIN_LIFECYCLE_TASKFILE"] = lifecyclePath
+
+	// Resolve the greywall profile list for this cabin and inject it on the
+	// process (from the cabin's path, independent of the caller's CWD).
+	// Best-effort: a resolution failure leaves the var unset instead of
+	// blocking task execution.
+	if bundles, vars, merged, _, err := resolveCabinFragments(c.Path); err == nil {
+		if profiles, err := fragments.ResolveGreywallProfiles(merged, bundles, vars.AsMap()); err == nil {
+			vm["GREYWALL_PROFILE"] = strings.Join(profiles, ",")
+		}
+	}
 
 	return task.Run(ctx, c.Path, taskName, rawArgs, vm, stdout, stderr)
 }

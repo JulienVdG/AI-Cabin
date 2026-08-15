@@ -9,6 +9,10 @@ version: '3'
 # task reference. AGENT_SERVICE (default: agent) is declared by the cabin's
 # vars. AGENT_SERVICE stays cabin-owned.
 
+env:
+  GREYWALL_PROFILE:
+    sh: 'echo "${GREYWALL_PROFILE:-$($AI_CABIN_CMD internal greywall-profile)}"'
+
 tasks:
   prepare:
     desc: Full cabin setup (common dirs + rendered configs + agent setup)
