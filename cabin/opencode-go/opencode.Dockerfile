@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     git \
     sqlite3 \
     curl \
+    jq \
     vim \
     ca-certificates \
     bash-completion \
