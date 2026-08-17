@@ -36,27 +36,48 @@ and desk are not overwritten). Use ` + "`cabin profile init --force`" + ` to ove
 Agent-config materialization stays lazy, triggered on the first cabin task.`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		// 1. Default profile (or no-op if it exists): the --var global flag
-		// reaches InitProfile, so a custom desk path works the same as
-		// `cabin profile init --var AI_CABIN_DESK=...`.
-		profile, err := config.InitProfile("default", cliVars, false)
+		// Lifecycle first: the cabin is unusable without it, so fail fast (and
+		// loudly) before touching the profile or desk. A read-only state dir is
+		// worked around by redirecting the XDG vars to a writable path.
+		if _, err := ensureLifecycleArtifact(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: materialize lifecycle taskfile: %v\n", err)
+			fmt.Fprintln(os.Stderr, "The cabin is unusable without the lifecycle Taskfile.")
+			fmt.Fprintln(os.Stderr, "If the state dir is read-only, redirect it to a writable path, e.g.:")
+			fmt.Fprintln(os.Stderr, "  export XDG_STATE_HOME=/workspace/dev-state  XDG_CONFIG_HOME=/workspace/dev-config")
+			os.Exit(1)
+		}
+
+		// Detect a fresh bootstrap vs a no-op re-run (setup has no --force).
+		profExists, err := config.ProfileExists("default")
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
-		created := profile.Name == "default" && profile.Vars[config.DeskVar] != ""
+		fresh := !profExists
 
-		// 2. Desk skeleton (minimal, no-overwrite): the profile's AI_CABIN_DESK
-		// is the resolved value (--var > env > defaults), so a --var override
-		// on setup lands the desk where the user asked.
+		// Default profile: self-healing bootstrap. The forced merge
+		// (defaults ∪ --var ∪ existing) refills missing structural vars (e.g.
+		// a corrupted AI_CABIN_DESK) while preserving user-set keys. The --var
+		// global flag sets a custom desk path the same way as
+		// `cabin profile init --var AI_CABIN_DESK=...`.
+		profile, err := config.InitProfile("default", cliVars, true)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		if fresh {
+			fmt.Printf("Created profile %q at %s\n", profile.Name, profile.Path())
+		} else {
+			fmt.Printf("Ensured profile %q (user vars preserved)\n", profile.Name)
+		}
+		printVars(profile.Vars)
+
+		// Desk skeleton (minimal, no-overwrite).
 		desk := profile.Vars[config.DeskVar]
 		if desk == "" {
 			fmt.Fprintf(os.Stderr, "Error: AI_CABIN_DESK is not set in the profile\n")
 			os.Exit(1)
 		}
-		// Resolve the runtime view (env included) for the skeleton catalogue:
-		// AI_CABIN_SKELETON_DIRS is read from env/--var, not persisted to the
-		// bounded profile, so profile.Vars alone would miss repo skeletons.
 		resolvedVars, err := config.ResolveVars(profileFlag, cliVars)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -67,31 +88,29 @@ Agent-config materialization stays lazy, triggered on the first cabin task.`,
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
+		fmt.Printf("Copied desk skeleton (%d files) to %s\n", len(written), desk)
 
-		// 3. Workdir (default ~/projects): created from the resolved profile
-		// var, so a --var AI_CABIN_WORKDIR override is honored.
+		// Workdir (default ~/projects): honors a --var AI_CABIN_WORKDIR override.
 		workdir := profile.Vars[config.WorkdirVar]
 		if err := os.MkdirAll(workdir, 0o755); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: create workdir %q: %v\n", workdir, err)
 			os.Exit(1)
 		}
+		fmt.Printf("Workdir: %s\n", workdir)
 
-		// 4. Lifecycle Taskfile to XDG state (idempotent content-compare) so
-		// `task` resolves a cabin's includes: at parse time before any task
-		// runs. Reused from runtime.go (runCabinTask + completion).
-		lifecyclePath, err := ensureLifecycleArtifact()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: materialize lifecycle taskfile: %v\n", err)
+		// Activate default only once the environment is in place: a failed
+		// bootstrap must never leave (or clobber) the current profile.
+		if err := config.SetCurrentProfile("default"); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
+		fmt.Printf("Active profile set to %q\n", "default")
 
-		_ = created // (kept for a future "already set up" vs "fresh" message)
-		fmt.Printf("AI-Cabin environment ready.\n")
-		fmt.Printf("  Profile:    %s at %s\n", profile.Name, profile.Path())
-		fmt.Printf("  Desk:       %s (%d skeleton files)\n", desk, len(written))
-		fmt.Printf("  Workdir:    %s\n", workdir)
-		fmt.Printf("  Lifecycle:  %s\n", lifecyclePath)
-		fmt.Println("\nNext: register a cabin with `cabin cabin add <path>` and run `cabin task <cabin> <task>`.")
+		fmt.Println("AI-Cabin environment ready.")
+		// Show the onboarding hint only when no cabin is registered yet.
+		if cabins, err := config.ListCabins(); err == nil && len(cabins) == 0 {
+			fmt.Println("Next: register a cabin with `cabin cabin add <path>` and run `cabin task <cabin> <task>`.")
+		}
 	},
 }
 

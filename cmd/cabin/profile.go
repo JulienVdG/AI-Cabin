@@ -75,10 +75,7 @@ var profileShowCmd = &cobra.Command{
 
 		fmt.Printf("Profile: %s\n", profile.Name)
 		fmt.Printf("Path: %s\n", profile.Path())
-		fmt.Println("Variables:")
-		for k, v := range profile.Vars {
-			fmt.Printf("  %s=%s\n", k, v)
-		}
+		printVars(profile.Vars)
 	},
 }
 
@@ -172,11 +169,12 @@ On an existing profile: no-op (warn + exit 0); use --force to overwrite both the
 			os.Exit(1)
 		}
 
-		fmt.Printf("Created profile %q at %s\n", profile.Name, profile.Path())
-		fmt.Println("Variables:")
-		for k, v := range profile.Vars {
-			fmt.Printf("  %s=%s\n", k, v)
+		if exists {
+			fmt.Printf("Updated profile %q at %s\n", profile.Name, profile.Path())
+		} else {
+			fmt.Printf("Created profile %q at %s\n", profile.Name, profile.Path())
 		}
+		printVars(profile.Vars)
 
 		desk := profile.Vars[config.DeskVar]
 		if desk == "" {
@@ -197,6 +195,14 @@ On an existing profile: no-op (warn + exit 0); use --force to overwrite both the
 			os.Exit(1)
 		}
 		fmt.Printf("Copied desk skeleton (%d files) to %s\n", len(written), desk)
+
+		// Activate the profile only once the environment is in place: a failed
+		// profile/desk must never become (or clobber) the current profile.
+		if err := config.SetCurrentProfile(name); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Active profile set to %q\n", name)
 	},
 }
 
