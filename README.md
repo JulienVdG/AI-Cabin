@@ -484,6 +484,8 @@ Apache License 2.0 - See [LICENSE](LICENSE) for details.
 
 Contributions welcome! Please read our development guide and open an issue before submitting PRs.
 
+*This repo was written with an AI agent in the passenger seat, carefully reviewed by a human captain.* 🚢
+
 ---
 
 **You're the captain. AI is just another passenger. Stay in control. 🚢**
