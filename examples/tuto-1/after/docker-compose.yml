@@ -1,0 +1,48 @@
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: ai-cabin.Dockerfile
+    container_name: tuto1_agent
+    hostname: tuto1
+    # Required for bubblewrap (greywall)
+    privileged: true
+    stdin_open: true
+    tty: true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      # Terminal / sandbox
+      - TERM=xterm-256color
+      # Host paths (bind-mounted)
+      - AI_CABIN_DESK=${AI_CABIN_DESK}
+      - AI_CABIN_WORKDIR=${AI_CABIN_WORKDIR}
+      - CONTAINER_HOME=/home/ubuntu
+      # Container workdir path (transparent by default, remapped in advanced mode)
+      - CONTAINER_WORKDIR=${CONTAINER_WORKDIR:-${AI_CABIN_WORKDIR}}
+      # Greywall profile + per-wrapper extras (pass-through from the task env)
+      - GREYWALL_PROFILE
+      - GREYWALL_ARGS
+      - OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD}
+      # Go
+      - GOPATH=${CONTAINER_HOME}/go
+    volumes:
+      # Desk (single mount for desk + skills)
+      - ${AI_CABIN_DESK}:${CONTAINER_HOME}/desk:rw
+      # Cache
+      - ${AI_CABIN_HOME}/.cache:${CONTAINER_HOME}/.cache:rw
+      # Workdir (transparent by default, remapped in advanced mode)
+      - ${AI_CABIN_WORKDIR}:${CONTAINER_WORKDIR:-${AI_CABIN_WORKDIR}}:rw
+      # bash_history (eases greywall setup debugging)
+      - ${AI_CABIN_HOME}/.local/state/ai-cabin/container_bash_history:${CONTAINER_HOME}/.bash_history:rw
+      # Greywall config (learning persists across up/down)
+      - ${AI_CABIN_HOME}/.config/greywall:${CONTAINER_HOME}/.config/greywall:rw
+      - ${AI_CABIN_HOME}/.local/share/opencode:${CONTAINER_HOME}/.local/share/opencode:rw
+      - ${AI_CABIN_HOME}/.local/state/opencode:${CONTAINER_HOME}/.local/state/opencode:rw
+      - ${AI_CABIN_HOME}/.config/opencode:${CONTAINER_HOME}/.config/opencode:rw
+      - ${AI_CABIN_DESK}/skills:${CONTAINER_HOME}/.config/opencode/skills:ro
+      # Go module cache (shared bind mount)
+      - ${AI_CABIN_HOME}/go:${CONTAINER_HOME}/go:rw
+    ports:
+      - "127.0.0.1:9090:9090"
+      - "[::1]:9090:9090"

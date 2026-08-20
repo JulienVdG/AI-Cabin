@@ -1,0 +1,90 @@
+ai-cabin:
+  agents:
+    - opencode
+    - pi
+  features:
+    - git-agent
+    - port-forward: {port: 5432, host: postgres}
+version: '3'
+# Shared docker-* lifecycle targets (optional; materialized to XDG state by the CLI)
+includes:
+  lifecycle:
+    taskfile: '{{.AI_CABIN_LIFECYCLE_TASKFILE | default "~/.local/state/ai-cabin/Taskfile.lifecycle.yml"}}'
+    flatten: true
+    optional: true
+vars:
+  # Name of the agent service in docker-compose
+  AGENT_SERVICE: "agent"
+env:
+  # Container-side shared env (bind paths / greywall args; agent bundles override)
+  CONTAINER_HOME: /home/ai_agent
+  GREYWALL_ARGS: "-p 9090"
+tasks:
+  # Alias + agent targets (agent bundles add their run/setup tasks here)
+  default:
+    desc: Start the cabin (docker-up + info)
+    cmds:
+      - task: docker-up
+      - task: info
+  setup:
+    desc: Agent-specific setup (agent dirs + configs)
+    preconditions:
+      - sh: '[ -v AI_CABIN_HOME ]'
+        msg: "missing environment variable AI_CABIN_HOME"
+      - sh: '[ -v AI_CABIN_DESK ]'
+        msg: "missing environment variable AI_CABIN_DESK"
+      - sh: '[ -v AI_CABIN_WORKDIR ]'
+        msg: "missing environment variable AI_CABIN_WORKDIR"
+    cmds:
+      - touch {{.AI_CABIN_HOME}}/.local/state/ai-cabin/container_bash_history
+      - mkdir -p {{.AI_CABIN_HOME}}/.local/share/opencode
+      - mkdir -p {{.AI_CABIN_HOME}}/.local/state/opencode
+      - mkdir -p {{.AI_CABIN_HOME}}/.config/opencode
+      - mkdir -p {{.AI_CABIN_HOME}}/.cache/opencode
+      - cat "{{.AI_CABIN_DESK}}/AGENTS.md" "{{.AI_CABIN_HOME}}/.cache/ai-cabin/AGENTS-workspace.md" > "{{.AI_CABIN_HOME}}/.config/opencode/AGENTS.md"
+      - mkdir -p {{.AI_CABIN_HOME}}/.pi/agent
+      - cat "{{.AI_CABIN_DESK}}/AGENTS.md" "{{.AI_CABIN_HOME}}/.cache/ai-cabin/AGENTS-workspace.md" > "{{.AI_CABIN_HOME}}/.pi/agent/AGENTS.md"
+  up:
+    desc: Start the cabin (alias for docker-up + info)
+    cmds:
+      - task: docker-up
+      - task: info
+  down:
+    desc: Stop the cabin (alias for docker-down)
+    cmds:
+      - task: docker-down
+  info:
+    desc: Show cabin access info
+    cmds:
+      - 'echo "greyproxy (host):            http://localhost:43080"'
+      - 'echo "AI Agent (opencode web):     http://localhost:9090 (use chromium)"'
+      - 'echo "AI Agent (pi.dev TUI):        Use ''task pi'''
+    silent: true
+  help:
+    desc: Show usage
+    cmds:
+      - |
+        echo "Environment variables (must be set before running task):"
+        echo "  AI_CABIN_HOME      : Host home directory (e.g., /home/user/)"
+        echo "  AI_CABIN_DESK      : Shared desk directory (AGENTS.md, skills)"
+        echo "  AI_CABIN_WORKDIR   : Git repositories"
+        echo ""
+        echo "Usage:"
+        echo "  task prepare          # Full setup (common dirs + agent configs)"
+        echo "  task docker-up        # Start cabin"
+        echo "  task docker-shell     # Get shell inside container"
+        echo "  task docker-greyshell # Greywall sandboxed shell"
+        echo "  task docker-logs      # Follow logs"
+      - |
+        echo "  task opencode [args...]  # opencode CLI/TUI, args transmitted verbatim"
+      - |
+        echo "  task pi [args...]     # pi.dev CLI/TUI, args transmitted verbatim"
+    silent: true
+  opencode:
+    desc: Continue opencode session (greywall sandboxed TUI)
+    cmds:
+      - docker compose exec -e CABIN_REL_PATH="${CABIN_REL_PATH}" agent opencode {{.CLI_ARGS}}
+  pi:
+    desc: Continue pi.dev session (greywall sandboxed TUI)
+    cmds:
+      - docker compose exec -e CABIN_REL_PATH="${CABIN_REL_PATH}" agent pi {{.CLI_ARGS}}

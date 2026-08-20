@@ -1,0 +1,89 @@
+services:
+  web:
+    build: .
+    image: tuto2-web
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://app:app@postgres:5432/appdb
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: appdb
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+      - "[::1]:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d appdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  agent:
+    build:
+      context: .
+      dockerfile: ai-cabin.Dockerfile
+    container_name: tuto2_agent
+    hostname: tuto2
+    # Required for bubblewrap (greywall)
+    privileged: true
+    stdin_open: true
+    tty: true
+    depends_on:
+      - web
+      - postgres
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - TERM=xterm-256color
+      # Host paths (bind-mounted)
+      - AI_CABIN_DESK=${AI_CABIN_DESK}
+      - AI_CABIN_WORKDIR=${AI_CABIN_WORKDIR}
+      - CONTAINER_HOME=/home/ai_agent
+      # Container workdir path (transparent by default, remapped in advanced mode)
+      - CONTAINER_WORKDIR=${CONTAINER_WORKDIR:-${AI_CABIN_WORKDIR}}
+      # Greywall profile + per-wrapper extras (pass-through from the task env)
+      - GREYWALL_PROFILE
+      - GREYWALL_ARGS
+      - OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD}
+      # Disable Pi.dev telemetry and version checks
+      - PI_SKIP_VERSION_CHECK=1
+      - PI_OFFLINE=0
+      # Git agent name and email (consumed by the git-agent entrypoint hook)
+      - GIT_AGENT_NAME=${GIT_AGENT_NAME:-AI Agent}
+      - GIT_AGENT_EMAIL=${GIT_AGENT_EMAIL:-ai-agent@vdg.name}
+    volumes:
+      # Desk (single mount for desk + skills)
+      - ${AI_CABIN_DESK}:${CONTAINER_HOME}/desk:rw
+      # Cache
+      - ${AI_CABIN_HOME}/.cache:${CONTAINER_HOME}/.cache:rw
+      # Workdir (transparent by default, remapped in advanced mode)
+      - ${AI_CABIN_WORKDIR}:${CONTAINER_WORKDIR:-${AI_CABIN_WORKDIR}}:rw
+      # bash_history (eases greywall setup debugging)
+      - ${AI_CABIN_HOME}/.local/state/ai-cabin/container_bash_history:${CONTAINER_HOME}/.bash_history:rw
+      # Greywall config (learning persists across up/down)
+      - ${AI_CABIN_HOME}/.config/greywall:${CONTAINER_HOME}/.config/greywall:rw
+      - ${AI_CABIN_HOME}/.local/share/opencode:${CONTAINER_HOME}/.local/share/opencode:rw
+      - ${AI_CABIN_HOME}/.local/state/opencode:${CONTAINER_HOME}/.local/state/opencode:rw
+      - ${AI_CABIN_HOME}/.config/opencode:${CONTAINER_HOME}/.config/opencode:rw
+      - ${AI_CABIN_DESK}/skills:${CONTAINER_HOME}/.config/opencode/skills:ro
+      # Pi.dev sessions, config, extensions
+      - ${AI_CABIN_HOME}/.pi:${CONTAINER_HOME}/.pi:rw
+      - ${AI_CABIN_DESK}/skills:${CONTAINER_HOME}/.pi/agent/skills:ro
+    ports:
+      - "127.0.0.1:9090:9090"
+      - "[::1]:9090:9090"
