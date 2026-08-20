@@ -463,14 +463,37 @@ curl -s http://100.64.0.1:43080/api/settings | jq '.notifications'
 
 ### Ubuntu AppArmor Blocks Greywall
 
-**Issue:** Bubblewrap cannot mount tun due to AppArmor restrictions.
+**Issue:** Bubblewrap cannot run (or cannot create the TUN device) due to
+AppArmor user-namespace restrictions. The exact failure depends on the Ubuntu
+version:
 
-**Solution:**
+- **24.04 (kernel 6.8):** the unprivileged user namespace is blocked, so
+  Bubblewrap fails with `bwrap: setting up uid map: Permission denied` and
+  Greywall silently falls back to env-var proxying (no TUN).
+- **26.04 (kernel 7.0):** the user namespace is created, but a dedicated
+  AppArmor profile (`/etc/apparmor.d/bwrap-userns-restrict`) is stacked onto
+  Bubblewrap and **strips all capabilities from its children**. The TUN
+  creation then fails with `RTNETLINK answers: Operation not permitted` /
+  `ioctl(TUNSETIFF): Operation not permitted` (audit shows `profile="unpriv_bwrap"
+  ... capname="net_admin"` denied).
+
+**Solution — 24.04:** allow unprivileged user namespaces:
 ```bash
 sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0
 ```
 
-**Note:** A PPA-based solution may also be available.
+**Solution — 26.04:** the sysctl above is **not sufficient** on 26.04: it does
+not remove the `bwrap-userns-restrict` profile, which keeps denying
+capabilities (`net_admin`, `sys_admin`) no matter the sysctl value. Disable
+that profile instead (run once, persists across reboots):
+```bash
+sudo apt install apparmor-utils
+sudo aa-disable /etc/apparmor.d/bwrap-userns-restrict
+```
+
+**Verify:** after the fix, a sandboxed network command must reach the TUN setup
+without `Operation not permitted` (you still need Greyproxy running for actual
+network traffic).
 
 ---
 
