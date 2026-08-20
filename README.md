@@ -243,9 +243,9 @@ The essential variables are listed under Profile Variables below.
 
 The registry maps cabin names to their directory so `cabin <name> ...` resolves them.
 
-- `cabin add <path> [name]` — register or update a cabin
-- `cabin list` — list registered cabins
-- `cabin scan <path>` — recursively discover and register cabins under a path (e.g. `cabin scan cabin/`)
+- `cabin cabin add <path> [name]` — register or update a cabin
+- `cabin cabin list` — list registered cabins
+- `cabin cabin scan <path>` — recursively discover and register cabins under a path (e.g. `cabin cabin scan cabin/`)
 
 ### Lifecycle
 
