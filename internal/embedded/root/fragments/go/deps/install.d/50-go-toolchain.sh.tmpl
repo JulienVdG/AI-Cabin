@@ -1,0 +1,18 @@
+#!/bin/sh
+set -e
+
+# Install the Go toolchain when the go feature opts in via its attrs.
+{{if .install}}
+GO_VERSION="{{default "1.26.3" .version}}"
+
+# Download the official Go tarball for linux-amd64 and extract it.
+# profile.d/ai-cabin-go.sh puts /usr/local/go/bin on the agent's PATH when
+# install is set, so no symlinking is needed here.
+curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tar.gz
+rm -rf /usr/local/go
+tar -C /usr/local -xzf /tmp/go.tar.gz
+rm -f /tmp/go.tar.gz
+{{else}}
+# Not enabled via `go: {install: true}`
+{{end}}
+exit 0

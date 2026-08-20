@@ -457,6 +457,43 @@ func TestMaterialize(t *testing.T) {
 			assert.Contains(t, err.Error(), "neither mirror, entries, nor greywall_profiles")
 		})
 	})
+
+	t.Run("GoToolchainInstallFromEmbedded", func(t *testing.T) {
+		// Materialize the real embedded go bundle's deps facet and assert the
+		// attrs gate both the toolchain install and the PATH addition: with
+		// go: {install: true} the install.d step downloads Go at the pinned
+		// version and profile.d appends /usr/local/go/bin; without the attr
+		// the install is a no-op and PATH is unchanged. Validates the shipped
+		// fragments end-to-end through BuildLayers + Materialize.
+		embedFS, err := embedded.Fragments()
+		require.NoError(t, err)
+		merged, err := fragments.BuildLayers(nil, "", embedFS)
+		require.NoError(t, err)
+
+		dest := t.TempDir()
+		mat := truncateMat(t, merged, "deps.yaml", dest, nil)
+
+		// With the install attr: Go is downloaded and /usr/local/go/bin added.
+		w, err := mat.Materialize("go", map[string]any{"install": true, "version": "1.26.3"})
+		require.NoError(t, err)
+		assert.Contains(t, w, "install.d/50-go-toolchain.sh")
+		assert.Contains(t, w, "profile.d/ai-cabin-go.sh")
+		script := readDest(t, dest, "install.d/50-go-toolchain.sh")
+		assert.Contains(t, script, "GO_VERSION=\"1.26.3\"")
+		assert.Contains(t, script, "tar -C /usr/local -xzf")
+		profile := readDest(t, dest, "profile.d/ai-cabin-go.sh")
+		assert.Contains(t, profile, "$PATH:/usr/local/go/bin")
+
+		// Without the attr: the install is a no-op and the PATH append is absent.
+		w2, err := mat.Materialize("go", nil)
+		require.NoError(t, err)
+		assert.Contains(t, w2, "install.d/50-go-toolchain.sh")
+		noop := readDest(t, dest, "install.d/50-go-toolchain.sh")
+		assert.NotContains(t, noop, "GO_VERSION=")
+		assert.NotContains(t, noop, "tar -C /usr/local")
+		profileNoop := readDest(t, dest, "profile.d/ai-cabin-go.sh")
+		assert.NotContains(t, profileNoop, "$PATH:/usr/local/go/bin")
+	})
 }
 
 // backupMat builds a Materializer with BackupCreator (the setup-facet copy

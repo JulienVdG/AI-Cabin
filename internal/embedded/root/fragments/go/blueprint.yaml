@@ -16,3 +16,14 @@ help: |
   profile.d PATH setup (ai-cabin-go.sh) installed by the base 30-profile step.
   Its setup cmds create the go dirs the greywall go profile binds.
   Select it for a cabin whose agent works on Go code; it is off by default.
+
+  The Go toolchain itself is not installed by default (it comes from the base
+  image, e.g. a golang: base, or from apt). To have this bundle install it on
+  a bare base (e.g. ubuntu), add the feature with its install attr and an
+  optional version override:
+
+      ai-cabin:
+        features:
+          - go: {install: true, version: "1.26.3"}   # version optional
+
+  Without the attr, the install step (install.d/50-go-toolchain.sh) is a no-op.
