@@ -5,6 +5,7 @@
 # alpine/redhat distros are a future refinement.
 apt:
   - git
+  - iproute2
   - sqlite3
   - curl
   - vim
