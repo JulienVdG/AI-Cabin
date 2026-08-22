@@ -71,7 +71,15 @@ func (s *ConfigService) LoadProfile(name string) (*Profile, error) {
 	if err := yaml.Unmarshal(data, &profile); err != nil {
 		return nil, fmt.Errorf("failed to parse profile %q: %w", name, err)
 	}
-	profile.path = pathStr
+	// Resolve the absolute file path (the read above goes through fs with a
+	// relative path, but Path() must surface a real, operator-facing absolute
+	// path so output like `profile show`/`set` points the user at the exact
+	// YAML to inspect or fix by hand). GetProfilesDir is host-resolved.
+	profilesDir, err := GetProfilesDir()
+	if err != nil {
+		return nil, fmt.Errorf("resolve profiles dir: %w", err)
+	}
+	profile.path = filepath.Join(profilesDir, name+".yaml")
 
 	return &profile, nil
 }

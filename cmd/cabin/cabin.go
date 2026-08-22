@@ -56,36 +56,59 @@ exit 0). Re-adding with a different path errors out unless --force is given.`,
 		}
 
 		existing, err := config.GetCabin(name)
+		wasNew := errors.Is(err, config.ErrCabinNotFound)
+		needsWrite := true
+		exitCode := 0
+		displayPath := normalizedPath
+		result := ""
+		resultOut := os.Stdout
 		switch {
-		case errors.Is(err, config.ErrCabinNotFound):
-			// New entry: proceed to add.
+		case wasNew:
+			result = "New cabin"
 		case err != nil:
+			// GetCabin itself failed (IO/parse): plain terminal error.
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		case existing.Path == normalizedPath:
-			// Idempotent re-add (same path): warn on stderr, exit 0 so scripts
+			// Idempotent re-add (same path): no write, exit 0 so scripts
 			// re-running `add` don't fail on a clean re-run.
-			fmt.Fprintf(os.Stderr, "Warning: cabin %q already registered at %s (no change)\n",
-				name, normalizedPath)
-			return
+			result = "Already registered"
+			needsWrite = false
 		case forceAdd:
-			// Overwrite with a different path, explicit user consent.
-			fmt.Fprintf(os.Stderr, "Warning: overwriting cabin %q (was: %s)\n",
-				name, existing.Path)
+			// Overwrite with a different path, explicit user consent. The previous
+			// location is carried on the result line.
+			result = fmt.Sprintf("Updated cabin path (was: %s)", existing.Path)
 		default:
-			// Different path, no --force: refuse with an actionable message.
-			fmt.Fprintf(os.Stderr,
-				"Error: cabin %q already exists at %s; use --force to overwrite with %s\n",
+			// Different path, no --force: refuse. The structural block always goes
+			// to stdout (context); only the result line is routed to stderr and the
+			// exit code is non-zero, so the stream + code signal the failure.
+			displayPath = existing.Path
+			result = fmt.Sprintf("Error: cabin %q already exists at %s; use --force to overwrite with %s",
 				name, existing.Path, normalizedPath)
-			os.Exit(1)
+			exitCode = 1
+			needsWrite = false
+			resultOut = os.Stderr
 		}
 
-		if err := config.AddCabin(name, normalizedPath); err != nil {
+		if needsWrite {
+			if err := config.AddCabin(name, normalizedPath); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+		}
+
+		cabinsPath, err := config.CabinsPath()
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
-
-		fmt.Printf("Registered cabin %q -> %s\n", name, normalizedPath)
+		fmt.Printf("Cabin registry: %s\n", cabinsPath)
+		fmt.Printf("Cabin: %s\n", name)
+		fmt.Printf("Path: %s\n", displayPath)
+		fmt.Fprintln(resultOut, result)
+		if exitCode != 0 {
+			os.Exit(exitCode)
+		}
 	},
 }
 
@@ -107,6 +130,13 @@ var cabinListCmd = &cobra.Command{
 			fmt.Println("No cabins registered. Add one with 'cabin cabin add <path> [name]'.")
 			return
 		}
+
+		cabinsPath, err := config.CabinsPath()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Cabin registry: %s\n", cabinsPath)
 
 		// Sort by name for stable output (registry preserves insertion order, but
 		// the user expects alphabetical listing).

@@ -33,8 +33,15 @@ var profileListCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		profilesDir, err := config.GetProfilesDir()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Profiles: %s\n", profilesDir)
+
 		if len(profiles) == 0 {
-			fmt.Println("No profiles found. Create one in ~/.config/ai-cabin/profiles/")
+			fmt.Println("No profiles found.")
 			return
 		}
 
@@ -90,8 +97,9 @@ var profileUseCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		profileName := args[0]
 
-		// Verify profile exists
-		_, err := config.LoadProfile(profileName)
+		// Verify profile exists (LoadProfile resolves an absolute Path() to
+		// display where the selected profile lives).
+		profile, err := config.LoadProfile(profileName)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Profile %q not found: %v\n", profileName, err)
 			os.Exit(1)
@@ -102,6 +110,8 @@ var profileUseCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		fmt.Printf("Profile: %s\n", profile.Name)
+		fmt.Printf("Path: %s\n", profile.Path())
 		fmt.Printf("Active profile set to %q\n", profileName)
 	},
 }
@@ -123,6 +133,8 @@ var profileSetCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		fmt.Printf("Profile: %s\n", profile.Name)
+		fmt.Printf("Path: %s\n", profile.Path())
 		fmt.Printf("Set %s=%s on profile %q\n", key, value, profile.Name)
 	},
 }
@@ -169,10 +181,12 @@ On an existing profile: no-op (warn + exit 0); use --force to overwrite both the
 			os.Exit(1)
 		}
 
+		fmt.Printf("Profile: %s\n", profile.Name)
+		fmt.Printf("Path: %s\n", profile.Path())
 		if exists {
-			fmt.Printf("Updated profile %q at %s\n", profile.Name, profile.Path())
+			fmt.Printf("Updated profile\n")
 		} else {
-			fmt.Printf("Created profile %q at %s\n", profile.Name, profile.Path())
+			fmt.Printf("Created profile\n")
 		}
 		printVars(profile.Vars)
 

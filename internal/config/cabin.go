@@ -36,6 +36,13 @@ func getCabinsPath() (string, error) {
 	return filepath.Join(configDir, CabinsFileName), nil
 }
 
+// CabinsPath returns the absolute path to the common cabins.yaml registry file,
+// for operator-facing output (e.g. `cabin add`/`list` showing where the
+// registry lives so the user can inspect or fix it by hand).
+func CabinsPath() (string, error) {
+	return getCabinsPath()
+}
+
 // cabinFileStore reads/writes a single cabins.yaml file.
 // ConfigService constructs one per call (CLI is one-shot = 1 access per process).
 //
