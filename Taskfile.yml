@@ -26,6 +26,11 @@ tasks:
       - mkdir -p bin
       - go build -o bin/cabin ./cmd/cabin
 
+  install:
+    desc: Build and install the CLI in go path
+    cmds:
+      - go install ./cmd/cabin
+
   tidy:
     desc: Tidy go.mod
     cmds:
