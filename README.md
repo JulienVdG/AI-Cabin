@@ -212,6 +212,19 @@ cabin greyshell opencode-go
 └────────────────────────────────────────────────────┘
 ```
 
+### Desk
+
+The **desk** is the shared, cross-project side of your workspace. It holds the
+instructions and knowledge every cabin relies on: `AGENTS.md` (agent
+instructions), `TODO.md` (task tracking), and `skills/` (reusable workflow
+guides). It lives outside any single project, so conventions apply across all
+your work. The desk is bind-mounted into every cabin (read-write): it is the
+source of the `AGENTS.md` and skills injected into each agent's config where
+the software expects them, and the canonical copy the agent updates during
+retros. `cabin setup` and `cabin profile init` create a minimal desk at
+`AI_CABIN_DESK` (default `~/Documents/desk`), and you can seed it from a **desk
+skeleton** (see [Skeletons](#skeletons)).
+
 ### Available Cabins
 
 | Cabin | Agent | Language | Use Case |
@@ -229,13 +242,21 @@ cabin greyshell opencode-go
 
 ### Profiles
 
-A **profile** holds the cabin configuration (paths, credentials, provider) and is selected with `--profile` (default `default`) or `AI_CABIN_PROFILE`.
+A **profile** gathers everything the cabins read once per user context:
+
+- where your **desk** and workdir live (`AI_CABIN_DESK`, `AI_CABIN_WORKDIR`, `AI_CABIN_HOME`) — a profile therefore selects which desk the cabins use;
+- the configuration **shared across cabins** (credentials, provider, git identity);
+- **variables injected into the environment** of a cabin's commands: when you run a task, they land in the `task` process env, which `docker compose` reads as `${VAR}` at launch.
+
+The active profile is selected with `--profile` (default: the active profile, initially `default`) or `AI_CABIN_PROFILE`.
 
 - `cabin profile init [name]` — create a profile and copy the desk skeleton (`--skeleton`, `--var`, `--force`)
 - `cabin profile list` — list available profiles
 - `cabin profile show` — show the active profile
 - `cabin profile set <key> <value>` — set a variable on a profile
 - `cabin profile use <name>` — select the active profile
+
+Value resolution, highest to lowest: `--var KEY=VAL` (repeatable global flag), environment variables, the profile file, then built-in defaults.
 
 The essential variables are listed under Profile Variables below.
 
@@ -283,11 +304,18 @@ Launching the agent through `cabin task`, `shell`, or `greyshell` feels like run
 
 ### Skeletons
 
-Applies a skeleton (desk or project) by name:
+Skeletons are ready-made template sets you apply to scaffold a **desk** or
+a **project**:
+
+- **`desk/` skeletons** seed an `AI_CABIN_DESK` — the minimal desk is already
+  applied by `setup`/`profile init`; apply another to replace it.
+- **`projects/` skeletons** scaffold a new project (e.g.
+  `cabin skeleton apply projects/go_makefile`, passing `--attr module=...` for
+  Go; `--force` to overwrite existing files).
+
+Apply one by name:
 
 - `cabin skeleton apply [desk=]desk/<skeleton> [<name>=projects/<skeleton>]`
-
-`desk/` skeletons are copied to `AI_CABIN_DESK` — the minimal desk is already applied by `setup`/`profile init`. `projects/` skeletons scaffold a new project (e.g. `cabin skeleton apply projects/go_makefile`, passing `--attr module=...` for Go, `--force` to overwrite existing files).
 
 ### Authoring
 
@@ -300,8 +328,7 @@ Both accept `--agents pi,opencode` and `--features git-agent,go`.
 
 ### Profile Variables
 
-The cabin reads its configuration from a **profile** (selected with `--profile`,
-default `default`). Set variables per profile with `cabin profile set <key> <value>`
+The cabin reads its configuration from a **profile** (selected with `--profile`, defaulting to the active profile, initially `default`). Set variables per profile with `cabin profile set <key> <value>`
 and view them with `cabin profile show`. The essential ones:
 
 | Variable | Purpose | Default |
@@ -315,6 +342,19 @@ and view them with `cabin profile show`. The essential ones:
 | `CREDENTIAL_INJECT` | Greyproxy credential labels Greywall injects (CSV) | _(none)_ |
 | `CREDENTIAL_IGNORE` | Env vars Greywall must not treat as credentials (CSV) | _(none)_ |
 | `SCW_PROJECT_ID`, `DEFAULT_PROVIDER`, `DEFAULT_MODEL` | Provider-specific (see Quick Start) | _(none)_ |
+
+**Changing the base directories** — `AI_CABIN_DESK`, `AI_CABIN_WORKDIR`, and
+`AI_CABIN_HOME` point at directories that already exist. Changing one of them
+(after `cabin setup`) updates the variable but does **not** move or populate the
+new location — you handle that yourself:
+
+- **Move or copy** the existing content to the new path. For the **workdir**
+  that is all there is to it (it is just where your projects live; no
+  regeneration exists).
+- For a **desk**, instead of copying you can **regenerate** it: `cabin profile
+  init <name> --force` re-copies the desk skeleton to the profile's
+  `AI_CABIN_DESK`, or re-apply any skeleton with `cabin skeleton apply
+  desk/<name>` (`--force` to overwrite).
 
 ---
 
