@@ -176,10 +176,15 @@ func (s *ConfigService) ProfileExists(name string) (bool, error) {
 	return true, nil
 }
 
-// GetActiveProfile resolves and loads a profile.
-// If name is empty, uses the current profile from config.yaml.
+// GetActiveProfile resolves and loads the active profile. The selector follows
+// the same precedence as ResolveVars: an explicit name (--profile) wins, then
+// AI_CABIN_PROFILE env (set by `cabin setenv`, so the standalone `task` path
+// selects the right profile), then the current profile from config.yaml.
 // Returns a user-friendly error if the profile doesn't exist or can't be loaded.
 func (s *ConfigService) GetActiveProfile(name string) (*Profile, error) {
+	if name == "" {
+		name = os.Getenv(ProfileEnvVar)
+	}
 	if name == "" {
 		var err error
 		name, err = s.GetCurrentProfile()

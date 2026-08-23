@@ -647,6 +647,81 @@ func TestConfigService_GetActiveProfile(t *testing.T) {
 			t.Errorf("GetActiveProfile() Name = %q, want %q", profile.Name, "perso")
 		}
 	})
+
+	// AI_CABIN_PROFILE env honors the same precedence as ResolveVars: an explicit
+	// name wins, then env, then the current profile from config.yaml. This keeps
+	// the CLI and the standalone `task` path (cabin setenv exports the var)
+	// selecting the same profile for the compose project name and profile show.
+	t.Run("AI_CABIN_PROFILE env selected when name empty", func(t *testing.T) {
+		svc := newTestService(t)
+		profilesDir, _ := config.GetProfilesDir()
+		if err := os.MkdirAll(profilesDir, 0o755); err != nil {
+			t.Fatalf("failed to create profiles dir: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(profilesDir, "envprof.yaml"), []byte("name: envprof"), 0o644); err != nil {
+			t.Fatalf("failed to write profile: %v", err)
+		}
+		t.Setenv(config.ProfileEnvVar, "envprof")
+
+		profile, err := svc.GetActiveProfile("")
+		if err != nil {
+			t.Fatalf("GetActiveProfile() error = %v", err)
+		}
+		if profile.Name != "envprof" {
+			t.Errorf("GetActiveProfile() Name = %q, want %q (from AI_CABIN_PROFILE env)", profile.Name, "envprof")
+		}
+	})
+
+	t.Run("explicit name overrides AI_CABIN_PROFILE env", func(t *testing.T) {
+		svc := newTestService(t)
+		profilesDir, _ := config.GetProfilesDir()
+		if err := os.MkdirAll(profilesDir, 0o755); err != nil {
+			t.Fatalf("failed to create profiles dir: %v", err)
+		}
+		for _, n := range []string{"envprof", "flagprof"} {
+			if err := os.WriteFile(filepath.Join(profilesDir, n+".yaml"), []byte("name: "+n), 0o644); err != nil {
+				t.Fatalf("failed to write profile: %v", err)
+			}
+		}
+		t.Setenv(config.ProfileEnvVar, "envprof")
+
+		profile, err := svc.GetActiveProfile("flagprof")
+		if err != nil {
+			t.Fatalf("GetActiveProfile() error = %v", err)
+		}
+		if profile.Name != "flagprof" {
+			t.Errorf("GetActiveProfile() Name = %q, want %q (--profile wins over env)", profile.Name, "flagprof")
+		}
+	})
+
+	t.Run("AI_CABIN_PROFILE env overrides current profile", func(t *testing.T) {
+		svc := newTestService(t)
+		configDir, _ := config.GetConfigDir()
+		if err := os.MkdirAll(configDir, 0o755); err != nil {
+			t.Fatalf("failed to create config dir: %v", err)
+		}
+		profilesDir, _ := config.GetProfilesDir()
+		if err := os.MkdirAll(profilesDir, 0o755); err != nil {
+			t.Fatalf("failed to create profiles dir: %v", err)
+		}
+		for _, n := range []string{"current", "envprof"} {
+			if err := os.WriteFile(filepath.Join(profilesDir, n+".yaml"), []byte("name: "+n), 0o644); err != nil {
+				t.Fatalf("failed to write profile: %v", err)
+			}
+		}
+		if err := os.WriteFile(filepath.Join(configDir, config.ConfigFileName), []byte("currentProfile: current"), 0o644); err != nil {
+			t.Fatalf("failed to write config: %v", err)
+		}
+		t.Setenv(config.ProfileEnvVar, "envprof")
+
+		profile, err := svc.GetActiveProfile("")
+		if err != nil {
+			t.Fatalf("GetActiveProfile() error = %v", err)
+		}
+		if profile.Name != "envprof" {
+			t.Errorf("GetActiveProfile() Name = %q, want %q (env wins over current)", profile.Name, "envprof")
+		}
+	})
 }
 
 func TestConfigService_SetProfileVar(t *testing.T) {
