@@ -1,4 +1,5 @@
 ai-cabin:
+  cabin: tuto2
   agents:
     - opencode
     - pi

@@ -220,6 +220,7 @@ func TestMapContainersToAgents(t *testing.T) {
 			Names: "blog-agent-1", State: "running",
 			Labels: map[string]string{
 				labelComposeService:       "agent",
+				labelComposeProject:       "default_blog",
 				labelComposeConfigFilesV2: blogCompose,
 			},
 		},
@@ -227,6 +228,7 @@ func TestMapContainersToAgents(t *testing.T) {
 			Names: "blog-db-1", State: "running",
 			Labels: map[string]string{
 				labelComposeService:       "db",
+				labelComposeProject:       "default_blog",
 				labelComposeConfigFilesV2: blogCompose,
 			},
 		},
@@ -234,6 +236,7 @@ func TestMapContainersToAgents(t *testing.T) {
 			Names: "blog-agent-1", State: "exited",
 			Labels: map[string]string{
 				labelComposeService:       "agent",
+				labelComposeProject:       "blog",
 				labelComposeConfigFilesV2: blogCompose,
 			},
 		},
@@ -241,6 +244,7 @@ func TestMapContainersToAgents(t *testing.T) {
 			Names: "ghost-1", State: "running",
 			Labels: map[string]string{
 				labelComposeService:       "agent",
+				labelComposeProject:       "custom",
 				labelComposeConfigFilesV2: "/nonexistent/cabin/docker-compose.yml",
 			},
 		},
@@ -253,10 +257,11 @@ func TestMapContainersToAgents(t *testing.T) {
 	t.Run("default: running agent only", func(t *testing.T) {
 		// Only the running agent of the registered cabin matches. The db service,
 		// the exited agent, the ghost (dir does not exist), and the raw container
-		// (no compose labels) are all skipped.
+		// (no compose labels) are all skipped. The profile is derived from the
+		// project label: "default_blog" -> "default".
 		got := mapContainersToAgents(containers, registry, false)
 		want := []agentRow{
-			{name: "blog", container: "blog-agent-1", state: "running"},
+			{name: "blog", profile: "default", container: "blog-agent-1", state: "running"},
 		}
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("got %+v, want %+v", got, want)
@@ -264,10 +269,12 @@ func TestMapContainersToAgents(t *testing.T) {
 	})
 
 	t.Run("--all: include stopped agent", func(t *testing.T) {
+		// The exited agent carries the canonical-only project "blog" (no profile
+		// selected on that standalone run), so its profile is empty.
 		got := mapContainersToAgents(containers, registry, true)
 		want := []agentRow{
-			{name: "blog", container: "blog-agent-1", state: "running"},
-			{name: "blog", container: "blog-agent-1", state: "exited"},
+			{name: "blog", profile: "default", container: "blog-agent-1", state: "running"},
+			{name: "blog", profile: "", container: "blog-agent-1", state: "exited"},
 		}
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("got %+v, want %+v", got, want)

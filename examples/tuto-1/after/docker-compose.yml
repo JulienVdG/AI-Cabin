@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: ai-cabin.Dockerfile
-    container_name: tuto1_agent
+    image: tuto1
     hostname: tuto1
     # Required for bubblewrap (greywall)
     privileged: true

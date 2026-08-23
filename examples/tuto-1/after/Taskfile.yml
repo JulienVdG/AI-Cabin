@@ -1,4 +1,5 @@
 ai-cabin:
+  cabin: tuto1
   agents:
     - opencode
   features:

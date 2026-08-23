@@ -5,7 +5,7 @@ services:
       dockerfile: opencode.Dockerfile
       args:
         - OPENCODE_VERSION=1.4.9
-    container_name: opencode_go_agent
+    image: opencode-go
     hostname: opencode-go
     stdin_open: true
     tty: true

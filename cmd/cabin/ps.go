@@ -19,14 +19,17 @@ import (
 // Docker Compose labels set on every container it creates. `cabin ps` reads
 // them to resolve a container to its cabin (config_files -> cabin dir) and to
 // identify the agent service (service), without relying on a hardcoded service
-// name or the registry alone.
+// name or the registry alone. The project label carries the compose project
+// name (<profile>_<cabin> or <cabin> alone) from which the active profile is
+// derived.
 //
 // Compose v2 prefixes several labels with ".project."; the config_files label
 // is "com.docker.compose.project.config_files" on v2 and "com.docker.compose.
 // config_files" on legacy v1. Both are checked so `cabin ps` works across
-// Compose versions. The service label is the same on both.
+// Compose versions. The service and project labels are the same on both.
 const (
 	labelComposeService       = "com.docker.compose.service"
+	labelComposeProject       = "com.docker.compose.project"
 	labelComposeConfigFilesV2 = "com.docker.compose.project.config_files"
 	labelComposeConfigFilesV1 = "com.docker.compose.config_files"
 )
@@ -126,10 +129,12 @@ func parseLabelsCSV(s string) map[string]string {
 	return m
 }
 
-// agentRow is one line of the `cabin ps` output: the cabin name, the container
-// name, and the state.
+// agentRow is one line of the `cabin ps` output: the cabin name, the active
+// profile (derived from the compose project label; empty when the instance
+// carries no profile), the container name, and the state.
 type agentRow struct {
 	name      string
+	profile   string
 	container string
 	state     string
 }
@@ -170,8 +175,9 @@ func listRunningAgents(stdout, stderr io.Writer, all bool) {
 		}
 		return
 	}
+	fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\n", "CABIN", "PROFILE", "CONTAINER", "STATE")
 	for _, r := range rows {
-		fmt.Fprintf(stdout, "%s\t%s\t%s\n", r.name, r.container, r.state)
+		fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\n", r.name, r.profile, r.container, r.state)
 	}
 }
 
@@ -202,7 +208,12 @@ func mapContainersToAgents(containers []dockerContainer, registry map[string]str
 		if labels.service != agentSvc {
 			continue // not the agent service (e.g. an auxiliary service)
 		}
-		rows = append(rows, agentRow{name: name, container: ct.Names, state: ct.State})
+		rows = append(rows, agentRow{
+			name:      name,
+			profile:   cabin.DeriveProfile(labels.project, name),
+			container: ct.Names,
+			state:     ct.State,
+		})
 	}
 	return rows
 }
@@ -241,6 +252,7 @@ func composeLabelsOf(ct dockerContainer) (composeLabels, bool) {
 	}
 	return composeLabels{
 		service:     ct.Labels[labelComposeService],
+		project:     ct.Labels[labelComposeProject],
 		configFiles: cfg,
 	}, true
 }
@@ -260,6 +272,7 @@ func configFilesLabel(labels map[string]string) string {
 // container to resolve it to a cabin and identify the agent service.
 type composeLabels struct {
 	service     string // com.docker.compose.service (e.g. "agent")
+	project     string // com.docker.compose.project (<profile>_<cabin> or <cabin>)
 	configFiles string // com.docker.compose.config_files (absolute path(s), comma-separated)
 }
 

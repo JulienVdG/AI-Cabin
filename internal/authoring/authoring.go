@@ -32,7 +32,7 @@ const DefaultBaseImage = "golang:1.26-trixie"
 const CabinDockerfile = "ai-cabin.Dockerfile"
 
 // Selection is the feature selection of the cabin being authored: its name
-// (used for the compose container_name/hostname) and the agents/features.
+// (used for the compose image/hostname) and the agents/features.
 type Selection struct {
 	Name     string
 	Agents   []string
@@ -261,9 +261,11 @@ func (e *errWriter) printf(format string, a ...any) {
 	_, e.err = fmt.Fprintf(e, format, a...)
 }
 
-// writeCompose emits the agent service: the injected scaffold (build,
-// container_name, hostname) followed by the merged compose content. Comment
-// nodes inside the merged content are preserved on marshal.
+// writeCompose emits the agent service: the injected scaffold (build, image,
+// hostname) followed by the merged compose content. The explicit image tag
+// keeps the build shared across profile instances; container_name is omitted
+// (daemon-global, would collide across projects). Comment nodes inside the
+// merged content are preserved on marshal.
 func (m MergedBlueprint) writeCompose(w io.Writer, name string) error {
 	service := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
 
@@ -274,7 +276,7 @@ func (m MergedBlueprint) writeCompose(w io.Writer, name string) error {
 	)
 	service.Content = append(service.Content,
 		strNode("build"), build,
-		strNode("container_name"), strNode(name+"_agent"),
+		strNode("image"), strNode(name),
 		strNode("hostname"), strNode(name),
 	)
 	if m.Compose != nil {

@@ -1,4 +1,5 @@
 ai-cabin:
+  cabin: opencode-go
   agents: [opencode]
   features: [git-agent, go]
 

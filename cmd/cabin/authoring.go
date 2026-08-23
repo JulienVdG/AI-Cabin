@@ -166,6 +166,11 @@ func resolveAuthoring(path string) (*authoringResolution, error) {
 		sel.Agents = header.Agents
 		sel.Features = featureNames(header.Features)
 		bundles = cabin.ActiveBundles(header)
+		// The header cabin field (when set) wins over the dir basename so the
+		// authored image name matches the compose project name canonical.
+		if header.Cabin != "" {
+			sel.Name = header.Cabin
+		}
 	case errors.Is(herr, cabin.ErrNoHeader), errors.Is(herr, fs.ErrNotExist):
 		sel.Agents, sel.Features = authoringSelection(authoringAgents, authoringFeatures)
 		bundles = authoringBundles(sel)

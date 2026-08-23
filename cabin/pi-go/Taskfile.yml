@@ -1,4 +1,5 @@
 ai-cabin:
+  cabin: pi-go
   agents: [pi]
   features: [git-agent, go]
 

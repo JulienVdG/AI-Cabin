@@ -275,6 +275,28 @@ port-forward scripts) lives in feature bundles and is installed into the image
 at build time. A project carries only its cabin-specific deltas — the header,
 its base image, and its own compose services.
 
+### The agent service in compose
+
+`cabin authoring` generates the `agent` service with an explicit `image:` tag
+and **no `container_name:`**. Both matter when you run more than one instance
+of a cabin (e.g. the same cabin under two profiles, or the same cabin checked
+out twice):
+
+- `image:` pins the built image name so it is **shared** across instances. The
+  cabin name (header `cabin:` or the directory basename) is used as the tag —
+  `image: mycabin`.
+- `container_name:` is daemon-global, so two instances would **collide** and
+  fail to start (or one would silently reuse the other's container). Leaving it
+  out lets compose derive a per-project name (`<project>_<service>-1`), so each
+  instance gets its own container.
+
+The compose **project name** isolates instances further: `cabin` derives it
+from the active profile and the cabin name (`<profile>_<cabin>`), so two
+profiles operating the same cabin get distinct projects — distinct containers
+and networks — while sharing the image build. You do not set this by hand; the
+`docker compose` commands the cabin runs resolve it automatically (the CLI
+injects it, and the standalone `task` path resolves it the same way).
+
 ---
 
 ## Next steps

@@ -145,7 +145,7 @@ compose:
 			"    build:",
 			"      context: .",
 			"      dockerfile: ai-cabin.Dockerfile",
-			"    container_name: mycabin_agent",
+			"    image: mycabin",
 			"    hostname: mycabin",
 			"    stdin_open: true",
 			"    privileged: true",

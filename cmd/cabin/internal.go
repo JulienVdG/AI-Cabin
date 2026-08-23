@@ -101,6 +101,26 @@ func resolveCabinFragments(cabinPath string) ([]cabin.FeatureRef, config.Vars, f
 	return bundles, vars, merged, resolvedPath, nil
 }
 
+// composeProjectName resolves the docker compose project name for a cabin: the
+// active profile's name and the cabin's canonical name (ai-cabin.cabin header
+// > basename), sanitized and joined so two profiles operating the same cabin
+// get distinct projects while sharing the image build. A missing profile
+// yields the canonical name alone. The returned resolvedPath is populated even
+// on error so callers can surface which directory was inspected. Shared by
+// runCabinTask (CLI path) and `cabin internal compose-project-name` (standalone
+// `task` path).
+func composeProjectName(cabinPath string) (name, resolvedPath string, err error) {
+	canonical, resolvedPath, err := cabin.ValidateCabin(cabinPath, "")
+	if err != nil {
+		return "", resolvedPath, err
+	}
+	profileName := ""
+	if p, err := config.GetActiveProfile(profileFlag); err == nil {
+		profileName = p.Name
+	}
+	return cabin.ComposeProjectName(profileName, canonical), resolvedPath, nil
+}
+
 // internalDepsCmd materializes <cabin>/.deps/ from the active bundles declared
 // in the cabin's Taskfile header (agents:/features:), resolved through the
 // fallback chain (AI_CABIN_FRAGMENTS_DIRS > <cabin>/fragments/ > embedded).
@@ -222,9 +242,30 @@ var internalGreywallProfileCmd = &cobra.Command{
 	},
 }
 
+// internalComposeProjectNameCmd resolves the docker compose project name for
+// the cabin in the current directory (active profile + cabin canonical name).
+// It prints the name to stdout so the Taskfile can capture it via `env: sh:` on
+// the standalone path. The CLI path (cabin task/cabin up) sets
+// COMPOSE_PROJECT_NAME on the process directly, short-circuiting the sh: (no
+// subprocess). This is the hidden command the wrapper's $COMPOSE_PROJECT_NAME
+// resolves to when not preset — same convergence pattern as greywall-profile.
+var internalComposeProjectNameCmd = &cobra.Command{
+	Use:   "compose-project-name",
+	Short: "Resolve the docker compose project name from the active profile and cabin",
+	Run: func(cmd *cobra.Command, args []string) {
+		project, resolvedPath, err := composeProjectName(".")
+		if err != nil {
+			printValidateError(os.Stderr, err, resolvedPath)
+			os.Exit(1)
+		}
+		fmt.Println(project)
+	},
+}
+
 func init() {
 	internalCmd.AddCommand(internalDepsCmd)
 	internalCmd.AddCommand(internalSetupCmd)
 	internalCmd.AddCommand(internalGreywallProfileCmd)
+	internalCmd.AddCommand(internalComposeProjectNameCmd)
 	rootCmd.AddCommand(internalCmd)
 }

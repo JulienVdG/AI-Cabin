@@ -12,6 +12,8 @@ version: '3'
 env:
   GREYWALL_PROFILE:
     sh: 'echo "${GREYWALL_PROFILE:-$($AI_CABIN_CMD internal greywall-profile)}"'
+  COMPOSE_PROJECT_NAME:
+    sh: 'echo "${COMPOSE_PROJECT_NAME:-$($AI_CABIN_CMD internal compose-project-name)}"'
 
 tasks:
   prepare:

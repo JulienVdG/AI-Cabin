@@ -5,7 +5,7 @@ services:
       dockerfile: pi.Dockerfile
       args:
         - PI_VERSION=v0.72.1
-    container_name: pi_go_agent
+    image: pi-go
     hostname: pi-go
     stdin_open: true
     tty: true

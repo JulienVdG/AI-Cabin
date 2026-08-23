@@ -99,6 +99,16 @@ func runCabinTask(ctx context.Context, cabinName, taskName string, rawArgs []str
 		}
 	}
 
+	// Compose project name: isolate instances per (profile, cabin) so two
+	// profiles operating the same cabin get distinct projects (containers and
+	// networks) while sharing the image build. Best-effort: a missing profile
+	// falls back to the canonical name alone, and an unreadable Taskfile skips
+	// the injection (compose then defaults to the dir basename). The lifecycle
+	// `sh:` fallback resolves the same name on the standalone `task` path.
+	if project, _, err := composeProjectName(c.Path); err == nil {
+		vm["COMPOSE_PROJECT_NAME"] = project
+	}
+
 	return task.Run(ctx, c.Path, taskName, rawArgs, vm, stdout, stderr)
 }
 
