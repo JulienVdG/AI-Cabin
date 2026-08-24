@@ -1,6 +1,9 @@
 package config
 
-import "strings"
+import (
+	"os"
+	"strings"
+)
 
 // FragmentsDirsEnvVar is the comma-separated list of fragment override
 // directories (the conf layer of the fallback chain, highest priority). Each
@@ -94,6 +97,27 @@ type Vars map[string]string
 // map[string]string (e.g. task.Run sets each entry on os.Setenv without reading
 // any key, so internal/task does not need to depend on the Vars type).
 func (v Vars) AsMap() map[string]string { return v }
+
+// EnvShadowed reports profile vars shadowed by a same-named process-env var,
+// mapped name -> env value. A profile var is shadowed when the env carries the
+// same key with a *different* value (an identical echo is not an override),
+// because ResolveVars applies "set if not present" with the env as a
+// higher-precedence layer than the profile. Used by `cabin profile show` to
+// warn about the silent precedence before the resolved view is set on a
+// subprocess. Pure: only reads the process environment, never resolves a
+// profile or consults defaults, so an env-only var never appears (it is not a
+// profile var).
+func EnvShadowed(profileVars map[string]string) map[string]string {
+	out := make(map[string]string)
+	for _, e := range os.Environ() {
+		if k, v, ok := strings.Cut(e, "="); ok {
+			if pv, present := profileVars[k]; present && v != pv {
+				out[k] = v
+			}
+		}
+	}
+	return out
+}
 
 // FragmentsDirs resolves the fragment override directories from
 // AI_CABIN_FRAGMENTS_DIRS in the view. Each entry is ~-expanded via

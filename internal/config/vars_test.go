@@ -7,6 +7,7 @@ import (
 	"github.com/JulienVdG/AI-Cabin/internal/config"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestSplitPathList covers the PATH-style primitive shared by config vars
@@ -67,4 +68,58 @@ func TestSanitizeNameList(t *testing.T) {
 			assert.Equal(t, tc.want, config.SanitizeNameList(tc.in))
 		})
 	}
+}
+
+// TestEnvShadowed covers the warning helper behind `cabin profile show`: a
+// profile var is shadowed when a same-named process-env var carries a value
+// (env wins over profile in the resolved view). Keys are isolated to the test
+// so the surrounding process env (or a leak from another case) cannot make an
+// assertion flaky.
+func TestEnvShadowed(t *testing.T) {
+	const (
+		shadowKey  = "CABIN_TEST_SHADOWED"
+		atanKey    = "CABIN_TEST_ABSENT"
+		envOnlyKey = "CABIN_TEST_ENV_ONLY"
+	)
+	clearKeys := func() { unsetEnv(t, shadowKey, atanKey, envOnlyKey) }
+
+	t.Run("same-named env var shadows a profile var", func(t *testing.T) {
+		clearKeys()
+		t.Setenv(shadowKey, "from-env")
+		out := config.EnvShadowed(map[string]string{shadowKey: "from-profile"})
+		require.Equal(t, map[string]string{shadowKey: "from-env"}, out)
+	})
+
+	t.Run("profile var without env var is not shadowed", func(t *testing.T) {
+		clearKeys()
+		out := config.EnvShadowed(map[string]string{atanKey: "profile-only"})
+		assert.Empty(t, out)
+	})
+
+	t.Run("identical env echo is not an override", func(t *testing.T) {
+		clearKeys()
+		t.Setenv(shadowKey, "same")
+		out := config.EnvShadowed(map[string]string{shadowKey: "same"})
+		assert.Empty(t, out)
+	})
+
+	t.Run("env-only var (not a profile var) never appears", func(t *testing.T) {
+		clearKeys()
+		t.Setenv(envOnlyKey, "x")
+		out := config.EnvShadowed(map[string]string{atanKey: "y"})
+		assert.Empty(t, out)
+	})
+
+	t.Run("multiple shadowed vars returned as a map", func(t *testing.T) {
+		clearKeys()
+		t.Setenv(shadowKey, "e1")
+		t.Setenv(envOnlyKey, "e2")
+		out := config.EnvShadowed(map[string]string{shadowKey: "p1", envOnlyKey: "p2"})
+		assert.Equal(t, map[string]string{shadowKey: "e1", envOnlyKey: "e2"}, out)
+	})
+
+	t.Run("empty profile has no shadowed vars", func(t *testing.T) {
+		out := config.EnvShadowed(nil)
+		assert.Empty(t, out)
+	})
 }

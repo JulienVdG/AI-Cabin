@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"sort"
 	"strings"
 
 	"github.com/JulienVdG/AI-Cabin/internal/config"
@@ -83,6 +84,22 @@ var profileShowCmd = &cobra.Command{
 		fmt.Printf("Profile: %s\n", profile.Name)
 		fmt.Printf("Path: %s\n", profile.Path())
 		printVars(profile.Vars)
+
+		// Warn about profile vars that the process env shadows (env wins over
+		// profile in the resolved view), so silent precedence surprises are
+		// visible before the view is set on a subprocess. stdout stays the
+		// profile content; the warning goes to stderr.
+		if overrides := config.EnvShadowed(profile.Vars); len(overrides) > 0 {
+			keys := make([]string, 0, len(overrides))
+			for k := range overrides {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			fmt.Fprintf(os.Stderr, "Warning: these profile variables are overridden by the environment (env wins):\n")
+			for _, k := range keys {
+				fmt.Fprintf(os.Stderr, "  %s (env=%s)\n", k, overrides[k])
+			}
+		}
 	},
 }
 

@@ -256,7 +256,7 @@ The active profile is selected with `--profile` (default: the active profile, in
 - `cabin profile set <key> <value>` — set a variable on a profile
 - `cabin profile use <name>` — select the active profile
 
-Value resolution, highest to lowest: `--var KEY=VAL` (repeatable global flag), environment variables, the profile file, then built-in defaults.
+Value resolution, highest to lowest: `--var KEY=VAL` (repeatable global flag), environment variables, the profile file, then built-in defaults. Since environment variables outrank the profile file, a profile variable can be silently shadowed by a same-named shell variable; `cabin profile show` warns when that happens (it prints each shadowed variable with its environment value), so it doubles as a debug tool for precedence surprises.
 
 The essential variables are listed under Profile Variables below.
 
