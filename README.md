@@ -258,6 +258,14 @@ The active profile is selected with `--profile` (default: the active profile, in
 
 Value resolution, highest to lowest: `--var KEY=VAL` (repeatable global flag), environment variables, the profile file, then built-in defaults. Since environment variables outrank the profile file, a profile variable can be silently shadowed by a same-named shell variable; `cabin profile show` warns when that happens (it prints each shadowed variable with its environment value), so it doubles as a debug tool for precedence surprises.
 
+#### Env-var mode (`cabin setenv`)
+
+There is also a manual, **advanced** mode: `cabin setenv <shell> [<profile>]` prints the resolved profile variables in your shell's syntax (`bash`, `zsh`, or `fish`), typically loaded from a direnv `.envrc` or your shell rc — for running `task` standalone in a cabin directory. It exports `AI_CABIN_PROFILE`, so the standalone `task` path still selects the right profile.
+
+You normally never need it: `cabin task` / `cabin up` already set the resolved variables on the command itself. See `cabin setenv <shell> --help` for the exact source/eval idioms.
+
+Precedence is unchanged, and `cabin profile show` warns when a profile variable is shadowed by one of these exported variables.
+
 The essential variables are listed under Profile Variables below.
 
 ### Cabin registry

@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -122,4 +123,20 @@ func TestEnvShadowed(t *testing.T) {
 		out := config.EnvShadowed(nil)
 		assert.Empty(t, out)
 	})
+}
+
+// TestEnvironMap covers the shared process-env reader: normal vars pass
+// through and the shell's special `_` is excluded.
+func TestEnvironMap(t *testing.T) {
+	t.Setenv("CABIN_TEST_KEEP", "v")
+	t.Setenv("_", "junk")
+	defer func() {
+		_ = os.Unsetenv("CABIN_TEST_KEEP")
+		_ = os.Unsetenv("_")
+	}()
+
+	env := config.EnvironMap()
+	assert.Equal(t, "v", env["CABIN_TEST_KEEP"])
+	_, hasUnderscore := env["_"]
+	assert.False(t, hasUnderscore)
 }

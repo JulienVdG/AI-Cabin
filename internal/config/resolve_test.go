@@ -198,6 +198,39 @@ func TestResolveVars(t *testing.T) {
 			wantVal:     "perso",
 		},
 		{
+			// Same reflection for the current-profile fallback (no --profile /
+			// AI_CABIN_PROFILE): `cabin setenv` must still export
+			// AI_CABIN_PROFILE so the standalone `task` path selects the same
+			// profile for its compose project name.
+			name:     "current profile sets AI_CABIN_PROFILE in the view",
+			cleanEnv: true,
+			profiles: map[string]string{"perso": "name: perso\nvars:\n  CABIN_TEST_VAR: from-profile\n"},
+			current:  "perso",
+			wantVar:  "AI_CABIN_PROFILE",
+			wantVal:  "perso",
+		},
+		{
+			// AI_CABIN_PROFILE sourced from the env is reflected too (axis A), so
+			// `cabin setenv` exports back the profile the env selected.
+			name:     "env AI_CABIN_PROFILE reflected in the view",
+			cleanEnv: true,
+			profiles: map[string]string{"via-env": "name: via-env\nvars:\n  CABIN_TEST_VAR: x\n"},
+			env:      map[string]string{"AI_CABIN_PROFILE": "via-env"},
+			wantVar:  "AI_CABIN_PROFILE",
+			wantVal:  "via-env",
+		},
+		{
+			// An exported-but-empty AI_CABIN_PROFILE is not a selection (it falls
+			// back to the current profile); the view carries the resolved name.
+			name:     "empty AI_CABIN_PROFILE env falls back to current profile",
+			cleanEnv: true,
+			profiles: map[string]string{"current": "name: current\nvars:\n  CABIN_TEST_VAR: x\n"},
+			current:  "current",
+			env:      map[string]string{"AI_CABIN_PROFILE": ""},
+			wantVar:  "AI_CABIN_PROFILE",
+			wantVal:  "current",
+		},
+		{
 			// CONTAINER_WORKDIR unset falls back to AI_CABIN_WORKDIR
 			// (transparent mode) — resolved in sanitizeTypedVars so templates
 			// and the Taskfile read CONTAINER_WORKDIR directly.

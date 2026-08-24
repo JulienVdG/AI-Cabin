@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -41,13 +40,12 @@ func (s *ConfigService) ResolveVars(profileFlag string, cliVars []string) (Vars,
 		view[ProfileEnvVar] = profileFlag
 	}
 
-	// 2. Process env (set if not present, so --var/--profile win). Skip empty
-	// or whitespace-only keys (e.g. `=value`, seen in some sandboxed envs).
-	for _, e := range os.Environ() {
-		if k, v, ok := strings.Cut(e, "="); ok && strings.TrimSpace(k) != "" {
-			if _, present := view[k]; !present {
-				view[k] = v
-			}
+	// 2. Process env (set if not present, so --var/--profile win). EnvironMap
+	// skips empty/whitespace keys (`=value`, seen in some sandboxed envs) and
+	// the shell's special `_` variable.
+	for k, v := range EnvironMap() {
+		if _, present := view[k]; !present {
+			view[k] = v
 		}
 	}
 
@@ -64,6 +62,14 @@ func (s *ConfigService) ResolveVars(profileFlag string, cliVars []string) (Vars,
 	// 3. Selected profile file (if any). Missing selection is skipped; an
 	// explicitly selected missing file is an error.
 	if name != "" {
+		// Reflect the resolved profile in the view so setenv exports
+		// AI_CABIN_PROFILE even when the profile came from the current-profile
+		// fallback — the standalone `task` path then selects the same profile
+		// for its compose project name. Direct assignment: `name` already
+		// embodies the env/flag precedence, and an empty AI_CABIN_PROFILE in
+		// the env is not a selection (it falls back to the current profile).
+		view[ProfileEnvVar] = name
+
 		exists, err := s.ProfileExists(name)
 		if err != nil {
 			return nil, fmt.Errorf("check profile existence: %w", err)

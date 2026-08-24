@@ -98,22 +98,38 @@ type Vars map[string]string
 // any key, so internal/task does not need to depend on the Vars type).
 func (v Vars) AsMap() map[string]string { return v }
 
+// EnvironMap returns the process environment as a map. It skips entries whose
+// key is empty or whitespace-only (e.g. `=value`, seen in some sandboxed envs)
+// and the shell's special `_` variable (bash's $_, the last command argument
+// — not a real configuration var to propagate). Shared by ResolveVars (the
+// env layer of the resolved view), EnvShadowed (profile-override warning) and
+// `cabin setenv` (the shell delta), so the exclusion rule lives in one place.
+// Pure: only reads the process environment.
+func EnvironMap() map[string]string {
+	out := make(map[string]string)
+	for _, e := range os.Environ() {
+		if k, v, ok := strings.Cut(e, "="); ok && k != "_" && strings.TrimSpace(k) != "" {
+			out[k] = v
+		}
+	}
+	return out
+}
+
 // EnvShadowed reports profile vars shadowed by a same-named process-env var,
 // mapped name -> env value. A profile var is shadowed when the env carries the
 // same key with a *different* value (an identical echo is not an override),
 // because ResolveVars applies "set if not present" with the env as a
 // higher-precedence layer than the profile. Used by `cabin profile show` to
 // warn about the silent precedence before the resolved view is set on a
-// subprocess. Pure: only reads the process environment, never resolves a
-// profile or consults defaults, so an env-only var never appears (it is not a
-// profile var).
+// subprocess. Pure: only reads the process environment (via EnvironMap), never
+// resolves a profile or consults defaults, so an env-only var never appears
+// (it is not a profile var).
 func EnvShadowed(profileVars map[string]string) map[string]string {
+	env := EnvironMap()
 	out := make(map[string]string)
-	for _, e := range os.Environ() {
-		if k, v, ok := strings.Cut(e, "="); ok {
-			if pv, present := profileVars[k]; present && v != pv {
-				out[k] = v
-			}
+	for k, pv := range profileVars {
+		if ev, present := env[k]; present && ev != pv {
+			out[k] = ev
 		}
 	}
 	return out
