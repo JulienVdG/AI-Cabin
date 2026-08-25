@@ -11,39 +11,46 @@ import (
 
 // taskCmd runs a Taskfile target of a registered cabin:
 //
-//	cabin task <cabin> <task> [params...]
+//	cabin task <task> [params...]
 //
-// Resolves the cabin via the registry, resolves the var view (set on the
-// process so docker-compose ${VAR} resolves), and forwards extra params to
-// the task's {{.CLI_ARGS}}. A `task` subcommand (not root fallback) keeps
-// internal commands (up/build/ps/...) and Taskfile targets from colliding.
+// The cabin is resolved by --cabin / current-cabin (resolveTargetCabin); the
+// first positional is the target. The CLI resolves the var view (set on the
+// process so docker-compose ${VAR} resolves) and forwards extra params to the
+// task's {{.CLI_ARGS}}. A `task` subcommand (not root fallback) keeps internal
+// commands (up/build/ps/...) and Taskfile targets from colliding.
 //
 // The shared runCabinTask helper also materializes the lifecycle Taskfile and
 // injects AI_CABIN_CMD/AI_CABIN_LIFECYCLE_TASKFILE, the same path the
 // `cabin up|down|...` wrappers use, so `cabin task` and the wrappers behave
 // identically.
 var taskCmd = &cobra.Command{
-	Use:   "task <cabin> <task> [params...]",
+	Use:   "task <task> [params...]",
 	Short: "Run a Taskfile target of a cabin",
-	Long: `Run a Taskfile target of a registered cabin, forwarding extra params to the
-task's {{.CLI_ARGS}} (e.g. agent flags like --port).
+	Long: `Run a Taskfile target of a cabin, forwarding extra params to the
+Taskfile target's {{.CLI_ARGS}} (e.g. agent flags like --port).
 
-The cabin must be registered first with 'cabin cabin add'. The active
+The cabin must be registered first with 'cabin add'. It is selected with
+--cabin (before any positional) or the current cabin of the active profile
+('cabin use <cabin>'); pass --profile to pick the profile. The active
 profile's env vars are set on the process so docker-compose ${VAR} resolves.
 
 Examples:
-  cabin task pi-go pi
-  cabin task blog opencode web --port 9090
+  cabin task pi           # run the default target of the current cabin
+  cabin --cabin blog task opencode web --port 9090
 `,
-	Args: cobra.MinimumNArgs(2),
-	// <cabin> (1st positional) and <task> (2nd positional) are completed; the
-	// 3rd+ positional (agent params) is forwarded raw via {{.CLI_ARGS}} and is
-	// not completed.
+	Args: cobra.MinimumNArgs(1),
+	// <task> (1st positional) is completed from the target cabin's Taskfile;
+	// the 2nd+ positional (agent params) is forwarded raw via {{.CLI_ARGS}} and
+	// is not completed.
 	ValidArgsFunction: completeTaskArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		cabinName := args[0]
-		taskName := args[1]
-		rawArgs := args[2:]
+		cabinName, err := resolveTargetCabin()
+		if err != nil {
+			exitOnRunError(os.Stderr, cabinName, err)
+			return
+		}
+		taskName := args[0]
+		rawArgs := args[1:]
 
 		if err := runCabinTask(context.Background(), cabinName, taskName, rawArgs, true, os.Stdout, os.Stderr); err != nil {
 			exitOnRunError(os.Stderr, cabinName, err)

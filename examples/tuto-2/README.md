@@ -143,25 +143,32 @@ agent's sandbox to the `postgres` service.
 ### 8. Register the cabin
 
 ```bash
-cabin cabin add . tuto2
+cabin add . tuto2
 ```
 
-### 9. Build, then start everything
+### 9. Select, build, then start everything
 
-`cabin build tuto2` prepares the agent dirs, **materializes `.deps/`** (the
+Make `tuto2` the current cabin of your profile (`cabin use`), so the lifecycle
+commands below target it without repeating the name:
+
+```bash
+cabin use tuto2
+```
+
+`cabin build` prepares the agent dirs, **materializes `.deps/`** (the
 Dockerfile `COPY .deps/` needs it) and runs `docker compose build` — which
 builds the `web` image (`tuto2-web`, tagged in its service) first and then the
 `agent` image `FROM` it, in the right order because `agent` depends on `web`:
 
 ```bash
-cabin build tuto2
+cabin build
 ```
 
-Then `cabin up tuto2` runs `docker compose up -d`, which starts **all** services
+Then `cabin up` runs `docker compose up -d`, which starts **all** services
 of the merged compose — `web`, `postgres` and `agent` — in one command:
 
 ```bash
-cabin up tuto2
+cabin up
 ```
 
 ### 10. Verify the agent reaches Postgres
@@ -170,7 +177,7 @@ From a sandboxed shell, `localhost:5432` is bridged to the `postgres` service:
 
 ```bash
 cd ~/projects/tuto2
-cabin greyshell tuto2
+cabin greyshell
 # inside the sandboxed shell:
 pg_isready -h localhost -p 5432
 ```
@@ -181,8 +188,8 @@ And the app is still reachable on the host at http://localhost:8000.
 
 ```bash
 cd ~/projects/tuto2
-cabin task tuto2 opencode
-# or: cabin task tuto2 pi
+cabin task opencode
+# or: cabin task pi
 ```
 
 From opencode, ask it to work with the database through the forwarded

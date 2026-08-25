@@ -9,6 +9,15 @@ import (
 // --var), so --profile and AI_CABIN_PROFILE env are one mechanism, not two.
 const ProfileEnvVar = "AI_CABIN_PROFILE"
 
+// CurrentCabinVar is the profile var recording the cabin a user is currently
+// working in, set with `cabin use` (one profile, one current cabin). It is a
+// plain var, so the standard var mechanism applies: an exported
+// AI_CABIN_CURRENT_CABIN overrides the profile file (and `cabin profile show`
+// warns when it shadow a same-named profile var). It resolves through
+// ResolveVars and propagates into the container with the other vars, which is
+// harmless: a cabin knowing its own name is not a leak.
+const CurrentCabinVar = "AI_CABIN_CURRENT_CABIN"
+
 // ResolveVars returns the variable view the CLI sets on its task subprocess:
 // CLI overrides (--var, --profile), process env, selected profile file, and
 // internal defaults — applied with "set if not present" semantics (highest
@@ -25,6 +34,28 @@ const ProfileEnvVar = "AI_CABIN_PROFILE"
 // creation/update (not the selected one) and persists a bounded key set (env
 // overrides values but does not enlarge the set), whereas this view includes
 // the whole env. See ConfigService.InitProfile for the persistence rule.
+// ResolveCabin resolves the target cabin for cabin-scoped commands
+// (up/down/build/shell/greyshell/logs/restart/task). Precedence, matching the
+// --var > env > profile order of ResolveVars: the --cabin flag (explicit,
+// highest) > the AI_CABIN_CURRENT_CABIN env var > the active profile's
+// current-cabin var (set with `cabin use`). The active profile is the one
+// selected by --profile / AI_CABIN_PROFILE / config.yaml, resolved via
+// ResolveVars. It errors only when no cabin resolves at all, with guidance for
+// the two ways to name one.
+func (s *ConfigService) ResolveCabin(cabinFlag, profileFlag string) (string, error) {
+	if cabinFlag != "" {
+		return cabinFlag, nil
+	}
+	vars, err := s.ResolveVars(profileFlag, nil)
+	if err != nil {
+		return "", err
+	}
+	if cabin := vars[CurrentCabinVar]; cabin != "" {
+		return cabin, nil
+	}
+	return "", fmt.Errorf("no cabin selected: pass --cabin <cabin> before any positional arg, or set one with 'cabin use <cabin>'")
+}
+
 func (s *ConfigService) ResolveVars(profileFlag string, cliVars []string) (Vars, error) {
 	view := make(Vars)
 

@@ -15,7 +15,7 @@ import (
 // cabinScanCmd recursively discovers cabins under <path> and registers them.
 // A directory is a cabin when it contains a Taskfile.yml with an ai-cabin:
 // header (cabin.ValidateCabin). Non-cabin directories are skipped silently;
-// discovered cabins are registered via the same add flow as `cabin cabin add`
+// discovered cabins are registered via the same add flow as `cabin add`
 // (idempotent on same path, strict on a conflicting path unless --force).
 //
 // Use case: onboard a developer by scanning ~/projects and registering every
@@ -29,7 +29,7 @@ var cabinScanCmd = &cobra.Command{
 Non-cabin directories are skipped silently. A discovered cabin already
 registered with the same path is skipped (idempotent). A discovered cabin
 whose name maps to a different path errors out unless --force is given
-(same rules as 'cabin cabin add').`,
+(same rules as 'cabin add').`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		root := args[0]
@@ -40,7 +40,7 @@ whose name maps to a different path errors out unless --force is given
 func init() {
 	cabinScanCmd.Flags().BoolVarP(&forceAdd, "force", "f", false,
 		"overwrite an existing cabin registered with a different path")
-	cabinCmd.AddCommand(cabinScanCmd)
+	rootCmd.AddCommand(cabinScanCmd)
 }
 
 // scanCabins walks root and registers every valid cabin directory found. It
@@ -93,7 +93,7 @@ func scanCabins(root string, stdout, stderr io.Writer) {
 	}
 }
 
-// registerScanned upserts a discovered cabin, mirroring `cabin cabin add` UX:
+// registerScanned upserts a discovered cabin, mirroring `cabin add` UX:
 // same path -> idempotent skip (no warning, scan is bulk), different path ->
 // error unless --force. Returns a suffix describing the outcome (e.g.
 // " (updated, was /old)") for the progress line.

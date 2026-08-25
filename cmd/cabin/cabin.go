@@ -13,13 +13,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// cabinCmd represents the cabin command (registry of cabins: name -> path).
-var cabinCmd = &cobra.Command{
-	Use:   "cabin",
-	Short: "Manage the cabin registry",
-	Long:  `The cabin registry maps cabin names to their path on disk (~/.config/ai-cabin/cabins.yaml).`,
-}
-
 // cabinAddCmd registers a cabin after validating it is a real cabin directory.
 // Signature is "add <path> [name]": the path is primary (what makes a cabin),
 // the name is derived (CLI arg > Taskfile ai-cabin.cabin > dir basename).
@@ -127,7 +120,7 @@ var cabinListCmd = &cobra.Command{
 		}
 
 		if len(cabins) == 0 {
-			fmt.Println("No cabins registered. Add one with 'cabin cabin add <path> [name]'.")
+			fmt.Println("No cabins registered. Add one with 'cabin add <path> [name]'.")
 			return
 		}
 
@@ -153,9 +146,8 @@ var cabinListCmd = &cobra.Command{
 func init() {
 	cabinAddCmd.Flags().BoolVarP(&forceAdd, "force", "f", false,
 		"overwrite an existing cabin registered with a different path")
-	cabinCmd.AddCommand(cabinAddCmd)
-	cabinCmd.AddCommand(cabinListCmd)
-	rootCmd.AddCommand(cabinCmd)
+	rootCmd.AddCommand(cabinAddCmd)
+	rootCmd.AddCommand(cabinListCmd)
 }
 
 // printValidateError renders a ValidateCabin error with actionable guidance.

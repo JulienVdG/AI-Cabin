@@ -120,7 +120,7 @@ Agent-config materialization stays lazy, triggered on the first cabin task.`,
 		fmt.Println("AI-Cabin environment ready.")
 		// Show the onboarding hint only when no cabin is registered yet.
 		if cabins, err := config.ListCabins(); err == nil && len(cabins) == 0 {
-			fmt.Println("Next: register a cabin with `cabin cabin add <path>` and run `cabin task <cabin> <task>`.")
+			fmt.Println("Next: register a cabin with `cabin add <path>`, then `cabin use <name>` and `cabin task <task>`.")
 		}
 	},
 }

@@ -103,13 +103,13 @@ Re-running `cabin setup` is safe at any time: it repairs missing pieces and
 picks up low-risk additions from newer versions without overwriting your
 existing desk or profile.
 
-### 3. Register a cabin
+### 3. Register the reference cabins
 
 ```bash
-cabin cabin add cabin/opencode-go
+cabin scan cabin/
 ```
 
-Registers `opencode-go` in the cabin registry (the name-to-directory map that lets `cabin <name> ...` resolve it, see [Documentation](#documentation)). The path is relative to the AI-Cabin clone, so run this from where you cloned in step 1.
+`cabin scan <path>` walks the directory and registers every valid cabin it finds — here the two reference cabins `opencode-go` and `pi-go` — so `cabin use` and `--cabin <name>` can select them by name (see [Documentation](#documentation)). The path is relative to the AI-Cabin clone, so run this from where you cloned in step 1. To register a single cabin instead, use `cabin add <path> [name]`.
 
 ### 4. Add your AI provider secret to Greyproxy
 
@@ -149,10 +149,11 @@ Two other common provider vars:
 The commands below assume steps 2-5 are done (a configured profile, a registered cabin, and Greyproxy reachable from Docker):
 
 ```bash
-cabin build opencode-go              # build the image (also runs prepare + deps)
-cabin up opencode-go                 # start the cabin in background
+cabin use opencode-go                # make opencode-go the current cabin
+cabin build                          # build the image (also runs prepare + deps)
+cabin up                             # start the cabin in background
 cd ~/projects/<your-project>         # cd into a directory inside the workdir
-cabin task opencode-go opencode      # run the agent terminal UI (TUI)
+cabin task opencode                  # run the agent terminal UI (TUI)
 ```
 
 `cabin task` (and `shell`/`greyshell`) shadow your host path inside the container and require the current directory to be inside the workdir; otherwise it fails fast with a `relpath` error. Work from a project under `~/projects` (or your `AI_CABIN_WORKDIR`), or pass `--no-relpath` to skip the check.
@@ -160,7 +161,7 @@ cabin task opencode-go opencode      # run the agent terminal UI (TUI)
 **Sandboxed shell** (within a running cabin):
 
 ```bash
-cabin greyshell opencode-go
+cabin greyshell
 ```
 
 ---
@@ -270,34 +271,51 @@ The essential variables are listed under Profile Variables below.
 
 ### Cabin registry
 
-The registry maps cabin names to their directory so `cabin <name> ...` resolves them.
+The registry maps cabin names to their directory so `cabin use` and `--cabin <name>` select a cabin by name.
 
-- `cabin cabin add <path> [name]` — register or update a cabin
-- `cabin cabin list` — list registered cabins
-- `cabin cabin scan <path>` — recursively discover and register cabins under a path (e.g. `cabin cabin scan cabin/`)
+- `cabin add <path> [name]` — register or update a cabin
+- `cabin list` — list registered cabins
+- `cabin scan <path>` — recursively discover and register cabins under a path (e.g. `cabin scan cabin/`)
+
+### Current cabin
+
+Cabin-scoped commands (`build`, `up`, `down`, `restart`, `logs`, `shell`, `greyshell`, `task`) target a **current cabin**, so you never repeat a name. Set it once per profile with `cabin use` (it is sugar for `cabin profile set AI_CABIN_CURRENT_CABIN <name>`; the current cabin is a profile variable, so each profile has its own):
+
+```bash
+cabin use opencode-go    # make opencode-go the current cabin of the active profile
+cabin up                 # operates opencode-go
+```
+
+Override it for a single command with `--cabin <name>` (before any positional). Selection order:
+
+`--cabin <name>` > `AI_CABIN_CURRENT_CABIN` env > current cabin of the active profile
+
+Global flags (`--cabin`, `--profile`, `--var`) always come before positional arguments; on `cabin task`, everything after the first positional belongs to the task. At `cabin profile init`, seed the current cabin with `--var AI_CABIN_CURRENT_CABIN=<name>`.
 
 ### Lifecycle
 
-- `cabin build <name>` — build the cabin image (also runs prepare + deps)
-- `cabin up <name>` — start the cabin in background
-- `cabin down <name>` — stop the cabin
-- `cabin restart <name>` — restart the agent container
-- `cabin logs <name>` — follow agent logs
-- `cabin shell <name>` — get a bash shell inside the container
-- `cabin greyshell <name>` — get a greywall-sandboxed shell
+The cabin commands below operate on the current cabin; pass `--cabin <name>` (before any positional) to target another (`cabin ps` lists all containers and takes no cabin).
+
+- `cabin build` — build the current cabin's image (also runs prepare + deps)
+- `cabin up` — start the current cabin in background
+- `cabin down` — stop the current cabin
+- `cabin restart` — restart the current cabin's container
+- `cabin logs` — follow the current cabin's logs
+- `cabin shell` — get a bash shell inside the current cabin's container
+- `cabin greyshell` — get a greywall-sandboxed shell in the current cabin
 - `cabin ps` — list agent containers across cabins (`-a` for all, including stopped)
 
 ### Task
 
-Runs a Taskfile target of a cabin, optionally forwarding parameters to the agent:
+Runs a Taskfile target of the current cabin (or the one given by `--cabin`), optionally forwarding parameters to the agent:
 
-- `cabin task <cabin> <target> [params...]`
+- `cabin task <target> [params...]`
 
 Examples:
 
 ```bash
-cabin task opencode-go opencode    # run the OpenCode TUI
-cabin task pi-go pi -c             # pass -c to the agent
+cabin task opencode    # run the OpenCode TUI of the current cabin
+cabin --cabin pi-go task pi -c    # pass -c to the agent of pi-go
 ```
 
 The cabins ship with lifecycle Taskfiles that `task` can also run standalone, without the cabin CLI (the `cabin task` wrapper adds profile env, path shadowing, and registry resolution):

@@ -122,6 +122,13 @@ func ResolveVars(profileFlag string, cliVars []string) (Vars, error) {
 	return configService.ResolveVars(profileFlag, cliVars)
 }
 
+// ResolveCabin returns the target cabin for cabin-scoped commands, resolving
+// --cabin > AI_CABIN_CURRENT_CABIN env > active profile var. It delegates to the
+// global ConfigService.
+func ResolveCabin(cabinFlag, profileFlag string) (string, error) {
+	return configService.ResolveCabin(cabinFlag, profileFlag)
+}
+
 // InitProfile creates or overwrites a profile with a bounded set of resolved
 // vars (defaults ∪ --var ∪ existing-on-force) and returns the persisted profile.
 // On an existing profile without force it is a no-op returning the existing

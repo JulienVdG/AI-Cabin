@@ -41,7 +41,7 @@ var cabinEnvVars = []string{
 	"AI_CABIN_HOME", "AI_CABIN_DESK", "AI_CABIN_WORKDIR",
 	"CONTAINER_WORKDIR",
 	"GIT_AGENT_NAME", "GIT_AGENT_EMAIL", "SCW_PROJECT_ID",
-	"AI_CABIN_PROFILE", "CABIN_TEST_VAR",
+	"AI_CABIN_PROFILE", "CABIN_TEST_VAR", "AI_CABIN_CURRENT_CABIN",
 	"CREDENTIAL_INJECT", "CREDENTIAL_IGNORE",
 }
 
@@ -289,6 +289,90 @@ func TestResolveVars(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tc.wantVal, vars[tc.wantVar])
+		})
+	}
+}
+
+// TestResolveCabin covers the cabin-scoped target resolution used by
+// up/down/build/shell/greyshell/logs/restart/task: --cabin flag > env
+// AI_CABIN_CURRENT_CABIN > active profile var (set with `cabin use`). The
+// active profile is the one selected by --profile / AI_CABIN_PROFILE /
+// config.yaml (axis A), so the current cabin is genuinely per-profile.
+func TestResolveCabin(t *testing.T) {
+	cases := []struct {
+		name        string
+		cabinFlag   string
+		profileFlag string
+		profiles    map[string]string // name -> vars yaml body
+		current     string
+		env         map[string]string
+		want        string
+		wantErr     bool
+	}{
+		{
+			// The --cabin flag is explicit and wins over every other level.
+			name:      "--cabin flag wins over env and profile var",
+			cabinFlag: "pi-go",
+			env:       map[string]string{"AI_CABIN_CURRENT_CABIN": "opencode-go"},
+			profiles:  map[string]string{"default": "name: default\nvars:\n  AI_CABIN_CURRENT_CABIN: blog\n"},
+			current:   "default",
+			want:      "pi-go",
+		},
+		{
+			// Env outranks the profile file, matching ResolveVars' axis B.
+			name:     "env AI_CABIN_CURRENT_CABIN wins over profile var",
+			env:      map[string]string{"AI_CABIN_CURRENT_CABIN": "opencode-go"},
+			profiles: map[string]string{"default": "name: default\nvars:\n  AI_CABIN_CURRENT_CABIN: blog\n"},
+			current:  "default",
+			want:     "opencode-go",
+		},
+		{
+			// No flag, no env: the active profile's var is the current cabin.
+			name:     "current cabin from active profile var",
+			profiles: map[string]string{"default": "name: default\nvars:\n  AI_CABIN_CURRENT_CABIN: blog\n"},
+			current:  "default",
+			want:     "blog",
+		},
+		{
+			// The current cabin is per-profile: --profile selects which
+			// profile's var is read.
+			name:        "current cabin from an explicitly selected profile",
+			profileFlag: "work",
+			profiles:    map[string]string{"work": "name: work\nvars:\n  AI_CABIN_CURRENT_CABIN: prod-go\n"},
+			want:        "prod-go",
+		},
+		{
+			// Nothing names a cabin: ResolveCabin errors with guidance.
+			name:    "no cabin selected errors",
+			current: "default",
+			profiles: map[string]string{
+				"default": "name: default\nvars:\n  AI_CABIN_WORKDIR: /tmp/work\n",
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			unsetCabinEnv(t)
+			svc := newResolveService(t)
+			for name, body := range tc.profiles {
+				writeProfile(t, name, body)
+			}
+			if tc.current != "" {
+				require.NoError(t, svc.SetCurrentProfile(tc.current))
+			}
+			for k, v := range tc.env {
+				t.Setenv(k, v)
+			}
+
+			got, err := svc.ResolveCabin(tc.cabinFlag, tc.profileFlag)
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }

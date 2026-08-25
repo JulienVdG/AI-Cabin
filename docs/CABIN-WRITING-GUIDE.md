@@ -223,28 +223,34 @@ Taskfile.
 
 `cabin authoring` does not register the cabin — useful when you are trying
 assemblies on throwaway directories. Register once before building so the cabin
-is resolvable by name:
+is selectable by name:
 
 ```bash
-cabin cabin add path/to/project [name]
+cabin add path/to/project [name]
 ```
 
-Then build, start and run through the `cabin` CLI — it wires up profile vars,
-path shadowing, and the agent configs for you. The CLI invokes the internal
-materialization commands automatically; you only use the public commands
-below.
+Then select it as the current cabin and build, start and run through the
+`cabin` CLI — it wires up profile vars, path shadowing, and the agent configs
+for you. The CLI invokes the internal materialization commands automatically;
+you only use the public commands below.
+
+Make the cabin the current one of your active profile:
+
+```bash
+cabin use <name>
+```
 
 Build the image (this also prepares the agent dirs and materializes `.deps/`):
 
 ```bash
-cabin build <cabin>
+cabin build      # or: cabin --cabin <name> build
 ```
 
 Start the cabin in the background (this runs the agent setup, rendering the
 agent configs into `$AI_CABIN_HOME`):
 
 ```bash
-cabin up <cabin>
+cabin up         # or: cabin --cabin <name> up
 ```
 
 Run the agent from inside your project directory (the current host path is
@@ -252,12 +258,14 @@ shadowed into the container, so the agent sees the files you are working on):
 
 ```bash
 cd ~/projects/<your-project>     # must be inside AI_CABIN_WORKDIR
-cabin task <cabin> opencode      # or: cabin task <cabin> pi
+cabin task opencode              # or: cabin task pi    (or: cabin --cabin <name> task opencode)
 ```
 
 Other per-project lifecycle commands: `cabin down`, `cabin restart`,
 `cabin logs`, `cabin shell` (plain container shell), `cabin greyshell`
-(greywall-sandboxed shell), `cabin ps` (list agent containers).
+(greywall-sandboxed shell), `cabin ps`. Each operates on the current cabin
+unless `--cabin <name>` is given. `cabin ps` lists agent containers across all
+cabins.
 
 ---
 

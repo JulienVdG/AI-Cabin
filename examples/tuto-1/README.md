@@ -115,14 +115,18 @@ And in `Taskfile.yml`:
 ### 6. Register the cabin
 
 ```bash
-cabin cabin add . tuto1
+cabin add . tuto1
 ```
 
-### 7. Build, start
+### 7. Select, build, start
+
+Make `tuto1` the current cabin of your profile (`cabin use`), so the lifecycle
+commands below target it without repeating the name:
 
 ```bash
-cabin build tuto1
-cabin up tuto1
+cabin use tuto1
+cabin build
+cabin up
 ```
 
 ### 8. Verify the Go toolchain is inside the sandbox
@@ -133,7 +137,7 @@ project builds in the sandbox:
 
 ```bash
 cd ~/projects/tuto1
-cabin greyshell tuto1
+cabin greyshell
 # inside the sandboxed shell:
 go run .
 ```
@@ -144,7 +148,7 @@ You should see `Hello from the sample Go project`.
 
 ```bash
 cd ~/projects/tuto1
-cabin task tuto1 opencode
+cabin task opencode
 ```
 
 From the opencode TUI, you can also ask the agent to run the project and

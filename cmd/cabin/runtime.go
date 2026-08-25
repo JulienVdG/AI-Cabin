@@ -132,7 +132,7 @@ func exitOnRunError(w io.Writer, cabinName string, err error) {
 	if errors.Is(err, config.ErrCabinNotFound) {
 		fmt.Fprintf(w,
 			"Error: cabin %q is not registered.\n"+
-				"Run 'cabin cabin add <path> %s' to register it, or 'cabin cabin list' to see known cabins.\n",
+				"Run 'cabin add <path> %s' to register it, or 'cabin list' to see known cabins.\n",
 			cabinName, cabinName)
 	} else {
 		fmt.Fprintf(w, "Error: %v\n", err)
@@ -140,23 +140,34 @@ func exitOnRunError(w io.Writer, cabinName string, err error) {
 	os.Exit(1)
 }
 
-// lifecycleWrapper builds a `cabin <cmd> <cabin>` command that delegates to the
-// shared docker-<cmd> Taskfile target. The `docker-` prefix avoids collision
-// with cabin-owned targets: task errors on a flatten include with a duplicate
-// name, so the cabin owns setup/deps/agent targets and the lifecycle owns the
-// docker-* names. needRelpath selects whether the host CWD sub-path is
-// injected (shell/greyshell drop the user into the container) or skipped
-// (up/down/build/logs/restart are container-level actions with no CWD to
-// propagate).
+// resolveTargetCabin resolves the cabin for cabin-scoped commands from the
+// global --cabin flag / AI_CABIN_CURRENT_CABIN env / active profile var
+// (config.ResolveCabin). Shared by `cabin task` and the lifecycle wrappers so
+// they all honor the same precedence.
+func resolveTargetCabin() (string, error) {
+	return config.ResolveCabin(cabinFlag, profileFlag)
+}
+
+// lifecycleWrapper builds a `cabin <cmd>` command that delegates to the
+// shared docker-<cmd> Taskfile target. The target cabin is resolved by
+// --cabin / current-cabin (resolveTargetCabin), not a positional arg. The
+// `docker-` prefix avoids collision with cabin-owned targets: task errors on a
+// flatten include with a duplicate name, so the cabin owns setup/deps/agent
+// targets and the lifecycle owns the docker-* names. needRelpath selects
+// whether the host CWD sub-path is injected (shell/greyshell drop the user
+// into the container) or skipped (up/down/build/logs/restart are
+// container-level actions with no CWD to propagate).
 func lifecycleWrapper(name, target, short string, needRelpath bool) *cobra.Command {
 	return &cobra.Command{
-		Use:   name + " <cabin>",
+		Use:   name,
 		Short: short,
-		Args:  cobra.ExactArgs(1),
-		// <cabin> is completed from the registry (config.ListCabins).
-		ValidArgsFunction: completeCabinNames,
+		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			cabinName := args[0]
+			cabinName, err := resolveTargetCabin()
+			if err != nil {
+				exitOnRunError(os.Stderr, cabinName, err)
+				return
+			}
 			if err := runCabinTask(cmd.Context(), cabinName, target, nil, needRelpath, os.Stdout, os.Stderr); err != nil {
 				exitOnRunError(os.Stderr, cabinName, err)
 			}
