@@ -41,6 +41,31 @@ AI-Cabin provides a secure, reproducible, and agent-agnostic environment for AI 
 
 ---
 
+## Install modes
+
+`cabin` installs two ways. The Quick Start below follows the **clone** mode
+because it unlocks the full feature set.
+
+**`go install` — minimal**
+
+- `go install github.com/JulienVdG/AI-Cabin/cmd/cabin@latest`
+- Single binary, no repo checkout.
+- Gives: `cabin setup` (minimal desk) and `cabin authoring` to build a cabin —
+  [Cabin Writing Guide](docs/CABIN-WRITING-GUIDE.md).
+- Does not give: reference cabins to `scan`, rich FR/EN desks, project
+  skeletons (these live in the repo only).
+
+**Clone — full (recommended)**
+
+- `git clone https://github.com/JulienVdG/AI-Cabin.git` then
+  `go install ./cmd/cabin`
+- Register the clone as a **layer** at first setup (see [Layers](#layers)):
+  `cabin setup --var AI_CABIN_LAYER_DIRS=$PWD/AI-Cabin` — unlocking rich FR/EN
+  desks and project skeletons for that profile.
+
+**Note on reproducibility:** pin the clone if you need the binary and the
+clone to stay in sync.
+
 ## Quick Start
 
 ### Prerequisites
@@ -342,6 +367,33 @@ a **project**:
 Apply one by name:
 
 - `cabin skeleton apply [desk=]desk/<skeleton> [<name>=projects/<skeleton>]`
+
+### Layers
+
+A **layer** is a self-contained override root — a git repo or a directory —
+carrying everything an organization or user needs to redirect AI-Cabin
+defaults to their context (richer desks, project skeletons, profile defaults),
+activated by a single var. A layer root mirrors the embedded tree:
+
+- `fragments/` — fragment bundles, prepended to the fallback chain (above the
+  cabin-local and embedded layers): the usual per-file override by priority
+  across the whole chain (earlier dir wins per file, later layers still
+  contribute their unshadowed files);
+- `skeletons/` — desk/project skeletons, added the same way: each
+  `<layer>/skeletons` dir joins the catalogue as a per-file priority layer;
+- `layer.yaml` — optional; a `vars:` block. Only the **first** layer with a
+  `layer.yaml` (in `AI_CABIN_LAYER_DIRS` order) contributes its vars — a
+  file-level first-wins, not a per-key merge.
+
+**Activation is per profile.** `AI_CABIN_LAYER_DIRS` is a profile var,
+persisted when set: pass it via `--var` or an exported env var at
+`cabin setup`/`cabin profile init`, or `cabin profile set AI_CABIN_LAYER_DIRS=...`.
+The first active layer's `layer.yaml`
+`vars:` are then persisted as profile defaults, ranked below the profile's own
+keys.
+
+A bare fragments root (`AI_CABIN_FRAGMENTS_DIRS`) keeps working unchanged: a
+layer only adds a richer root type and does not break the classic dirs vars.
 
 ### Authoring
 

@@ -970,4 +970,115 @@ func TestConfigService_InitProfile(t *testing.T) {
 		_, err = os.Stat(filepath.Join(profilesDir, "default.yaml"))
 		require.NoError(t, err)
 	})
+
+	t.Run("LayerVarsContributeDefaults", func(t *testing.T) {
+		// An env-exported AI_CABIN_LAYER_DIRS activates the layer coherently:
+		// the env value is persisted (the bounded set admits the layer dirs var
+		// even though it is not a default) AND its layer.yaml vars: block
+		// contributes defaults — no half-apply between the dirs
+		// (fragments/skeletons) and the vars.
+		unsetEnv(t, config.LayerDirsEnvVar)
+		layerRoot := t.TempDir()
+		require.NoError(t, os.MkdirAll(layerRoot, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(layerRoot, "layer.yaml"),
+			[]byte("vars:\n  DEFAULT_MODEL: Qwen3\n  CREDENTIAL_INJECT: \"A,B\"\n"), 0o644))
+		t.Setenv(config.LayerDirsEnvVar, layerRoot)
+
+		svc := newInitService(t)
+		profile, err := svc.InitProfile("dev", nil, false)
+		require.NoError(t, err)
+
+		// The env-activated layer dirs var is persisted and the layer.yaml
+		// vars are contributed alongside it.
+		assert.Equal(t, layerRoot, profile.Vars[config.LayerDirsEnvVar], "env-activation persists the layer dirs var")
+		assert.Equal(t, "Qwen3", profile.Vars["DEFAULT_MODEL"], "layer var persisted as a default")
+		assert.Equal(t, initDefaultVars[config.HomeVar], profile.Vars[config.HomeVar], "defaults still present")
+	})
+
+	t.Run("NoLayerLeavesKeyAbsent", func(t *testing.T) {
+		// No layer anywhere: AI_CABIN_LAYER_DIRS is not persisted at all — it
+		// is a normal var, present only when set (layer is an advanced opt-in).
+		unsetEnv(t, config.LayerDirsEnvVar)
+		svc := newInitService(t)
+
+		profile, err := svc.InitProfile("dev", nil, false)
+		require.NoError(t, err)
+		_, ok := profile.Vars[config.LayerDirsEnvVar]
+		assert.False(t, ok, "layer dirs var absent when no layer is set")
+	})
+
+	t.Run("LayerVarsOverriddenByVar", func(t *testing.T) {
+		// --var ranking above the layer vars tier: a same-key --var wins.
+		unsetEnv(t, config.LayerDirsEnvVar)
+		layerRoot := t.TempDir()
+		require.NoError(t, os.MkdirAll(layerRoot, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(layerRoot, "layer.yaml"),
+			[]byte("vars:\n  DEFAULT_MODEL: Qwen3\n"), 0o644))
+		t.Setenv(config.LayerDirsEnvVar, layerRoot)
+
+		svc := newInitService(t)
+		profile, err := svc.InitProfile("dev", []string{"DEFAULT_MODEL=Grok4"}, false)
+		require.NoError(t, err)
+		assert.Equal(t, "Grok4", profile.Vars["DEFAULT_MODEL"], "--var wins over the layer vars tier")
+	})
+
+	t.Run("EnvOverridesLayerVar", func(t *testing.T) {
+		// The env bounds include the layer var keys, so env overrides a layer
+		// default (env > layer vars) but never enlarges the set with a stray.
+		unsetEnv(t, config.LayerDirsEnvVar)
+		layerRoot := t.TempDir()
+		require.NoError(t, os.MkdirAll(layerRoot, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(layerRoot, "layer.yaml"),
+			[]byte("vars:\n  DEFAULT_MODEL: Qwen3\n"), 0o644))
+		t.Setenv(config.LayerDirsEnvVar, layerRoot)
+		t.Setenv("DEFAULT_MODEL", "Grok4")
+
+		svc := newInitService(t)
+		profile, err := svc.InitProfile("dev", nil, false)
+		require.NoError(t, err)
+		assert.Equal(t, "Grok4", profile.Vars["DEFAULT_MODEL"], "env wins over the layer vars tier")
+	})
+
+	t.Run("LayerVarAsVarIsPersisted", func(t *testing.T) {
+		// The documented activation path (cabin setup --var
+		// AI_CABIN_LAYER_DIRS=...): the var is passed as --var and its
+		// layer.yaml vars are contributed as defaults.
+		unsetEnv(t, config.LayerDirsEnvVar)
+		layerRoot := t.TempDir()
+		require.NoError(t, os.MkdirAll(layerRoot, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(layerRoot, "layer.yaml"),
+			[]byte("vars:\n  DEFAULT_MODEL: Qwen3\n"), 0o644))
+
+		svc := newInitService(t)
+		profile, err := svc.InitProfile("dev", []string{config.LayerDirsEnvVar + "=" + layerRoot}, false)
+		require.NoError(t, err)
+
+		assert.Equal(t, "Qwen3", profile.Vars["DEFAULT_MODEL"], "layer var contributed from the --var layer")
+		assert.Equal(t, layerRoot, profile.Vars[config.LayerDirsEnvVar], "layer dirs var persisted (--var sets the var)")
+	})
+
+	t.Run("ForceKeepsExistingLayerVarOverGlobal", func(t *testing.T) {
+		// On --force overwrite, an existing profile's own AI_CABIN_LAYER_DIRS
+		// overrides the env: the profile's layer selection is its own.
+		unsetEnv(t, config.LayerDirsEnvVar)
+		layerA := t.TempDir()
+		require.NoError(t, os.MkdirAll(layerA, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(layerA, "layer.yaml"),
+			[]byte("vars:\n  DEFAULT_MODEL: FromA\n"), 0o644))
+		layerB := t.TempDir()
+		require.NoError(t, os.MkdirAll(layerB, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(layerB, "layer.yaml"),
+			[]byte("vars:\n  DEFAULT_MODEL: FromB\n"), 0o644))
+
+		svc := newInitService(t)
+		// First init creates the profile with layer B (its own selection).
+		_, err := svc.InitProfile("dev", []string{config.LayerDirsEnvVar + "=" + layerB}, false)
+		require.NoError(t, err)
+		// Env now exports layer A; the existing profile's B must win on force.
+		t.Setenv(config.LayerDirsEnvVar, layerA)
+
+		profile, err := svc.InitProfile("dev", nil, true)
+		require.NoError(t, err)
+		assert.Equal(t, "FromB", profile.Vars["DEFAULT_MODEL"], "existing profile layer wins over env on force")
+	})
 }

@@ -29,12 +29,14 @@ const ManifestName = "skeleton.yaml"
 
 // BuildLayers constructs the skeleton fallback chain as a union fs.FS, ordered
 // highest priority first (first-wins like $PATH): the conf dirs, then the
-// embedded base layer. It reuses fragments.BuildLayers (same unionfs assembly);
-// skeletons have no cabin-local layer, so the cabin dir is empty. The conf dirs
-// come pre-resolved from config.Vars.SkeletonDirs (which parses
-// AI_CABIN_SKELETON_DIRS); a missing dir is a strict error.
-func BuildLayers(dirs []string, embedFS fs.FS) (fs.FS, error) {
-	return fragments.BuildLayers(dirs, "", embedFS)
+// layer-derived dirs (<root>/skeletons), then the embedded base layer. It
+// reuses fragments.BuildLayers (same unionfs assembly); skeletons have no
+// cabin-local layer, so the cabin dir is empty. The conf dirs come pre-resolved
+// from config.Vars.SkeletonDirs (which parses AI_CABIN_SKELETON_DIRS) and the
+// layer dirs from config.Vars.LayerSkeletonDirs; a missing conf dir is a strict
+// error, a missing layer dir is tolerated (a layer may not ship skeletons).
+func BuildLayers(dirs, layerDirs []string, embedFS fs.FS) (fs.FS, error) {
+	return fragments.BuildLayers(dirs, layerDirs, "", embedFS)
 }
 
 // Apply copies a Class 1 skeleton to dest via the fragments engine. The

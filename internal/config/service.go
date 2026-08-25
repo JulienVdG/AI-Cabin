@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -260,19 +259,22 @@ func (s *ConfigService) BuildDefaultProfile(name string) (*Profile, error) {
 //
 // The persisted key set is bounded — never the whole env:
 //   - defaults (BuildDefaultProfile: AI_CABIN_HOME/DESK/WORKDIR + GIT_AGENT_*)
+//   - the layer vars (LayerVars: a layer's layer.yaml vars: block, when the
+//     resolved AI_CABIN_LAYER_DIRS is non-empty — see the body)
 //   - the --var keys (cliVars), which act as the initial `set` of the profile
 //     CRUD and DO enlarge the set (e.g. --var AI_CABIN_DESK=/custom)
 //   - on --force with an existing profile, the existing profile's keys
 //
 // Values are resolved with ResolveVars precedence (--var > env > existing >
-// defaults): an env override on a bounded key (e.g. AI_CABIN_DESK in env) is
-// picked up for the value, but env vars outside the bounded set are dropped
-// (no PATH, no stray SCW_PROJECT_ID unless passed as --var).
+// layer vars > defaults): an env override on a bounded key (e.g. AI_CABIN_DESK
+// in env) is picked up for the value, but env vars outside the bounded set are
+// dropped (no PATH, no stray SCW_PROJECT_ID unless passed as --var).
 //
 // On a new profile (does not exist, force ignored): persisted = defaults ∪
-// --var. On --force with an existing profile: persisted = defaults ∪ --var ∪
-// existing. On an existing profile without --force: no-op, returns the existing
-// profile (the CLI warns + exit 0, mirroring `cabin add`).
+// layer vars ∪ --var. On --force with an existing profile: persisted =
+// defaults ∪ layer vars ∪ --var ∪ existing. On an existing profile without
+// --force: no-op, returns the existing profile (the CLI warns + exit 0,
+// mirroring `cabin add`).
 //
 // The merge precedence mirrors ResolveVars (--var > env > existing > defaults)
 // but is not delegated to it: ResolveVars loads the *selected* profile (axis A)
@@ -303,37 +305,70 @@ func (s *ConfigService) InitProfile(name string, cliVars []string, force bool) (
 		return nil, err
 	}
 
-	// Build the persisted var map with ResolveVars precedence:
-	// --var > env > existing (force) > defaults.
-	persisted := make(Vars, len(defaults.Vars))
-	setIfAbsent(persisted, defaults.Vars) // defaults first (lowest precedence)
-
+	// On --force with an existing profile, its keys form a persistence tier.
+	var existing *Profile
 	if force && exists {
-		existing, err := s.LoadProfile(name)
+		existing, err = s.LoadProfile(name)
 		if err != nil {
 			return nil, fmt.Errorf("load existing profile: %w", err)
 		}
-		setIfAbsent(persisted, existing.Vars) // existing wins over defaults
 	}
 
-	// Env: only the keys already in `persisted` (the bounded set) are updated
-	// from env — env overrides default/existing values but does NOT enlarge the
-	// set (no PATH stray). Precedence so far: env > existing > defaults.
-	for k := range persisted {
-		if v, ok := os.LookupEnv(k); ok {
-			persisted[k] = v
+	cliVarsMap, err := parseCLIVars(cliVars)
+	if err != nil {
+		return nil, err
+	}
+	env := EnvironMap()
+
+	// The active layer dirs gate the layer vars tier, resolved with the var
+	// precedence (--var > env > existing > defaults).
+	activeLayerVar := ""
+	if existing != nil {
+		if v, ok := existing.Vars[LayerDirsEnvVar]; ok {
+			activeLayerVar = v
+		}
+	}
+	if v, ok := env[LayerDirsEnvVar]; ok {
+		activeLayerVar = v
+	}
+	if v, ok := cliVarsMap[LayerDirsEnvVar]; ok {
+		activeLayerVar = v
+	}
+	layerVars, err := LayerVars(SplitPathList(activeLayerVar))
+	if err != nil {
+		return nil, err
+	}
+
+	// Env overrides only the persisted bounded set (defaults, layer and existing
+	// keys), never stray env vars (no PATH, no SCW_PROJECT_ID unless passed as
+	// --var). Build that set, then the env slice restricted to it. The layer
+	// dirs var is added explicitly — it is not a default, but an env-exported
+	// value must persist when it activates a layer.
+	bounded := make(Vars, 1+len(defaults.Vars)+len(layerVars))
+	bounded[LayerDirsEnvVar] = ""
+	if existing != nil {
+		setIfAbsent(bounded, existing.Vars)
+	}
+	setIfAbsent(bounded, layerVars)
+	setIfAbsent(bounded, defaults.Vars)
+	envRestricted := make(Vars)
+	for k := range bounded {
+		if v, ok := env[k]; ok {
+			envRestricted[k] = v
 		}
 	}
 
-	// --var (cliVars): highest precedence and DOES enlarge the set (a --var key
-	// not in defaults/existing is added — the initial `set` of the CRUD).
-	for _, kv := range cliVars {
-		k, v, ok := strings.Cut(kv, "=")
-		if !ok || k == "" {
-			return nil, fmt.Errorf("invalid --var %q: expected KEY=VAL", kv)
-		}
-		persisted[k] = v
+	// Build the persisted map with the same first-wins helper, highest priority
+	// first: --var > env > existing > layer vars > defaults. --var also enlarges
+	// the set (the initial `set` of the CRUD).
+	persisted := make(Vars, len(bounded)+len(cliVarsMap))
+	setIfAbsent(persisted, cliVarsMap)
+	setIfAbsent(persisted, envRestricted)
+	if existing != nil {
+		setIfAbsent(persisted, existing.Vars)
 	}
+	setIfAbsent(persisted, layerVars)
+	setIfAbsent(persisted, defaults.Vars)
 
 	profile := &Profile{Name: name, Vars: persisted}
 	if err := s.SaveProfile(profile); err != nil {

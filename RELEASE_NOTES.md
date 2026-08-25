@@ -10,6 +10,17 @@ release time.
 
 ## Unreleased
 
+### New features
+
+- **Layer activation** — `AI_CABIN_LAYER_DIRS` activates a self-contained
+  override root (per profile): `<layer>/fragments` prepends the fragment
+  chain (below `AI_CABIN_FRAGMENTS_DIRS`), `<layer>/skeletons` joins the
+  skeleton catalogue, and an optional `<layer>/layer.yaml` `vars:` block
+  contributes **profile defaults**. Setting it at profile creation — via
+  `--var AI_CABIN_LAYER_DIRS=...` or an exported env var at `cabin setup`/
+  `cabin profile init` — persists it in the profile var. A layer may
+  carry only some subdirs (a fragments-only root is valid and tolerated).
+
 ## v1.1.0
 
 ### Breaking changes

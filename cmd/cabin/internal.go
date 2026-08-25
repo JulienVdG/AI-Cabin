@@ -64,7 +64,7 @@ func buildFragmentLayers(cabinPath string, vars config.Vars) (fs.FS, string, err
 	if err != nil {
 		return nil, cabinLocal, err
 	}
-	merged, err := fragments.BuildLayers(vars.FragmentsDirs(), cabinLocal, embedFS)
+	merged, err := fragments.BuildLayers(vars.FragmentsDirs(), vars.LayerFragmentDirs(), cabinLocal, embedFS)
 	if err != nil {
 		return nil, cabinLocal, err
 	}

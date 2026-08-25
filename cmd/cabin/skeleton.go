@@ -276,7 +276,7 @@ func buildSkeletonLayers() (fs.FS, error) {
 	if err != nil {
 		return nil, err
 	}
-	return skeletons.BuildLayers(config.Vars(vars).SkeletonDirs(), emb)
+	return skeletons.BuildLayers(config.Vars(vars).SkeletonDirs(), config.Vars(vars).LayerSkeletonDirs(), emb)
 }
 
 // completeDeskSkeletonNames completes the --skeleton flag of `cabin profile

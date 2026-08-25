@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -12,6 +13,17 @@ import (
 // + embed). It is resolved as a profile var (a profile may set it, --var/env
 // can override it), so it reaches Vars via the standard ResolveVars path.
 const FragmentsDirsEnvVar = "AI_CABIN_FRAGMENTS_DIRS"
+
+// LayerDirsEnvVar is the comma-separated list of layer roots (the root of a
+// self-contained override set; a layer contributes <root>/fragments to the
+// fragment chain, <root>/skeletons to the skeleton catalogue, and its
+// layer.yaml vars: block as profile defaults). Each entry is ~-expanded; first
+// in the list wins (like $PATH). Resolved as a profile var so it reaches Vars
+// via the standard ResolveVars path and is activated per profile — never
+// globally in config.yaml, so a profile does not import another profile's
+// layers. Unset/empty means no layer (fragments/skeletons then resolve from
+// their own vars + embedded alone).
+const LayerDirsEnvVar = "AI_CABIN_LAYER_DIRS"
 
 // SkeletonDirsEnvVar is the comma-separated list of skeleton directories (the
 // conf layer of the Class 1 skeleton fallback chain, highest priority). Each
@@ -150,6 +162,47 @@ func (v Vars) FragmentsDirs() []string {
 // Pure: no stat, no disk — existence is validated by BuildLayers.
 func (v Vars) SkeletonDirs() []string {
 	return SplitPathList(v[SkeletonDirsEnvVar])
+}
+
+// LayerDirs resolves the active layer roots from AI_CABIN_LAYER_DIRS in the
+// view. A layer is a self-contained override root: <root>/fragments feeds the
+// fragment fallback chain, <root>/skeletons feeds the skeleton catalogue, and
+// <root>/layer.yaml contributes profile-default vars. Each entry is ~-expanded
+// via SplitPathList (same PATH-style convention as FragmentsDirs/SkeletonDirs).
+// Returns nil when the var is unset/empty. Pure: no stat, no disk — existence
+// of a <root>/<subdir> is checked (and a missing one tolerated) by the caller
+// when it builds the layers.
+func (v Vars) LayerDirs() []string {
+	return SplitPathList(v[LayerDirsEnvVar])
+}
+
+// LayerDirsSubdir returns <root>/<subdir> for each active layer root (LayerDirs),
+// preserving order (first in the list wins, PATH convention). A layer is a root
+// that may carry only some subdirs (the fragment + skeleton contributions are
+// independent), so these dirs are used tolerantly by the callers: a missing
+// subdir is skipped, not an error. Pure: path join only, no stat.
+func (v Vars) LayerDirsSubdir(sub string) []string {
+	roots := v.LayerDirs()
+	if len(roots) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(roots))
+	for _, r := range roots {
+		out = append(out, filepath.Join(r, sub))
+	}
+	return out
+}
+
+// LayerFragmentDirs returns the <root>/fragments dirs derived from the active
+// layers (the fragment-chain contribution of a layer). See LayerDirsSubdir.
+func (v Vars) LayerFragmentDirs() []string {
+	return v.LayerDirsSubdir("fragments")
+}
+
+// LayerSkeletonDirs returns the <root>/skeletons dirs derived from the active
+// layers (the catalogue contribution of a layer). See LayerDirsSubdir.
+func (v Vars) LayerSkeletonDirs() []string {
+	return v.LayerDirsSubdir("skeletons")
 }
 
 // SplitPathList splits a comma-separated path list, trims whitespace, and

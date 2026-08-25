@@ -6,8 +6,9 @@
 // (no printing, no --force — the CLI in cmd/cabin owns the UX).
 //
 // The fallback chain is a union fs.FS (first-wins like $PATH):
-// AI_CABIN_FRAGMENTS_DIRS entries (conf) > cabin-local dir (dev) > embedded
-// base layer. BuildLayers constructs it from os.DirFS layers + the embed FS.
+// AI_CABIN_FRAGMENTS_DIRS entries (conf) > <layer>/fragments (layer-derived)
+// > cabin-local dir (dev) > embedded base layer. BuildLayers constructs it
+// from os.DirFS layers + the embed FS.
 //
 // Materialize reads a bundle's manifest (deps.yaml or setup.yaml) and writes
 // each declared fragment to a destination root (<cabin>/.deps for deps,
@@ -56,17 +57,22 @@ const (
 )
 
 // BuildLayers constructs the fallback chain as a union fs.FS, ordered highest
-// priority first (first-wins like $PATH): the conf dirs, then the cabin-local
-// dir (dev), then the embedded base layer. Each conf dir is an os.DirFS layer;
-// cabin-local is an os.DirFS on the cabin dir; embedFS is the base (typically
-// embedded.Fragments()).
+// priority first (first-wins like $PATH): the explicit conf dirs, then the
+// layer-derived dirs, then the cabin-local dir (dev), then the embedded base
+// layer. Each conf/layer/cabin dir is an os.DirFS layer; embedFS is the base
+// (typically embedded.Fragments()).
 //
-// The conf dirs come pre-resolved from config.Vars.FragmentsDirs (which parses
-// AI_CABIN_FRAGMENTS_DIRS: comma-split + ~ expansion); BuildLayers does not
-// re-parse the env var. A missing dir is a strict error (no silent skip of a
-// typo'd path — a misconfigured override layer should fail loudly, not
-// silently drop). Returns an error if no layer is configured at all.
-func BuildLayers(dirs []string, cabinDir string, embedFS fs.FS) (fs.FS, error) {
+// dirs (the explicit conf dirs) come pre-resolved from config.Vars.FragmentsDirs
+// (which parses AI_CABIN_FRAGMENTS_DIRS: comma-split + ~ expansion); layerDirs
+// come pre-resolved from the active layer roots (config.Vars.LayerFragmentDirs,
+// <root>/fragments). BuildLayers does not re-parse the env var. A missing
+// explicit dir (or cabinLocal) is a strict error — no silent skip of a typo'd
+// path; a misconfigured override layer should fail loudly. A missing layerDirs
+// entry is tolerated instead: a layer is a root that may carry only some
+// subdirs (fragments vs skeletons are independent contributions), so an absent
+// <root>/fragments must not fail resolutions that are only skeleton-driven.
+// Returns an error if no layer is configured at all.
+func BuildLayers(dirs, layerDirs []string, cabinDir string, embedFS fs.FS) (fs.FS, error) {
 	var layers []fs.FS
 
 	for _, dir := range dirs {
@@ -74,6 +80,14 @@ func BuildLayers(dirs []string, cabinDir string, embedFS fs.FS) (fs.FS, error) {
 			return nil, fmt.Errorf("fragment dir %q: %w", dir, err)
 		}
 		layers = append(layers, os.DirFS(dir))
+	}
+
+	for _, dir := range layerDirs {
+		// Tolerate an absent (or not-a-dir) layer subdir: a layer is a root
+		// that may not carry every subdir. See the doc comment above.
+		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+			layers = append(layers, os.DirFS(dir))
+		}
 	}
 
 	if cabinDir != "" {
@@ -88,7 +102,7 @@ func BuildLayers(dirs []string, cabinDir string, embedFS fs.FS) (fs.FS, error) {
 	}
 
 	if len(layers) == 0 {
-		return nil, errors.New("no fragment layers configured (set AI_CABIN_FRAGMENTS_DIRS, provide a cabin dir, or an embed FS)")
+		return nil, errors.New("no fragment layers configured (set AI_CABIN_FRAGMENTS_DIRS, provide a layer or cabin dir, or an embed FS)")
 	}
 
 	return unionfs.New(layers...), nil

@@ -57,7 +57,7 @@ func TestBuildLayers(t *testing.T) {
 		writeLayer(t, cabinDir, map[string]string{"base/shared.txt": "cabin", "base/only-cabin.txt": "cabin"})
 		embedFS := fstest.MapFS{"base/shared.txt": {Data: []byte("embed")}, "base/only-embed.txt": {Data: []byte("embed")}}
 
-		merged, err := fragments.BuildLayers([]string{confDir}, cabinDir, embedFS)
+		merged, err := fragments.BuildLayers([]string{confDir}, nil, cabinDir, embedFS)
 		require.NoError(t, err)
 
 		assert.Equal(t, "conf", readFS(t, merged, "base/shared.txt"))
@@ -74,7 +74,7 @@ func TestBuildLayers(t *testing.T) {
 		writeLayer(t, dir1, map[string]string{"base/x.txt": "1"})
 		writeLayer(t, dir2, map[string]string{"base/x.txt": "2", "base/y.txt": "2"})
 
-		merged, err := fragments.BuildLayers([]string{dir1, dir2}, "", nil)
+		merged, err := fragments.BuildLayers([]string{dir1, dir2}, nil, "", nil)
 		require.NoError(t, err)
 
 		assert.Equal(t, "1", readFS(t, merged, "base/x.txt")) // dir1 wins over dir2
@@ -82,19 +82,65 @@ func TestBuildLayers(t *testing.T) {
 	})
 
 	t.Run("MissingConfDirIsStrictError", func(t *testing.T) {
-		_, err := fragments.BuildLayers([]string{"/does/not/exist"}, "", nil)
+		_, err := fragments.BuildLayers([]string{"/does/not/exist"}, nil, "", nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "fragment dir")
 	})
 
+	t.Run("LayerDirsRankAboveCabinLocal", func(t *testing.T) {
+		// A layer's <root>/fragments sits between explicit conf dirs and the
+		// cabin-local dir: it shadows cabin-local + embed but yields to the
+		// explicit conf dirs (which were asserted above).
+		layerDir := t.TempDir()
+		writeLayer(t, layerDir, map[string]string{"base/shared.txt": "layer", "base/only-layer.txt": "layer"})
+		cabinDir := t.TempDir()
+		writeLayer(t, cabinDir, map[string]string{"base/shared.txt": "cabin", "base/only-cabin.txt": "cabin"})
+		embedFS := fstest.MapFS{"base/shared.txt": {Data: []byte("embed")}}
+
+		merged, err := fragments.BuildLayers(nil, []string{layerDir}, cabinDir, embedFS)
+		require.NoError(t, err)
+
+		assert.Equal(t, "layer", readFS(t, merged, "base/shared.txt")) // layer > cabin-local > embed
+		assert.Equal(t, "layer", readFS(t, merged, "base/only-layer.txt"))
+		assert.Equal(t, "cabin", readFS(t, merged, "base/only-cabin.txt"))
+	})
+
+	t.Run("MultipleLayerDirsFirstWins", func(t *testing.T) {
+		// Two layer-derived fragment dirs in AI_CABIN_LAYER_DIRS order: the
+		// first wins, the second contributes its own files.
+		l1 := t.TempDir()
+		writeLayer(t, l1, map[string]string{"base/x.txt": "1", "base/only-1.txt": "1"})
+		l2 := t.TempDir()
+		writeLayer(t, l2, map[string]string{"base/x.txt": "2", "base/only-2.txt": "2"})
+
+		merged, err := fragments.BuildLayers(nil, []string{l1, l2}, "", nil)
+		require.NoError(t, err)
+
+		assert.Equal(t, "1", readFS(t, merged, "base/x.txt")) // l1 wins
+		assert.Equal(t, "1", readFS(t, merged, "base/only-1.txt"))
+		assert.Equal(t, "2", readFS(t, merged, "base/only-2.txt"))
+	})
+
+	t.Run("MissingLayerSubdirIsTolerated", func(t *testing.T) {
+		// A layer root without a fragments/ subdir is skipped, not a strict
+		// error (a layer may carry only some subdirs — e.g. skeletons-only, or
+		// the fragments-only reference layer when resolving skeletons).
+		layerRoot := t.TempDir() // exists but has no fragments/ subdir
+		emb := fstest.MapFS{"base/shared.txt": {Data: []byte("embed")}}
+
+		merged, err := fragments.BuildLayers(nil, []string{layerRoot}, "", emb)
+		require.NoError(t, err)
+		assert.Equal(t, "embed", readFS(t, merged, "base/shared.txt"))
+	})
+
 	t.Run("MissingCabinDirIsStrictError", func(t *testing.T) {
-		_, err := fragments.BuildLayers(nil, "/does/not/exist", nil)
+		_, err := fragments.BuildLayers(nil, nil, "/does/not/exist", nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cabin-local")
 	})
 
 	t.Run("NoLayersConfiguredErrors", func(t *testing.T) {
-		_, err := fragments.BuildLayers(nil, "", nil)
+		_, err := fragments.BuildLayers(nil, nil, "", nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no fragment layers")
 	})
@@ -173,7 +219,7 @@ func TestMaterialize(t *testing.T) {
 		// collisions with agent profiles (pi.json, opencode.json).
 		embedFS, err := embedded.Fragments()
 		require.NoError(t, err)
-		merged, err := fragments.BuildLayers(nil, "", embedFS)
+		merged, err := fragments.BuildLayers(nil, nil, "", embedFS)
 		require.NoError(t, err)
 
 		// --- deps facet (TruncateCreator): socat entrypoint script into .deps/.
@@ -354,7 +400,7 @@ func TestMaterialize(t *testing.T) {
 		require.NoError(t, os.WriteFile(plain, []byte("#!/bin/bash\n"), 0o644))
 		require.NoError(t, os.WriteFile(filepath.Join(src, "base", "deps.yaml"), []byte("mirror: deps/\n"), 0o644))
 
-		merged, err := fragments.BuildLayers([]string{src}, "", nil)
+		merged, err := fragments.BuildLayers([]string{src}, nil, "", nil)
 		require.NoError(t, err)
 
 		dest := t.TempDir()
@@ -467,7 +513,7 @@ func TestMaterialize(t *testing.T) {
 		// fragments end-to-end through BuildLayers + Materialize.
 		embedFS, err := embedded.Fragments()
 		require.NoError(t, err)
-		merged, err := fragments.BuildLayers(nil, "", embedFS)
+		merged, err := fragments.BuildLayers(nil, nil, "", embedFS)
 		require.NoError(t, err)
 
 		dest := t.TempDir()
@@ -681,7 +727,7 @@ func TestResolveGreywallProfiles(t *testing.T) {
 		// reproduces the profile list the pi wrapper consumes.
 		embedFS, err := embedded.Fragments()
 		require.NoError(t, err)
-		merged, err := fragments.BuildLayers(nil, "", embedFS)
+		merged, err := fragments.BuildLayers(nil, nil, "", embedFS)
 		require.NoError(t, err)
 
 		header, err := cabin.ParseHeader([]byte(`ai-cabin:
@@ -702,7 +748,7 @@ func TestResolveGreywallProfiles(t *testing.T) {
 		// identified in Jalon 2 (forward-* not referenced by wrappers).
 		embedFS, err := embedded.Fragments()
 		require.NoError(t, err)
-		merged, err := fragments.BuildLayers(nil, "", embedFS)
+		merged, err := fragments.BuildLayers(nil, nil, "", embedFS)
 		require.NoError(t, err)
 
 		header, err := cabin.ParseHeader([]byte(`ai-cabin:

@@ -249,12 +249,11 @@ func applyDeskSkeleton(skeleton, dest string, vars map[string]string, force bool
 		skeleton = "minimal"
 	}
 
-	dirs := config.Vars(vars).SkeletonDirs()
 	emb, err := embedded.Skeletons()
 	if err != nil {
 		return nil, err
 	}
-	merged, err := skeletons.BuildLayers(dirs, emb)
+	merged, err := skeletons.BuildLayers(config.Vars(vars).SkeletonDirs(), config.Vars(vars).LayerSkeletonDirs(), emb)
 	if err != nil {
 		return nil, err
 	}

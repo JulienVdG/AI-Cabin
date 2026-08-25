@@ -59,19 +59,17 @@ func (s *ConfigService) ResolveCabin(cabinFlag, profileFlag string) (string, err
 func (s *ConfigService) ResolveVars(profileFlag string, cliVars []string) (Vars, error) {
 	view := make(Vars)
 
-	// 1. CLI overrides (--var, --profile sets AI_CABIN_PROFILE).
-	for _, kv := range cliVars {
-		k, v, ok := strings.Cut(kv, "=")
-		if !ok || k == "" {
-			return nil, fmt.Errorf("invalid --var %q: expected KEY=VAL", kv)
-		}
-		view[k] = v
+	// CLI overrides (--var, --profile sets AI_CABIN_PROFILE).
+	cliVarsMap, err := parseCLIVars(cliVars)
+	if err != nil {
+		return nil, err
 	}
+	setIfAbsent(view, cliVarsMap)
 	if profileFlag != "" {
 		view[ProfileEnvVar] = profileFlag
 	}
 
-	// 2. Process env (set if not present, so --var/--profile win). EnvironMap
+	// Process env (set if not present, so --var/--profile win). EnvironMap
 	// skips empty/whitespace keys (`=value`, seen in some sandboxed envs) and
 	// the shell's special `_` variable.
 	for k, v := range EnvironMap() {
@@ -90,7 +88,7 @@ func (s *ConfigService) ResolveVars(profileFlag string, cliVars []string) (Vars,
 		name = current
 	}
 
-	// 3. Selected profile file (if any). Missing selection is skipped; an
+	// Selected profile file (if any). Missing selection is skipped; an
 	// explicitly selected missing file is an error.
 	if name != "" {
 		// Reflect the resolved profile in the view so setenv exports
@@ -115,14 +113,14 @@ func (s *ConfigService) ResolveVars(profileFlag string, cliVars []string) (Vars,
 		setIfAbsent(view, profile.Vars)
 	}
 
-	// 4. Internal defaults — last resort.
+	// Internal defaults — last resort.
 	defaults, err := s.BuildDefaultProfile("")
 	if err != nil {
 		return nil, fmt.Errorf("build default profile: %w", err)
 	}
 	setIfAbsent(view, defaults.Vars)
 
-	// 5. Normalize typed vars whose profile/env form is permissive (CSV,
+	// Normalize typed vars whose profile/env form is permissive (CSV,
 	// JSON array, ...) into the canonical form templates expect. Applied
 	// after assembly so --var and env are normalized too, not just profile.
 	sanitizeTypedVars(view)
@@ -137,6 +135,20 @@ func setIfAbsent(dst, src map[string]string) {
 			dst[k] = v
 		}
 	}
+}
+
+// parseCLIVars validates and maps a --var list (KEY=VAL) into a Vars map,
+// shared by ResolveVars and InitProfile so the KEY=VAL shape is enforced once.
+func parseCLIVars(cliVars []string) (Vars, error) {
+	out := make(Vars, len(cliVars))
+	for _, kv := range cliVars {
+		k, v, ok := strings.Cut(kv, "=")
+		if !ok || k == "" {
+			return nil, fmt.Errorf("invalid --var %q: expected KEY=VAL", kv)
+		}
+		out[k] = v
+	}
+	return out, nil
 }
 
 // sanitizeTypedVars normalizes vars whose input form is permissive (CSV,

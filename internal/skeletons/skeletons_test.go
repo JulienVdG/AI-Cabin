@@ -261,3 +261,49 @@ func TestApply(t *testing.T) {
 type bareFS struct{}
 
 func (bareFS) Open(string) (fs.File, error) { return nil, fs.ErrNotExist }
+
+// TestBuildLayersCatalogue covers the layer contribution to the skeleton
+// catalogue: a <root>/skeletons dir is resolved by name over the embedded
+// catalogue, and a layer root without a skeletons/ subdir is tolerated (a
+// layer may be fragments-only).
+func TestBuildLayersCatalogue(t *testing.T) {
+	// On-disk layer with a skeletons/ subdir shipping a custom project skeleton.
+	layerRoot := t.TempDir()
+	skelDir := filepath.Join(layerRoot, "skeletons")
+	require.NoError(t, os.MkdirAll(filepath.Join(skelDir, "corp_go"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(skelDir, "corp_go", "skeleton.yaml"),
+		[]byte("entries:\n  - src: main.go\n    dst: main.go\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(skelDir, "corp_go", "main.go"),
+		[]byte("package main\n"), 0o644))
+	emb := fstest.MapFS{
+		"desks/minimal/skeleton.yaml":     {Data: []byte("mirror: content\n")},
+		"desks/minimal/content/AGENTS.md": {Data: []byte("# Agent rules\n")},
+		"corp_go/skeleton.yaml":           {Data: []byte("mirror: content\n")},
+		"corp_go/content/README.md":       {Data: []byte("embedded\n")},
+	}
+
+	t.Run("LayerSkeletonsResolvedOverEmbed", func(t *testing.T) {
+		merged, err := skeletons.BuildLayers(nil, []string{filepath.Join(layerRoot, "skeletons")}, emb)
+		require.NoError(t, err)
+
+		dest := t.TempDir()
+		written, err := skeletons.Apply(merged, "corp_go", dest, nil, nil, writestrategy.SkipCreator{})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"main.go"}, written)
+		// The layer version shadows the embedded corps_go of the same name.
+		assert.Equal(t, "package main\n", readDest(t, dest, "main.go"))
+		// Embedded minimal desk still reachable.
+		_, err = merged.Open("desks/minimal/skeleton.yaml")
+		require.NoError(t, err)
+	})
+
+	t.Run("LayerWithoutSkeletonsTolerated", func(t *testing.T) {
+		// A layer root with no skeletons/ subdir must not break resolution: the
+		// catalogue still resolves the embedded minimal desk.
+		merged, err := skeletons.BuildLayers(nil, []string{layerRoot}, emb)
+		require.NoError(t, err)
+
+		_, err = merged.Open("desks/minimal/skeleton.yaml")
+		require.NoError(t, err)
+	})
+}

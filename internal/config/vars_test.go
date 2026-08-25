@@ -140,3 +140,24 @@ func TestEnvironMap(t *testing.T) {
 	_, hasUnderscore := env["_"]
 	assert.False(t, hasUnderscore)
 }
+
+// TestLayerDirs covers the layer-root parsing (AI_CABIN_LAYER_DIRS) and the
+// <root>/<subdir> derivation shared by the fragment-chain and skeleton-catalogue
+// contributions of a layer. LayerDirs reuses SplitPathList (comma split + ~
+// expansion, covered there), so here we only pin the subdir join and the
+// empty/no-layer cases.
+func TestLayerDirs(t *testing.T) {
+	t.Run("EmptyIsNoLayer", func(t *testing.T) {
+		v := config.Vars{}
+		assert.Nil(t, v.LayerDirs())
+		assert.Nil(t, v.LayerFragmentDirs())
+		assert.Nil(t, v.LayerSkeletonDirs())
+	})
+
+	t.Run("ParsesAndJoinsSubdirs", func(t *testing.T) {
+		v := config.Vars{config.LayerDirsEnvVar: "/layers/a,/layers/b"}
+		assert.Equal(t, []string{"/layers/a", "/layers/b"}, v.LayerDirs())
+		assert.Equal(t, []string{"/layers/a/fragments", "/layers/b/fragments"}, v.LayerFragmentDirs())
+		assert.Equal(t, []string{"/layers/a/skeletons", "/layers/b/skeletons"}, v.LayerSkeletonDirs())
+	})
+}
