@@ -66,13 +66,12 @@ func unsetEnv(t *testing.T, keys ...string) {
 
 // newInitService builds a ConfigService backed by a temp config dir with a
 // fixed home (/tmp/test-home) and git identity, so the defaults are stable
-// across sub-cases. The AI_CABIN_*/GIT_AGENT_* env vars are unset (via the
-// shared unsetCabinEnv helper) so the defaults from the mock providers apply;
-// sub-cases that test env override set them explicitly via t.Setenv.
+// across sub-cases. TestMain blanks the AI_CABIN_*/GIT_AGENT_* host env, so
+// the defaults from the mock providers apply; sub-cases that test env
+// override set them explicitly via t.Setenv.
 func newInitService(t *testing.T) *config.ConfigService {
 	t.Helper()
 	setupTestConfig(t)
-	unsetCabinEnv(t)
 	configDir, err := config.GetConfigDir()
 	require.NoError(t, err)
 	require.NoError(t, os.MkdirAll(configDir, 0o755))
@@ -931,7 +930,6 @@ func TestConfigService_InitProfile(t *testing.T) {
 		// When BuildDefaultProfile fails (home dir lookup error), InitProfile
 		// propagates the error and writes nothing.
 		setupTestConfig(t)
-		unsetCabinEnv(t)
 		configDir, err := config.GetConfigDir()
 		require.NoError(t, err)
 		require.NoError(t, os.MkdirAll(configDir, 0o755))
