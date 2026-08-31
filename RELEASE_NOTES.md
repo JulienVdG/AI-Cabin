@@ -10,6 +10,14 @@ release time.
 
 ## Unreleased
 
+### Features
+
+- **`cabin version`** — prints the cabin version derived from the Go build
+  info: the VCS tag when the revision is exactly a release tag, else the
+  module version from a `go install @VERSION` build, else `(devel)`. When
+  built from a checkout it also prints the revision, build date and
+  dirty-tree status, so the exact source revision is always pinned.
+
 ## v1.2.0
 
 ### Features
