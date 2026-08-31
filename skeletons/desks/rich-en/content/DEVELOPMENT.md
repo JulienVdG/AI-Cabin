@@ -173,17 +173,18 @@ cat Makefile
 grep "^[a-z].*:" Makefile
 ```
 
-### Example (cabin/greymeta)
+### Example
 
 ```bash
 # ❌ Don't propose
-docker-compose build
-docker-compose up -d
+go test ./...
+go tool goimports -w .
 
-# ✅ Use Makefile targets
-make docker-build      # Includes setup dependency
-make docker-up         # Includes setup dependency
-make docker-shell      # Wrapper for docker compose exec
+# ✅ Use the root Taskfile targets
+make test      # Runs go test ./...
+make fmt       # Formats Go code (goimports -local)
+make lint      # Runs golangci-lint
+make build     # Builds the CLI into bin/
 ```
 
 ### When to Use Makefile
