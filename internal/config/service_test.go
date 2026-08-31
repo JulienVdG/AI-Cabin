@@ -723,6 +723,229 @@ func TestConfigService_GetActiveProfile(t *testing.T) {
 	})
 }
 
+// TestConfigService_ResolveProfile covers the active-profile name resolution
+// that display sites (profile list/show/group help) use to mark and warn about
+// the effective profile: --profile flag > AI_CABIN_PROFILE env > config
+// currentProfile, with Use recording the persisted (use) selection and Source
+// the layer that selected the name.
+func TestConfigService_ResolveProfile(t *testing.T) {
+	writeConfig := func(t *testing.T, svc *config.ConfigService, current string) {
+		t.Helper()
+		// Compute the dir after newTestService/setupTestConfig redirected
+		// XDG_CONFIG_HOME to a writable temp dir (the sandbox ~/.config is
+		// read-only).
+		configDir, err := config.GetConfigDir()
+		if err != nil {
+			t.Fatalf("GetConfigDir() error = %v", err)
+		}
+		if err := os.MkdirAll(configDir, 0o755); err != nil {
+			t.Fatalf("failed to create config dir: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(configDir, config.ConfigFileName), []byte("currentProfile: "+current+"\n"), 0o644); err != nil {
+			t.Fatalf("failed to write config: %v", err)
+		}
+	}
+
+	t.Run("no config yet returns empty config selection", func(t *testing.T) {
+		svc := newTestService(t)
+		sel, err := svc.ResolveProfile("", "", nil)
+		if err != nil {
+			t.Fatalf("ResolveProfile() error = %v", err)
+		}
+		if sel.Name != "" || sel.Use != "" {
+			t.Errorf("ResolveProfile() = %+v, want empty Name and Use", sel)
+		}
+		if sel.Source != config.ProfileSourceConfig {
+			t.Errorf("ResolveProfile() Source = %q, want %q", sel.Source, config.ProfileSourceConfig)
+		}
+	})
+
+	t.Run("flag with no config returns empty Use and counts as overridden", func(t *testing.T) {
+		svc := newTestService(t)
+		sel, err := svc.ResolveProfile("", "flagprof", nil)
+		if err != nil {
+			t.Fatalf("ResolveProfile() error = %v", err)
+		}
+		if sel.Name != "flagprof" || sel.Use != "" {
+			t.Errorf("ResolveProfile() = %+v, want Name=flagprof and empty Use", sel)
+		}
+		if sel.Source != config.ProfileSourceFlag {
+			t.Errorf("ResolveProfile() Source = %q, want %q", sel.Source, config.ProfileSourceFlag)
+		}
+		if !sel.Overridden() {
+			t.Errorf("ResolveProfile() = %+v, Overridden() = false, want true", sel)
+		}
+	})
+
+	t.Run("config currentProfile selected when no flag or env", func(t *testing.T) {
+		svc := newTestService(t)
+		writeConfig(t, svc, "perso")
+		sel, err := svc.ResolveProfile("", "", nil)
+		if err != nil {
+			t.Fatalf("ResolveProfile() error = %v", err)
+		}
+		if sel.Name != "perso" {
+			t.Errorf("ResolveProfile() Name = %q, want %q", sel.Name, "perso")
+		}
+		if sel.Source != config.ProfileSourceConfig {
+			t.Errorf("ResolveProfile() Source = %q, want %q", sel.Source, config.ProfileSourceConfig)
+		}
+		if sel.Use != "perso" {
+			t.Errorf("ResolveProfile() Use = %q, want %q (same as config)", sel.Use, "perso")
+		}
+	})
+
+	t.Run("AI_CABIN_PROFILE env overrides config currentProfile", func(t *testing.T) {
+		svc := newTestService(t)
+		writeConfig(t, svc, "perso")
+		t.Setenv(config.ProfileEnvVar, "envprof")
+		sel, err := svc.ResolveProfile("", "", nil)
+		if err != nil {
+			t.Fatalf("ResolveProfile() error = %v", err)
+		}
+		if sel.Name != "envprof" {
+			t.Errorf("ResolveProfile() Name = %q, want %q", sel.Name, "envprof")
+		}
+		if sel.Source != config.ProfileSourceEnv {
+			t.Errorf("ResolveProfile() Source = %q, want %q", sel.Source, config.ProfileSourceEnv)
+		}
+		if sel.Use != "perso" {
+			t.Errorf("ResolveProfile() Use = %q, want %q (config kept separate)", sel.Use, "perso")
+		}
+	})
+
+	t.Run("--profile flag overrides env and config", func(t *testing.T) {
+		svc := newTestService(t)
+		writeConfig(t, svc, "perso")
+		t.Setenv(config.ProfileEnvVar, "envprof")
+		sel, err := svc.ResolveProfile("", "flagprof", nil)
+		if err != nil {
+			t.Fatalf("ResolveProfile() error = %v", err)
+		}
+		if sel.Name != "flagprof" {
+			t.Errorf("ResolveProfile() Name = %q, want %q", sel.Name, "flagprof")
+		}
+		if sel.Source != config.ProfileSourceFlag {
+			t.Errorf("ResolveProfile() Source = %q, want %q", sel.Source, config.ProfileSourceFlag)
+		}
+	})
+
+	t.Run("flag equal to config is not a divergence", func(t *testing.T) {
+		svc := newTestService(t)
+		writeConfig(t, svc, "perso")
+		sel, err := svc.ResolveProfile("", "perso", nil)
+		if err != nil {
+			t.Fatalf("ResolveProfile() error = %v", err)
+		}
+		if sel.Name != "perso" || sel.Use != "perso" {
+			t.Errorf("ResolveProfile() = %+v, want Name==Use==perso", sel)
+		}
+	})
+
+	t.Run("explicit positional name wins over flag, env and config", func(t *testing.T) {
+		svc := newTestService(t)
+		writeConfig(t, svc, "perso")
+		t.Setenv(config.ProfileEnvVar, "envprof")
+		sel, err := svc.ResolveProfile("argprof", "flagprof", nil)
+		if err != nil {
+			t.Fatalf("ResolveProfile() error = %v", err)
+		}
+		if sel.Name != "argprof" {
+			t.Errorf("ResolveProfile() Name = %q, want %q", sel.Name, "argprof")
+		}
+		if sel.Source != config.ProfileSourceArg {
+			t.Errorf("ResolveProfile() Source = %q, want %q", sel.Source, config.ProfileSourceArg)
+		}
+	})
+
+	t.Run("--var AI_CABIN_PROFILE overrides env", func(t *testing.T) {
+		svc := newTestService(t)
+		writeConfig(t, svc, "perso")
+		t.Setenv(config.ProfileEnvVar, "envprof")
+		sel, err := svc.ResolveProfile("", "", []string{"AI_CABIN_PROFILE=varprof"})
+		if err != nil {
+			t.Fatalf("ResolveProfile() error = %v", err)
+		}
+		if sel.Name != "varprof" || sel.Source != config.ProfileSourceVar {
+			t.Errorf("ResolveProfile() = %+v, want Name=varprof (Source=%q)", sel, config.ProfileSourceVar)
+		}
+	})
+
+	t.Run("--profile overrides --var AI_CABIN_PROFILE", func(t *testing.T) {
+		svc := newTestService(t)
+		writeConfig(t, svc, "perso")
+		t.Setenv(config.ProfileEnvVar, "envprof")
+		sel, err := svc.ResolveProfile("", "flagprof", []string{"AI_CABIN_PROFILE=varprof"})
+		if err != nil {
+			t.Fatalf("ResolveProfile() error = %v", err)
+		}
+		if sel.Name != "flagprof" || sel.Source != config.ProfileSourceFlag {
+			t.Errorf("ResolveProfile() = %+v, want Name=flagprof (Source=%q)", sel, config.ProfileSourceFlag)
+		}
+	})
+}
+
+// TestProfileSelection covers the Overridden and OverrideWarning helpers on
+// ProfileSelection: an override only arises when --profile or AI_CABIN_PROFILE
+// selected a name different from the use-selected profile; an explicit
+// positional name is never an override.
+func TestProfileSelection(t *testing.T) {
+	configSel := config.ProfileSelection{Name: "work", Source: config.ProfileSourceConfig, Use: "work"}
+	envSel := config.ProfileSelection{Name: "envprof", Source: config.ProfileSourceEnv, Use: "work"}
+	flagSel := config.ProfileSelection{Name: "flagprof", Source: config.ProfileSourceFlag, Use: "work"}
+	varSel := config.ProfileSelection{Name: "varprof", Source: config.ProfileSourceVar, Use: "work"}
+	argSame := config.ProfileSelection{Name: "perso", Source: config.ProfileSourceArg, Use: "perso"}
+	argDiff := config.ProfileSelection{Name: "perso", Source: config.ProfileSourceArg, Use: "work"}
+	flagUnset := config.ProfileSelection{Name: "flagprof", Source: config.ProfileSourceFlag, Use: ""}
+
+	t.Run("Overridden", func(t *testing.T) {
+		cases := []struct {
+			name string
+			sel  config.ProfileSelection
+			want bool
+		}{
+			{"config source is not overridden", configSel, false},
+			{"env diverging is overridden", envSel, true},
+			{"flag diverging is overridden", flagSel, true},
+			{"--var diverging is overridden", varSel, true},
+			{"positional same as use is not overridden", argSame, false},
+			{"positional different from use is not an override", argDiff, false},
+			{"flag with no use is overridden", flagUnset, true},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				if got := tc.sel.Overridden(); got != tc.want {
+					t.Errorf("%+v.Overridden() = %v, want %v", tc.sel, got, tc.want)
+				}
+			})
+		}
+	})
+
+	t.Run("OverrideWarning", func(t *testing.T) {
+		cases := []struct {
+			name string
+			sel  config.ProfileSelection
+			want string
+		}{
+			{"config source has no warning", configSel, ""},
+			{"positional has no warning", argDiff, ""},
+			{"env overrides use", envSel,
+				`Warning: AI_CABIN_PROFILE selects profile "envprof", which differs from the profile set by 'cabin profile use' ("work"). Use 'cabin profile use envprof' to persist it.`},
+			{"--var overrides use", varSel,
+				`Warning: --var AI_CABIN_PROFILE selects profile "varprof", which differs from the profile set by 'cabin profile use' ("work"). Use 'cabin profile use varprof' to persist it.`},
+			{"flag selects an unset profile", flagUnset,
+				`Warning: --profile selects profile "flagprof", but no profile is set with 'cabin profile use'. Use 'cabin profile use flagprof' to persist it.`},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				if got := tc.sel.OverrideWarning(); got != tc.want {
+					t.Errorf("OverrideWarning()\n got  = %q\n want = %q", got, tc.want)
+				}
+			})
+		}
+	})
+}
+
 func TestConfigService_SetProfileVar(t *testing.T) {
 	t.Run("sets var on explicit profile", func(t *testing.T) {
 		svc := newTestService(t)
@@ -1079,4 +1302,81 @@ func TestConfigService_InitProfile(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "FromB", profile.Vars["DEFAULT_MODEL"], "existing profile layer wins over env on force")
 	})
+}
+
+// TestResolveProfileMatchesResolveVars locks the guarantee that `cabin profile`
+// resolves the same active profile as the runtime commands: both go through the
+// same selector (resolveProfileName), so for identical inputs ResolveProfile's
+// Name equals the AI_CABIN_PROFILE value ResolveVars reflects into its view.
+func TestResolveProfileMatchesResolveVars(t *testing.T) {
+	writeProfile := func(t *testing.T, name string) {
+		t.Helper()
+		profilesDir, err := config.GetProfilesDir()
+		if err != nil {
+			t.Fatalf("GetProfilesDir() error = %v", err)
+		}
+		if err := os.MkdirAll(profilesDir, 0o755); err != nil {
+			t.Fatalf("failed to create profiles dir: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(profilesDir, name+".yaml"), []byte("name: "+name+"\n"), 0o644); err != nil {
+			t.Fatalf("failed to write profile: %v", err)
+		}
+	}
+	setProfileEnv := func(t *testing.T, val string) {
+		t.Helper()
+		old, had := os.LookupEnv(config.ProfileEnvVar)
+		if val == "" {
+			os.Unsetenv(config.ProfileEnvVar)
+		} else {
+			os.Setenv(config.ProfileEnvVar, val)
+		}
+		t.Cleanup(func() {
+			if had {
+				os.Setenv(config.ProfileEnvVar, old)
+			} else {
+				os.Unsetenv(config.ProfileEnvVar)
+			}
+		})
+	}
+
+	cases := []struct {
+		name, current, profileFlag, env string
+		cliVars                         []string
+	}{
+		{"config selected", "perso", "", "", nil},
+		{"flag wins over var, env and config", "perso", "flagprof", "envprof", []string{"AI_CABIN_PROFILE=varprof"}},
+		{"--var wins over env and config", "perso", "", "envprof", []string{"AI_CABIN_PROFILE=varprof"}},
+		{"env wins over config", "perso", "", "envprof", nil},
+		{"empty env falls back to config", "perso", "", "", nil},
+		{"empty --var falls back to config", "perso", "", "", []string{"AI_CABIN_PROFILE="}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := newResolveService(t)
+			configDir, err := config.GetConfigDir()
+			if err != nil {
+				t.Fatalf("GetConfigDir() error = %v", err)
+			}
+			if err := os.WriteFile(filepath.Join(configDir, config.ConfigFileName), []byte("currentProfile: "+tc.current+"\n"), 0o644); err != nil {
+				t.Fatalf("failed to write config: %v", err)
+			}
+			for _, n := range []string{"perso", "envprof", "varprof", "flagprof"} {
+				writeProfile(t, n)
+			}
+			setProfileEnv(t, tc.env)
+
+			sel, err := svc.ResolveProfile("", tc.profileFlag, tc.cliVars)
+			if err != nil {
+				t.Fatalf("ResolveProfile() error = %v", err)
+			}
+			view, err := svc.ResolveVars(tc.profileFlag, tc.cliVars)
+			if err != nil {
+				t.Fatalf("ResolveVars() error = %v", err)
+			}
+			viewName := view[config.ProfileEnvVar]
+			if sel.Name != viewName {
+				t.Errorf("ResolveProfile().Name = %q, ResolveVars()[AI_CABIN_PROFILE] = %q (want equal)", sel.Name, viewName)
+			}
+		})
+	}
 }

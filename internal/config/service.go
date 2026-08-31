@@ -211,6 +211,63 @@ func (s *ConfigService) GetActiveProfile(name string) (*Profile, error) {
 	return profile, nil
 }
 
+// ResolveProfile resolves the active profile name and its origin without
+// loading the file. Precedence: explicit positional name (profile show
+// <name>) > --profile flag > --var AI_CABIN_PROFILE > AI_CABIN_PROFILE env >
+// current profile from config.yaml. Use records the persisted selection so
+// callers can warn when the effective profile diverges from the one set with
+// `cabin profile use`. The name is resolved through resolveProfileName, the
+// same selector ResolveVars uses, so the displayed active profile always
+// matches what the runtime commands pick. Never errors on an empty selection
+// (no config yet); a malformed --var is rejected like ResolveVars.
+func (s *ConfigService) ResolveProfile(name, profileFlag string, cliVars []string) (ProfileSelection, error) {
+	use, err := s.GetCurrentProfile()
+	if err != nil {
+		return ProfileSelection{}, fmt.Errorf("failed to get current profile: %w", err)
+	}
+
+	sel := ProfileSelection{Use: use}
+	if name != "" {
+		sel.Name, sel.Source = name, ProfileSourceArg
+		return sel, nil
+	}
+	cliVarsMap, err := parseCLIVars(cliVars)
+	if err != nil {
+		return ProfileSelection{}, err
+	}
+	sel.Name, sel.Source, err = s.resolveProfileName(profileFlag, cliVarsMap, EnvironMap())
+	if err != nil {
+		return ProfileSelection{}, err
+	}
+	return sel, nil
+}
+
+// resolveProfileName returns the selected profile name and its source. It is
+// THE single place that decides which profile file is loaded, shared by
+// ResolveVars (runtime view) and ResolveProfile (cabin profile display), so
+// the two always agree on the active profile. Precedence: --profile flag >
+// --var AI_CABIN_PROFILE > AI_CABIN_PROFILE env > current profile from
+// config.yaml. cliVars is the already-validated --var map and envMap the
+// sanitized process env (EnvironMap); both callers pass the same env source
+// they use for their own assembly, so the selector has no hidden dependency
+// on the raw process env. Never errors on an empty selection (no config yet);
+// the config read error is wrapped.
+func (s *ConfigService) resolveProfileName(profileFlag string, cliVars, envMap map[string]string) (string, ProfileSource, error) {
+	switch {
+	case profileFlag != "":
+		return profileFlag, ProfileSourceFlag, nil
+	case cliVars[ProfileEnvVar] != "":
+		return cliVars[ProfileEnvVar], ProfileSourceVar, nil
+	case envMap[ProfileEnvVar] != "":
+		return envMap[ProfileEnvVar], ProfileSourceEnv, nil
+	}
+	use, err := s.GetCurrentProfile()
+	if err != nil {
+		return "", ProfileSourceConfig, fmt.Errorf("get current profile: %w", err)
+	}
+	return use, ProfileSourceConfig, nil
+}
+
 // BuildDefaultProfile creates a Profile object without writing it to disk.
 // This allows testing the profile construction logic separately from I/O.
 func (s *ConfigService) BuildDefaultProfile(name string) (*Profile, error) {

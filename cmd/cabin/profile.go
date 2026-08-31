@@ -16,11 +16,28 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// profileCmd represents the profile command
+// profileCmd represents the profile command group
 var profileCmd = &cobra.Command{
 	Use:   "profile",
 	Short: "Manage AI-Cabin profiles",
 	Long:  `Profiles define environment variables for different contexts (personal, work, etc.).`,
+	// Running `cabin profile` (no subcommand) prints the active profile on top
+	// of the subcommand help, so the current selection is visible at a glance.
+	Run: func(cmd *cobra.Command, args []string) {
+		sel, err := config.ResolveProfile("", profileFlag, cliVars)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not resolve active profile: %v\n", err)
+		} else if sel.Name == "" {
+			fmt.Println("No active profile set.")
+		} else {
+			fmt.Printf("Active profile: %s\n", sel.Name)
+			if msg := sel.OverrideWarning(); msg != "" {
+				fmt.Fprintln(os.Stderr, msg)
+			}
+		}
+		fmt.Println()
+		cmd.Help()
+	},
 }
 
 // profileListCmd represents the profile list command
@@ -46,17 +63,17 @@ var profileListCmd = &cobra.Command{
 			return
 		}
 
-		current, err := config.GetCurrentProfile()
+		// Resolve the effective profile (--profile > AI_CABIN_PROFILE > config)
+		// so the list marks the one that will actually be used, not just the
+		// config currentProfile. A resolution error only degrades the marker.
+		sel, err := config.ResolveProfile("", profileFlag, cliVars)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: could not get current profile: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Warning: could not resolve active profile: %v\n", err)
+			sel = config.ProfileSelection{}
 		}
 
 		for _, p := range profiles {
-			if p == current {
-				fmt.Printf("* %s (current)\n", p)
-			} else {
-				fmt.Printf("  %s\n", p)
-			}
+			fmt.Println(profileLine(p, sel))
 		}
 	},
 }
@@ -70,12 +87,25 @@ var profileShowCmd = &cobra.Command{
 	// <name> is completed from the available profiles.
 	ValidArgsFunction: completeProfileNames,
 	Run: func(cmd *cobra.Command, args []string) {
-		var profileName string
+		// Resolve the profile to display: a positional <name> wins, then
+		// --profile > AI_CABIN_PROFILE > config. The divergence warning is
+		// suppressed for an explicit positional (the user asked for it).
+		profileName := ""
 		if len(args) > 0 {
 			profileName = args[0]
 		}
 
-		profile, err := config.GetActiveProfile(profileName)
+		sel, err := config.ResolveProfile(profileName, profileFlag, cliVars)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		if sel.Name == "" {
+			fmt.Fprintf(os.Stderr, "Error: no current profile selected\nRun 'cabin profile init' to create a default profile, or 'cabin profile use <name>' to select one\n")
+			os.Exit(1)
+		}
+
+		profile, err := config.GetActiveProfile(sel.Name)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
@@ -99,6 +129,11 @@ var profileShowCmd = &cobra.Command{
 			for _, k := range keys {
 				fmt.Fprintf(os.Stderr, "  %s (env=%s)\n", k, overrides[k])
 			}
+		}
+
+		// Divergence of the effective profile from the one set with `use`.
+		if msg := sel.OverrideWarning(); msg != "" {
+			fmt.Fprintln(os.Stderr, msg)
 		}
 	},
 }
@@ -277,6 +312,25 @@ func applyDeskSkeleton(skeleton, dest string, vars map[string]string, force bool
 		creator = writestrategy.TruncateCreator{}
 	}
 	return skeletons.Apply(merged, skeletonRoot, dest, vars, nil, creator)
+}
+
+// profileLine renders one profile list entry. The active profile is marked
+// with a star, annotating its origin (--profile / AI_CABIN_PROFILE) when it
+// overrides the use-selected profile; the overridden use-selected profile is
+// itself flagged so the reader sees it is not the one in effect. Pure and
+// unit-testable; the list command prints each line to stdout.
+func profileLine(name string, sel config.ProfileSelection) string {
+	if name == sel.Name {
+		suffix := " (current)"
+		if sel.Overridden() {
+			suffix = fmt.Sprintf(" (current, from %s)", string(sel.Source))
+		}
+		return fmt.Sprintf("* %s%s", name, suffix)
+	}
+	if sel.Overridden() && sel.Use != "" && name == sel.Use {
+		return fmt.Sprintf("  %s (overridden)", name)
+	}
+	return "  " + name
 }
 
 func init() {

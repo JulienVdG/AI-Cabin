@@ -72,20 +72,18 @@ func (s *ConfigService) ResolveVars(profileFlag string, cliVars []string) (Vars,
 	// Process env (set if not present, so --var/--profile win). EnvironMap
 	// skips empty/whitespace keys (`=value`, seen in some sandboxed envs) and
 	// the shell's special `_` variable.
-	for k, v := range EnvironMap() {
+	environ := EnvironMap()
+	for k, v := range environ {
 		if _, present := view[k]; !present {
 			view[k] = v
 		}
 	}
 
-	// Which profile file to load: --profile > AI_CABIN_PROFILE env > current.
-	name := view[ProfileEnvVar]
-	if name == "" {
-		current, err := s.GetCurrentProfile()
-		if err != nil {
-			return nil, fmt.Errorf("get current profile: %w", err)
-		}
-		name = current
+	// Which profile file to load, resolved through the shared selector so the
+	// runtime view and `cabin profile` display agree on the active profile.
+	name, _, err := s.resolveProfileName(profileFlag, cliVarsMap, environ)
+	if err != nil {
+		return nil, err
 	}
 
 	// Selected profile file (if any). Missing selection is skipped; an

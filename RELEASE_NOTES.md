@@ -18,6 +18,12 @@ release time.
   built from a checkout it also prints the revision, build date and
   dirty-tree status, so the exact source revision is always pinned.
 
+- **Selected profile override markers** — `cabin profile list` and
+  `cabin profile show` now display the profile *actually* in effect. When
+  the active profile is overridden by `--profile` or `AI_CABIN_PROFILE`, it
+  is flagged `(current, from <source>)` and the overridden use-selected
+  profile is shown `(overridden)`, so the reader sees which one wins.
+
 ## v1.2.0
 
 ### Features
