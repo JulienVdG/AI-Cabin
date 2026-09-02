@@ -92,10 +92,12 @@ taskfile:
 func TestAssemble(t *testing.T) {
 	t.Run("DockerfileMerge", func(t *testing.T) {
 		fs := bundleFS(map[string]string{cabin.BaseBundle: baseBP, "agent-pi": piBP})
-		bps := fragments.ResolveBlueprints(fs, refs("agent-pi"))
-		sel := authoring.Selection{Name: "x", Agents: []string{"pi"}}
+		bps := fragments.ResolveBlueprints(fs, refs("agent-pi"), cabin.AICabinHeader{})
+		h := cabin.AICabinHeader{Cabin: "x", Agents: []string{"pi"}, AuthoredWith: cabin.AuthoringParams{
+			Image: authoring.DefaultBaseImage, User: authoring.DefaultUser, Home: authoring.DefaultHome,
+		}}
 		var out strings.Builder
-		if err := authoring.Assemble(bps, sel, &authoring.Files{Dockerfile: &out}); err != nil {
+		if err := authoring.Assemble(bps, h, &authoring.Files{Dockerfile: &out}); err != nil {
 			t.Fatalf("assemble: %v", err)
 		}
 		df := out.String()
@@ -131,10 +133,10 @@ compose:
     - "127.0.0.1:9090:9090"
 `
 		fs := bundleFS(map[string]string{cabin.BaseBundle: baseBP, "agent-opencode": opencodeBP})
-		bps := fragments.ResolveBlueprints(fs, refs("agent-opencode"))
-		sel := authoring.Selection{Name: "mycabin", Agents: []string{"opencode"}}
+		bps := fragments.ResolveBlueprints(fs, refs("agent-opencode"), cabin.AICabinHeader{})
+		h := cabin.AICabinHeader{Cabin: "mycabin", Agents: []string{"opencode"}}
 		var cf strings.Builder
-		if err := authoring.Assemble(bps, sel, &authoring.Files{Compose: &cf}); err != nil {
+		if err := authoring.Assemble(bps, h, &authoring.Files{Compose: &cf}); err != nil {
 			t.Fatalf("assemble: %v", err)
 		}
 		got := cf.String()
@@ -145,6 +147,8 @@ compose:
 			"    build:",
 			"      context: .",
 			"      dockerfile: ai-cabin.Dockerfile",
+			"      args:",
+			"        - HOST_UID=${HOST_UID:-1000}",
 			"    image: mycabin",
 			"    hostname: mycabin",
 			"    stdin_open: true",
@@ -171,10 +175,10 @@ compose:
 
 	t.Run("TaskfileMerge", func(t *testing.T) {
 		fs := bundleFS(map[string]string{cabin.BaseBundle: baseBP, "agent-pi": piBP})
-		bps := fragments.ResolveBlueprints(fs, refs("agent-pi"))
-		sel := authoring.Selection{Name: "x", Agents: []string{"pi"}}
+		bps := fragments.ResolveBlueprints(fs, refs("agent-pi"), cabin.AICabinHeader{})
+		h := cabin.AICabinHeader{Cabin: "x", Agents: []string{"pi"}}
 		var tf strings.Builder
-		if err := authoring.Assemble(bps, sel, &authoring.Files{Taskfile: &tf}); err != nil {
+		if err := authoring.Assemble(bps, h, &authoring.Files{Taskfile: &tf}); err != nil {
 			t.Fatalf("assemble: %v", err)
 		}
 		tfStr := tf.String()
@@ -211,10 +215,10 @@ dockerfile: |
   CMD ["npm", "start"]
 `
 		fs := bundleFS(map[string]string{cabin.BaseBundle: baseBP, "web": webBP})
-		bps := fragments.ResolveBlueprints(fs, refs("web"))
-		sel := authoring.Selection{Name: "x", Agents: []string{"web"}}
+		bps := fragments.ResolveBlueprints(fs, refs("web"), cabin.AICabinHeader{})
+		h := cabin.AICabinHeader{Cabin: "x", Agents: []string{"web"}}
 		var out strings.Builder
-		if err := authoring.Assemble(bps, sel, &authoring.Files{Dockerfile: &out}); err != nil {
+		if err := authoring.Assemble(bps, h, &authoring.Files{Dockerfile: &out}); err != nil {
 			t.Fatalf("assemble: %v", err)
 		}
 		df := out.String()
@@ -230,10 +234,10 @@ dockerfile: |
 	// with features emits a features list in the ai-cabin header.
 	t.Run("TaskfileFeatures", func(t *testing.T) {
 		fs := bundleFS(map[string]string{cabin.BaseBundle: baseBP})
-		bps := fragments.ResolveBlueprints(fs, refs())
-		sel := authoring.Selection{Name: "x", Agents: []string{"pi"}, Features: []string{"go"}}
+		bps := fragments.ResolveBlueprints(fs, refs(), cabin.AICabinHeader{})
+		h := cabin.AICabinHeader{Cabin: "x", Agents: []string{"pi"}, Features: []cabin.FeatureRef{{Name: "go"}}}
 		var tf strings.Builder
-		if err := authoring.Assemble(bps, sel, &authoring.Files{Taskfile: &tf}); err != nil {
+		if err := authoring.Assemble(bps, h, &authoring.Files{Taskfile: &tf}); err != nil {
 			t.Fatalf("assemble: %v", err)
 		}
 		out := tf.String()
@@ -247,13 +251,39 @@ dockerfile: |
 		}
 	})
 
+	// TaskfileAuthoredWith covers the authored_with record: the resolved params
+	// are written into the ai-cabin: header so re-running authoring on the
+	// cabin reuses the same image/user/home.
+	t.Run("TaskfileAuthoredWith", func(t *testing.T) {
+		fs := bundleFS(map[string]string{cabin.BaseBundle: baseBP})
+		bps := fragments.ResolveBlueprints(fs, refs(), cabin.AICabinHeader{})
+		h := cabin.AICabinHeader{Cabin: "x", Agents: []string{"opencode"}, AuthoredWith: cabin.AuthoringParams{
+			Image: "ubuntu:24.04", User: "ubuntu", Home: "/home/ubuntu",
+		}}
+		var tf strings.Builder
+		if err := authoring.Assemble(bps, h, &authoring.Files{Taskfile: &tf}); err != nil {
+			t.Fatalf("assemble: %v", err)
+		}
+		out := tf.String()
+		for _, want := range []string{
+			"  authored_with:",
+			"    image: ubuntu:24.04",
+			"    user: ubuntu",
+			"    home: /home/ubuntu",
+		} {
+			if !strings.Contains(out, want) {
+				t.Errorf("Taskfile header missing %q\n---\n%s", want, out)
+			}
+		}
+	})
+
 	// PropagatesWriteError covers the Assemble error branch: a failing Dockerfile
 	// writer surfaces as a non-nil error.
 	t.Run("PropagatesWriteError", func(t *testing.T) {
 		fs := bundleFS(map[string]string{cabin.BaseBundle: baseBP})
-		bps := fragments.ResolveBlueprints(fs, refs())
-		sel := authoring.Selection{Name: "x"}
-		if err := authoring.Assemble(bps, sel, &authoring.Files{Dockerfile: failWriter{}}); err == nil {
+		bps := fragments.ResolveBlueprints(fs, refs(), cabin.AICabinHeader{})
+		h := cabin.AICabinHeader{Cabin: "x"}
+		if err := authoring.Assemble(bps, h, &authoring.Files{Dockerfile: failWriter{}}); err == nil {
 			t.Fatal("expected a write error to propagate from Assemble")
 		}
 	})
@@ -267,10 +297,10 @@ dockerfile: |
   RUN echo dup
 `
 		fs := bundleFS(map[string]string{cabin.BaseBundle: baseBP, "dup": dupBP})
-		bps := fragments.ResolveBlueprints(fs, refs("dup"))
-		sel := authoring.Selection{Name: "x"}
+		bps := fragments.ResolveBlueprints(fs, refs("dup"), cabin.AICabinHeader{})
+		h := cabin.AICabinHeader{Cabin: "x"}
 		var out strings.Builder
-		if err := authoring.Assemble(bps, sel, &authoring.Files{Dockerfile: &out}); err != nil {
+		if err := authoring.Assemble(bps, h, &authoring.Files{Dockerfile: &out}); err != nil {
 			t.Fatalf("assemble: %v", err)
 		}
 		df := out.String()
@@ -290,14 +320,91 @@ dockerfile: |
   RUN echo no apt
 `
 		fs := bundleFS(map[string]string{"x": noApt})
-		bps := fragments.ResolveBlueprints(fs, []cabin.FeatureRef{{Name: "x"}})
-		sel := authoring.Selection{Name: "x"}
+		bps := fragments.ResolveBlueprints(fs, []cabin.FeatureRef{{Name: "x"}}, cabin.AICabinHeader{})
+		h := cabin.AICabinHeader{Cabin: "x"}
 		var out strings.Builder
-		if err := authoring.Assemble(bps, sel, &authoring.Files{Dockerfile: &out}); err != nil {
+		if err := authoring.Assemble(bps, h, &authoring.Files{Dockerfile: &out}); err != nil {
 			t.Fatalf("assemble: %v", err)
 		}
 		if strings.Contains(out.String(), "apt-get") {
 			t.Errorf("no apt RUN expected without packages\n---\n%s", out.String())
+		}
+	})
+
+	// AuthoringParams covers the authoring substitutions: image/user/home are
+	// rendered into the blueprint (at parse time, before YAML unmarshal, via
+	// {<.Image>}/{<.User>}/{<.Home>} actions) and so appear in the assembled
+	// dockerfile/compose/taskfile scalar values, while task-time {{...}} vars
+	// stay literal (the {< >} delimiters cannot collide with them).
+	t.Run("AuthoringParams", func(t *testing.T) {
+		paramsBP := `
+dockerfile: |
+  FROM {<.Image>}
+  RUN useradd -m {<.User>}
+  WORKDIR {<.Home>}
+compose:
+  environment:
+    - CONTAINER_HOME={<.Home>}
+    - LITERAL_TASK={{.AI_CABIN_HOME}}
+taskfile:
+  env:
+    CONTAINER_HOME: {<.Home>}
+    TASK_VAR: '{{.AI_CABIN_HOME}}'
+`
+		fs := bundleFS(map[string]string{cabin.BaseBundle: paramsBP})
+		h := cabin.AICabinHeader{Cabin: "x", AuthoredWith: cabin.AuthoringParams{Image: "ubuntu:24.04", User: "ubuntu", Home: "/home/ubuntu"}}
+		bps := fragments.ResolveBlueprints(fs, refs(), h)
+		var df, cf, tf strings.Builder
+		if err := authoring.Assemble(bps, h, &authoring.Files{Dockerfile: &df, Compose: &cf, Taskfile: &tf}); err != nil {
+			t.Fatalf("assemble: %v", err)
+		}
+		for _, want := range []string{
+			"FROM ubuntu:24.04",
+			"RUN useradd -m ubuntu",
+			"WORKDIR /home/ubuntu",
+		} {
+			if !strings.Contains(df.String(), want) {
+				t.Errorf("Dockerfile missing %q\n---\n%s", want, df.String())
+			}
+		}
+		if !strings.Contains(cf.String(), "CONTAINER_HOME=/home/ubuntu") {
+			t.Errorf("Compose missing rendered CONTAINER_HOME\n---\n%s", cf.String())
+		}
+		tfStr := tf.String()
+		if !strings.Contains(tfStr, "CONTAINER_HOME: /home/ubuntu") || !strings.Contains(tfStr, "{{.AI_CABIN_HOME}}") {
+			t.Errorf("Taskfile mismatch\n---\n%s", tfStr)
+		}
+		if strings.Contains(tfStr, "<no value>") || strings.Contains(cf.String(), "<no value>") {
+			t.Errorf("task-time vars must stay literal, got <no value>")
+		}
+	})
+
+	// AuthoringParamsDefaults covers the fallback: an empty Image/User/Home in
+	// the selection renders the package defaults, matching the reference cabins.
+	t.Run("AuthoringParamsDefaults", func(t *testing.T) {
+		paramsBP := `
+dockerfile: |
+  FROM {<.Image>}
+  RUN useradd -m {<.User>}
+  WORKDIR {<.Home>}
+`
+		fs := bundleFS(map[string]string{cabin.BaseBundle: paramsBP})
+		h := cabin.AICabinHeader{Cabin: "x", AuthoredWith: cabin.AuthoringParams{
+			Image: authoring.DefaultBaseImage, User: authoring.DefaultUser, Home: authoring.DefaultHome,
+		}}
+		bps := fragments.ResolveBlueprints(fs, refs(), h)
+		var df strings.Builder
+		if err := authoring.Assemble(bps, h, &authoring.Files{Dockerfile: &df}); err != nil {
+			t.Fatalf("assemble: %v", err)
+		}
+		for _, want := range []string{
+			"FROM " + authoring.DefaultBaseImage,
+			"RUN useradd -m " + authoring.DefaultUser,
+			"WORKDIR " + authoring.DefaultHome,
+		} {
+			if !strings.Contains(df.String(), want) {
+				t.Errorf("Dockerfile missing default %q\n---\n%s", want, df.String())
+			}
 		}
 	})
 }

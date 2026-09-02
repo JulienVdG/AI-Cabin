@@ -31,8 +31,11 @@ It works on its own with `docker compose up --build` (see `before/README.md`).
 
 ### 2. Scaffold the cabin files
 
+Set the base image at scaffold time so the cabin Dockerfile already builds on
+**top of the app image** (the agent inherits Python and its pip deps):
+
 ```bash
-cabin authoring new . --agents opencode,pi --features git-agent
+cabin authoring new . --agents opencode,pi --features git-agent --image tuto2-web
 ```
 
 Unlike tuto 1, the project already owns a `docker-compose.yml`, and `new` is
@@ -46,6 +49,21 @@ non-destructive — so the output is:
 
 The `agent` service is **not** written (the filename is taken by the project's
 compose). We re-add it by merging it into the existing compose later (Step 7).
+The `--image tuto2-web` value is recorded in the `authored_with:` header, like
+the default user/home:
+
+```yaml
+ai-cabin:
+  agents:
+    - opencode
+    - pi
+  features:
+    - git-agent
+  authored_with:
+    image: tuto2-web
+    user: ai_agent
+    home: /home/ai_agent
+```
 
 ### 3. Add the Postgres forward to the header
 
@@ -65,29 +83,17 @@ ai-cabin:
     - port-forward: {port: 5432, host: postgres}
 ```
 
-### 4. Let the agent build on top of the app image
+### 4. Give the app image a name
 
-The generated `ai-cabin.Dockerfile` starts from the default base image. Point it
-at the **app's built image** so the agent inherits Python and its pip deps. Two
-small edits are needed.
-
-First, give the `web` service a **named image** — the agent builds `FROM` it
-later, so it must have a tag. In `docker-compose.yml`, add the `image` line to
-your existing `web` service:
+The cabin image builds `FROM tuto2-web` (set in Step 2 via `--image`); for the
+agent to build on it, the app's `web` service must have a **named image** with
+a tag. In `docker-compose.yml`, add the `image` line to your existing `web`
+service:
 
 ```diff
    web:
      build: .
 +    image: tuto2-web
-```
-
-Then point the cabin image at that app image — replace the generated base:
-
-In `ai-cabin.Dockerfile`:
-
-```diff
--FROM golang:1.26-trixie
-+FROM tuto2-web
 ```
 
 `tuto2-web` is Debian-based (from `python:3.12-slim`), so the cabin's
@@ -110,10 +116,11 @@ In `ai-cabin.Dockerfile`:
 
 ### 6. Keep the generated user
 
-The cabin creates the `ai_agent` user from the blueprint as-is — no uid
-adjustment here. Watching an app image without a matching non-root user (uid
-mismatch with your host on the bind-mounts) is a known open point, tracked
-separately; this tutorial stays on the blueprint version.
+The cabin creates the `ai_agent` user from the blueprint as-is. Its uid follows
+the host at build time via the `HOST_UID` build arg (default 1000), so the
+bind-mounted dirs stay writable for a host user with uid 1000; a host with a
+different uid can override `HOST_UID` in the compose `.env`. The default user/home
+are recorded in the `authored_with:` header (Step 2).
 
 ### 7. Merge the `agent` service into the compose
 
@@ -131,9 +138,9 @@ Paste the `agent` service into `docker-compose.yml` next to `web` and
 In `docker-compose.yml`:
 
 ```yaml
-      depends_on:
-        - web
-        - postgres
+    depends_on:
+      - web
+      - postgres
 ```
 
 Because the `agent` sits in the same compose file as `postgres`, it is on the
@@ -227,6 +234,7 @@ than accidents:
 - **One "up" command** — `cabin up` runs `docker compose up -d`, which starts
   every service of the merged compose, so `web`/`postgres`/`agent` come up
   together.
-- **User/uid generalized** — an arbitrary app image has no non-root user, so the
-  uid differs from your host; this is a known open point, tracked as a finding
-  and deliberately left on the blueprint version here.
+- **User/uid alignment** — an arbitrary app image ships no non-root user, so the
+  blueprint's `ai_agent` is created with an uid that follows the host at build
+time via the `HOST_UID` build arg (default 1000; override it in the compose
+`.env` for a host with a different uid).

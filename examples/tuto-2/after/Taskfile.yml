@@ -6,6 +6,10 @@ ai-cabin:
   features:
     - git-agent
     - port-forward: {port: 5432, host: postgres}
+  authored_with:
+    image: tuto2-web
+    user: ai_agent
+    home: /home/ai_agent
 version: '3'
 # Shared docker-* lifecycle targets (optional; materialized to XDG state by the CLI)
 includes:

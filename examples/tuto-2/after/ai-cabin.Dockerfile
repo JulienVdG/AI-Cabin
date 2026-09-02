@@ -28,7 +28,11 @@ RUN /bin/sh /opt/ai-cabin-deps/install.sh \
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
 # User setup (the root-to-user transition stays visible here on purpose)
-RUN useradd -m ai_agent
+# HOST_UID aligns the container user's uid with the host so the bind-mounts
+# stay writable: the lifecycle resolves it (HOST_UID > id -u > 1000) and
+# compose passes it through build.args; the Dockerfile default is 1000.
+ARG HOST_UID=1000
+RUN useradd -m -u ${HOST_UID} ai_agent
 WORKDIR /home/ai_agent
 # Own the whole home so the agent can write anywhere it needs
 RUN chown -R ai_agent:ai_agent /home/ai_agent
@@ -38,7 +42,7 @@ WORKDIR /home/ai_agent
 # Add a greywall sandbox indicator to the prompt
 RUN echo 'if [ "$GREYWALL_SANDBOX" = "1" ]; then debian_chroot="🔒"; fi' >> /home/ai_agent/.bashrc
 
-# Create future mount-points so their owner is ai_agent
+# Create future mount-points so their owner is the cabin user
 RUN mkdir -p .local/share .local/state .local/bin .cache .config/greywall desk go
 # Agent opencode: web UI (install.d/50-opencode reads OPENCODE_VERSION)
 RUN mkdir -p .config/opencode

@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: ai-cabin.Dockerfile
+      args:
+        - HOST_UID=${HOST_UID:-1000}
     image: tuto1
     hostname: tuto1
     # Required for bubblewrap (greywall)

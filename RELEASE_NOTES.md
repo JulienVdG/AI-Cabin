@@ -24,6 +24,28 @@ release time.
   is flagged `(current, from <source>)` and the overridden use-selected
   profile is shown `(overridden)`, so the reader sees which one wins.
 
+- **Authoring parametrization** — `cabin authoring show`/`new` accept
+  `--image <base>`, `--user <name>` and `--home <path>` to set the base image
+  `FROM`, the container user and its home at assembly time. The resolved
+  values (defaults included) are recorded in the
+  `ai-cabin: {authored_with: {image, user, home}}` header with precedence
+  flag > header > default, and rendered into the blueprint via
+  `{<.Image>}/{<.User>}/{<.Home>}` delims (distinct from the `${...}`/`{{...}}`
+  runtime vars).
+
+- **`cabin authoring show --write-prefix <p>`** — materializes the three
+  assembled files (instead of stdout) with the prefix prepended to each
+  canonical name (`folder/` writes into that folder, `.new.` yields
+  no-collision files beside the originals). It creates the folder and
+  truncates existing files, independent of `--force`.
+
+- **`HOST_UID` build arg** — the generated Dockerfile aligns the container
+  user's uid with the host at build time (`ARG HOST_UID=1000` + `useradd -u
+  ${HOST_UID}`), passed by compose `build.args: HOST_UID=${HOST_UID:-1000}` and
+  resolved by the lifecycle Taskfile (`HOST_UID` env > `id -u` > `1000`). The
+  bind-mounted host dirs stay writable whatever the host uid, from committed
+  files that never change.
+
 ## v1.2.0
 
 ### Features

@@ -16,6 +16,7 @@ import (
 	"github.com/JulienVdG/AI-Cabin/internal/writestrategy"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 // authoringCmd groups the Class 2 cabin authoring commands. Unlike `cabin
@@ -36,11 +37,19 @@ directory (new files only, never overwrites).`,
 // authoringAgents and authoringFeatures select which bundles to assemble when
 // the target path is not a cabin yet (no header); for an existing cabin the
 // header drives the selection and these flags are ignored. authoringForce lets
-// new overwrite existing files.
+// new overwrite existing files. authoringImage/User/Home are project-level
+// authoring params (FROM / container user / container home), resolved with
+// precedence header > flag > default. authoringWritePrefix makes `show` write
+// the assembled files (instead of stdout) with the prefix prepended to each
+// name.
 var (
-	authoringAgents   string
-	authoringFeatures string
-	authoringForce    bool
+	authoringAgents      string
+	authoringFeatures    string
+	authoringForce       bool
+	authoringImage       string
+	authoringUser        string
+	authoringHome        string
+	authoringWritePrefix string
 )
 
 // authoringShowCmd renders the assembled cabin files to stdout without writing
@@ -67,7 +76,7 @@ is not a cabin yet.`,
 			os.Exit(1)
 		}
 		var df, cf, tf strings.Builder
-		if err := authoring.Assemble(res.blueprints, res.selection, &authoring.Files{
+		if err := authoring.Assemble(res.blueprints, res.header, &authoring.Files{
 			Dockerfile: &df,
 			Compose:    &cf,
 			Taskfile:   &tf,
@@ -77,6 +86,13 @@ is not a cabin yet.`,
 		}
 		if res.aggregated != nil {
 			fmt.Fprintf(os.Stderr, "Warning: %v\n", res.aggregated)
+		}
+		if authoringWritePrefix != "" {
+			if err := writePrefixed(authoringWritePrefix, df.String(), cf.String(), tf.String()); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+			return
 		}
 		printFiles(os.Stdout, df.String(), cf.String(), tf.String())
 	},
@@ -114,17 +130,17 @@ already a cabin.`,
 		if authoringForce {
 			creator = writestrategy.TruncateCreator{}
 		}
-		if err := writeNew(res.blueprints, res.selection, creator, args[0]); err != nil {
+		if err := writeNew(res.blueprints, res.header, creator, args[0]); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 	},
 }
 
-// authoringResolution is the bundle resolution result: the assembled selection,
-// the resolved blueprints, and any aggregated render warning.
+// authoringResolution is the bundle resolution result: the assembled cabin
+// header, the resolved blueprints, and any aggregated render warning.
 type authoringResolution struct {
-	selection  authoring.Selection
+	header     cabin.AICabinHeader
 	blueprints []fragments.BundleBlueprint
 	aggregated error
 }
@@ -157,25 +173,52 @@ func resolveAuthoring(path string) (*authoringResolution, error) {
 	if err != nil {
 		return nil, err
 	}
-	sel := authoring.Selection{Name: name}
-	var bundles []cabin.FeatureRef
 
-	header, cabinPath, herr := cabin.Header(path)
+	headerPtr, cabinPath, herr := cabin.Header(path)
+	var h cabin.AICabinHeader
+	var bundles []cabin.FeatureRef
 	switch {
 	case herr == nil:
-		sel.Agents = header.Agents
-		sel.Features = featureNames(header.Features)
-		bundles = cabin.ActiveBundles(header)
+		h = *headerPtr
 		// The header cabin field (when set) wins over the dir basename so the
 		// authored image name matches the compose project name canonical.
-		if header.Cabin != "" {
-			sel.Name = header.Cabin
+		if h.Cabin == "" {
+			h.Cabin = name
 		}
+		bundles = cabin.ActiveBundles(&h)
 	case errors.Is(herr, cabin.ErrNoHeader), errors.Is(herr, fs.ErrNotExist):
-		sel.Agents, sel.Features = authoringSelection(authoringAgents, authoringFeatures)
-		bundles = authoringBundles(sel)
+		agents, feats, err := authoringSelection(authoringAgents, authoringFeatures)
+		if err != nil {
+			return nil, err
+		}
+		h = cabin.AICabinHeader{Cabin: name, Agents: agents, Features: feats}
+		bundles = cabin.ActiveBundles(&h)
 	default:
 		return nil, fmt.Errorf("%s: %w", path, herr)
+	}
+
+	// Authoring params precedence: flag > recorded (authored_with) > default.
+	// A flag on an existing cabin therefore overrides the recorded value, so
+	// re-running authoring regenerates the files with the new choice. Each
+	// trailing default fills the void when neither flag nor record is set, so
+	// h.AuthoredWith is always fully resolved (defaults included) for the
+	// {<.X>} render. The resolved values — defaults included — are recorded in
+	// authored_with, so re-running authoring reproduces the same image/user/
+	// home even if the package defaults later change: the record pins the
+	// author's actual choice rather than re-deriving it from defaults.
+	h.AuthoredWith = cabin.AuthoringParams{
+		Image: firstNonEmpty(authoringImage, h.AuthoredWith.Image, authoring.DefaultBaseImage),
+		User:  firstNonEmpty(authoringUser, h.AuthoredWith.User, authoring.DefaultUser),
+		Home:  firstNonEmpty(authoringHome, h.AuthoredWith.Home, authoring.DefaultHome),
+	}
+
+	// The authoring params become {<.X>} substitutions inside the rendered
+	// blueprint; a value with a newline would break the file's YAML structure
+	// (a plain scalar cannot span lines), so reject it at the source.
+	for key, v := range map[string]string{"--image": h.AuthoredWith.Image, "--user": h.AuthoredWith.User, "--home": h.AuthoredWith.Home} {
+		if strings.ContainsAny(v, "\n\r") {
+			return nil, fmt.Errorf("%s must be a single line, got %q", key, v)
+		}
 	}
 
 	merged, _, err := buildFragmentLayers(cabinPath, vars)
@@ -183,7 +226,7 @@ func resolveAuthoring(path string) (*authoringResolution, error) {
 		return nil, err
 	}
 
-	blueprints := fragments.ResolveBlueprints(merged, bundles)
+	blueprints := fragments.ResolveBlueprints(merged, bundles, h)
 
 	var aggErr error
 	for _, b := range blueprints {
@@ -191,42 +234,40 @@ func resolveAuthoring(path string) (*authoringResolution, error) {
 			aggErr = errors.Join(aggErr, fmt.Errorf("bundle %q: %w", b.Name, b.Err))
 		}
 	}
-	return &authoringResolution{selection: sel, blueprints: blueprints, aggregated: aggErr}, nil
-}
-
-// featureNames maps header feature refs to their bundle names (a feature may
-// carry attrs, e.g. port-forward; only the name drives assembly).
-func featureNames(refs []cabin.FeatureRef) []string {
-	out := make([]string, 0, len(refs))
-	for _, r := range refs {
-		out = append(out, r.Name)
-	}
-	return out
+	return &authoringResolution{header: h, blueprints: blueprints, aggregated: aggErr}, nil
 }
 
 // authoringSelection returns the agents/features for a project that is not a
 // cabin yet, defaulting to the full built-in catalogue when no filter is given.
-func authoringSelection(agents, features string) ([]string, []string) {
+func authoringSelection(agents, features string) ([]string, []cabin.FeatureRef, error) {
 	if agents == "" {
 		agents = "pi,opencode"
 	}
 	if features == "" {
 		features = "git-agent,go"
 	}
-	return commaList(agents), commaList(features)
+	feats, err := parseFeatureRefs(features)
+	if err != nil {
+		return nil, nil, err
+	}
+	return commaList(agents), feats, nil
 }
 
-// authoringBundles builds the feature refs (base + agents + features) for a
-// project selection.
-func authoringBundles(sel authoring.Selection) []cabin.FeatureRef {
-	bundles := []cabin.FeatureRef{{Name: cabin.BaseBundle}}
-	for _, a := range sel.Agents {
-		bundles = append(bundles, cabin.FeatureRef{Name: "agent-" + a})
+// parseFeatureRefs decodes a --features value into []FeatureRef by wrapping
+// it as a YAML flow sequence and unmarshaling through FeatureRef.UnmarshalYAML
+// — the same code a header features: list uses. Each entry is either a bare
+// feature name (`go`) or a feature with inline attrs
+// (`port-forward: {port: 5432, host: postgres}`, a space after the key colon
+// as in the header), so the flag syntax mirrors the header syntax exactly.
+func parseFeatureRefs(value string) ([]cabin.FeatureRef, error) {
+	if strings.TrimSpace(value) == "" {
+		return nil, nil
 	}
-	for _, f := range sel.Features {
-		bundles = append(bundles, cabin.FeatureRef{Name: f})
+	var refs []cabin.FeatureRef
+	if err := yaml.Unmarshal([]byte("["+value+"]"), &refs); err != nil {
+		return nil, fmt.Errorf("invalid --features value %q: %w", value, err)
 	}
-	return bundles
+	return refs, nil
 }
 
 // commaList splits a comma-separated flag value, trimming whitespace and
@@ -239,6 +280,47 @@ func commaList(s string) []string {
 		}
 	}
 	return out
+}
+
+// firstNonEmpty returns the first non-empty of the given values.
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// writePrefixed materializes the assembled cabin files with prefix prepended
+// to each canonical name. The prefix is a raw string prefix (no separator is
+// inserted), which covers two cases at once: a prefix ending in a separator
+// writes the same base names into another folder (`folder/` ->
+// `folder/ai-cabin.Dockerfile`), and a plain prefix yields no-collision files
+// beside the originals — pass the separator yourself to keep the file dot
+// (`.new.` -> `.new.ai-cabin.Dockerfile`; a bare `.new` would concatenate as
+// `.newai-cabin.Dockerfile`). The destination directory is created (mkdir -p)
+// and existing files are truncated.
+func writePrefixed(prefix, dockerfile, compose, taskfile string) error {
+	files := []struct {
+		name string
+		body string
+	}{
+		{authoring.CabinDockerfile, dockerfile},
+		{"docker-compose.yml", compose},
+		{"Taskfile.yml", taskfile},
+	}
+	for _, f := range files {
+		dst := prefix + f.name
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return fmt.Errorf("create dir for %q: %w", dst, err)
+		}
+		if err := os.WriteFile(dst, []byte(f.body), 0o644); err != nil {
+			return fmt.Errorf("write %q: %w", dst, err)
+		}
+		fmt.Printf("  write %s\n", dst)
+	}
+	return nil
 }
 
 // printFiles prints the assembled cabin files to w, each under its filename
@@ -266,7 +348,7 @@ func printFiles(w io.Writer, dockerfile, compose, taskfile string) {
 // first via the write policy (SkipCreator skips an existing file; TruncateCreator
 // overwrites, selected by --force), then the merged content is assembled straight
 // into the created writers.
-func writeNew(blueprints []fragments.BundleBlueprint, sel authoring.Selection, creator writestrategy.FileCreator, dest string) error {
+func writeNew(blueprints []fragments.BundleBlueprint, h cabin.AICabinHeader, creator writestrategy.FileCreator, dest string) error {
 	files := &authoring.Files{}
 	names := []string{authoring.CabinDockerfile, "docker-compose.yml", "Taskfile.yml"}
 	writers := []*io.Writer{&files.Dockerfile, &files.Compose, &files.Taskfile}
@@ -281,7 +363,7 @@ func writeNew(blueprints []fragments.BundleBlueprint, sel authoring.Selection, c
 		}
 		*writers[i] = w
 	}
-	if err := authoring.Assemble(blueprints, sel, files); err != nil {
+	if err := authoring.Assemble(blueprints, h, files); err != nil {
 		return err
 	}
 	var jerr error
@@ -302,9 +384,16 @@ func writeNew(blueprints []fragments.BundleBlueprint, sel authoring.Selection, c
 func init() {
 	authoringShowCmd.Flags().StringVar(&authoringAgents, "agents", "", "agents to assemble when the path is not a cabin (pi,opencode)")
 	authoringShowCmd.Flags().StringVar(&authoringFeatures, "features", "", "features to assemble when the path is not a cabin (git-agent,go)")
+	authoringShowCmd.Flags().StringVar(&authoringImage, "image", "", "base image (FROM) for the assembly (default "+authoring.DefaultBaseImage+")")
+	authoringShowCmd.Flags().StringVar(&authoringUser, "user", "", "container user for the assembly (default "+authoring.DefaultUser+")")
+	authoringShowCmd.Flags().StringVar(&authoringHome, "home", "", "container home for the assembly (default "+authoring.DefaultHome+")")
+	authoringShowCmd.Flags().StringVar(&authoringWritePrefix, "write-prefix", "", "write the assembled files with prefix prepended to each name (e.g. '.new', 'folder/') instead of stdout")
 	authoringNewCmd.Flags().StringVar(&authoringAgents, "agents", "", "agents to assemble (pi,opencode)")
 	authoringNewCmd.Flags().StringVar(&authoringFeatures, "features", "", "features to assemble (git-agent,go)")
 	authoringNewCmd.Flags().BoolVar(&authoringForce, "force", false, "overwrite an existing file instead of skipping it")
+	authoringNewCmd.Flags().StringVar(&authoringImage, "image", "", "base image (FROM) for the assembly (default "+authoring.DefaultBaseImage+")")
+	authoringNewCmd.Flags().StringVar(&authoringUser, "user", "", "container user for the assembly (default "+authoring.DefaultUser+")")
+	authoringNewCmd.Flags().StringVar(&authoringHome, "home", "", "container home for the assembly (default "+authoring.DefaultHome+")")
 	authoringCmd.AddCommand(authoringShowCmd)
 	authoringCmd.AddCommand(authoringNewCmd)
 	rootCmd.AddCommand(authoringCmd)

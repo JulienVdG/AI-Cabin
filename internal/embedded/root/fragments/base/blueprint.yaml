@@ -23,17 +23,21 @@ dockerfile: |
   ENTRYPOINT ["/docker-entrypoint.sh"]
 
   # User setup (the root-to-user transition stays visible here on purpose)
-  RUN useradd -m ai_agent
-  WORKDIR /home/ai_agent
+  # HOST_UID aligns the container user's uid with the host so the bind-mounts
+  # stay writable: the lifecycle resolves it (HOST_UID > id -u > 1000) and
+  # compose passes it through build.args; the Dockerfile default is 1000.
+  ARG HOST_UID=1000
+  RUN useradd -m -u ${HOST_UID} {<.User>}
+  WORKDIR {<.Home>}
   # Own the whole home so the agent can write anywhere it needs
-  RUN chown -R ai_agent:ai_agent /home/ai_agent
-  USER ai_agent
-  WORKDIR /home/ai_agent
+  RUN chown -R {<.User>}:{<.User>} {<.Home>}
+  USER {<.User>}
+  WORKDIR {<.Home>}
 
   # Add a greywall sandbox indicator to the prompt
-  RUN echo 'if [ "$GREYWALL_SANDBOX" = "1" ]; then debian_chroot="🔒"; fi' >> /home/ai_agent/.bashrc
+  RUN echo 'if [ "$GREYWALL_SANDBOX" = "1" ]; then debian_chroot="🔒"; fi' >> {<.Home>}/.bashrc
 
-  # Create future mount-points so their owner is ai_agent
+  # Create future mount-points so their owner is the cabin user
   RUN mkdir -p .local/share .local/state .local/bin .cache .config/greywall desk go
 compose:
   # Required for bubblewrap (greywall)
@@ -48,7 +52,7 @@ compose:
     # Host paths (bind-mounted)
     - AI_CABIN_DESK=${AI_CABIN_DESK}
     - AI_CABIN_WORKDIR=${AI_CABIN_WORKDIR}
-    - CONTAINER_HOME=/home/ai_agent
+    - CONTAINER_HOME={<.Home>}
     # Container workdir path (transparent by default, remapped in advanced mode)
     - CONTAINER_WORKDIR=${CONTAINER_WORKDIR:-${AI_CABIN_WORKDIR}}
     # Greywall profile + per-wrapper extras (pass-through from the task env)
@@ -78,7 +82,7 @@ taskfile:
     AGENT_SERVICE: "agent"
   env:
     # Container-side shared env (bind paths / greywall args; agent bundles override)
-    CONTAINER_HOME: /home/ai_agent
+    CONTAINER_HOME: {<.Home>}
     GREYWALL_ARGS: ""
   tasks:
     # Alias + agent targets (agent bundles add their run/setup tasks here)

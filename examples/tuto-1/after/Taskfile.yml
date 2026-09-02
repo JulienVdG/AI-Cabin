@@ -4,6 +4,10 @@ ai-cabin:
     - opencode
   features:
     - go: {install: true, version: "1.26.3"}
+  authored_with:
+    image: ubuntu:24.04
+    user: ubuntu
+    home: /home/ubuntu
 version: '3'
 # Shared docker-* lifecycle targets (optional; materialized to XDG state by the CLI)
 includes:

@@ -22,11 +22,20 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/JulienVdG/AI-Cabin/internal/cabin"
+	"github.com/JulienVdG/AI-Cabin/internal/render"
 )
 
 // blueprintManifest is the manifest name for the blueprint facet, read by
 // ResolveBlueprints. It lives at the bundle root (like deps.yaml/setup.yaml).
 const blueprintManifest = "blueprint.yaml"
+
+// authoringDelims are the text/template delimiters for the blueprint authoring
+// substitutions. {< >} is distinct from the compose ${...} runtime vars and the
+// task-time {{...}} vars, so {<.Image>}/{<.User>}/{<.Home>} resolve when the
+// blueprint is read for authoring while a literal {{.AI_CABIN_HOME}} passes
+// through untouched to its runtime consumer. A blueprint declares its
+// authoring params as {<...>} actions anywhere a scalar is expected.
+var authoringDelims = render.Delims{Left: "{<", Right: ">}"}
 
 // BundleBlueprint is the resolved blueprint of a single active bundle. Compose
 // and Taskfile are YAML mapping subtrees (kept as yaml.Node, merged by the
@@ -44,15 +53,19 @@ type BundleBlueprint struct {
 }
 
 // ResolveBlueprints reads the blueprint.yaml of each active bundle from the
-// merged fallback chain and returns the resolved blueprints in bundle order.
-// A bundle with no blueprint.yaml contributes nothing and is skipped (e.g.
-// port-forward has only deps/setup facets). Every bundle is attempted (no
-// fail-fast) so one broken bundle (a read or parse error) does not hide the
-// rest.
-func ResolveBlueprints(merged fs.FS, bundles []cabin.FeatureRef) []BundleBlueprint {
+// merged fallback chain and returns the resolved blueprints in bundle order,
+// rendering each file with the authoring {<.X>} substitutions before the YAML
+// parse. The substitution values come from the header's recorded authoring
+// params (AuthoredWith); a blueprint with no {<...>} action passes through
+// unchanged. A bundle with no blueprint.yaml contributes nothing and is
+// skipped (e.g. port-forward has only deps/setup facets). Every bundle is
+// attempted (no fail-fast) so one broken bundle (a read or parse error) does
+// not hide the rest.
+func ResolveBlueprints(merged fs.FS, bundles []cabin.FeatureRef, h cabin.AICabinHeader) []BundleBlueprint {
 	out := make([]BundleBlueprint, 0, len(bundles))
+	attrs := h.AuthoredWith.ToMap()
 	for _, b := range bundles {
-		bp := resolveBundleBlueprint(merged, b)
+		bp := resolveBundleBlueprint(merged, b, attrs)
 		if bp != nil {
 			out = append(out, *bp)
 		}
@@ -61,10 +74,12 @@ func ResolveBlueprints(merged fs.FS, bundles []cabin.FeatureRef) []BundleBluepri
 }
 
 // resolveBundleBlueprint reads and resolves a single bundle's blueprint.yaml.
-// A missing manifest is a no-op (nil): the bundle has no blueprint facet. A
-// malformed manifest (bad YAML or a non-mapping document) is reported via
-// BundleBlueprint.Err so the caller can surface it without aborting.
-func resolveBundleBlueprint(merged fs.FS, b cabin.FeatureRef) *BundleBlueprint {
+// When a render config with delims is given, the file is templated first (the
+// authoring {<.X>} substitutions), then parsed. A missing manifest is a no-op
+// (nil): the bundle has no blueprint facet. A malformed manifest (bad YAML or
+// a non-mapping document) is reported via BundleBlueprint.Err so the caller
+// can surface it without aborting.
+func resolveBundleBlueprint(merged fs.FS, b cabin.FeatureRef, attrs map[string]any) *BundleBlueprint {
 	manifestPath := path.Join(b.Name, blueprintManifest)
 	data, err := fs.ReadFile(merged, manifestPath)
 	if err != nil {
@@ -73,6 +88,11 @@ func resolveBundleBlueprint(merged fs.FS, b cabin.FeatureRef) *BundleBlueprint {
 		}
 		return &BundleBlueprint{Name: b.Name, Err: fmt.Errorf("read manifest %q: %w", manifestPath, err)}
 	}
+	rendered, rerr := render.RenderString(string(data), nil, attrs, authoringDelims)
+	if rerr != nil {
+		return &BundleBlueprint{Name: b.Name, Err: fmt.Errorf("render manifest %q: %w", manifestPath, rerr)}
+	}
+	data = []byte(rendered)
 
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {

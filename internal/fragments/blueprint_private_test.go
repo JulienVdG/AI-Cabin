@@ -52,7 +52,7 @@ taskfile:
 			{Name: cabin.BaseBundle},
 			{Name: "port-forward"}, // has deps.yaml only: no blueprint
 		}
-		got := ResolveBlueprints(merged, bundles)
+		got := ResolveBlueprints(merged, bundles, cabin.AICabinHeader{})
 		if len(got) != 1 {
 			t.Fatalf("len(got) = %d, want 1 (base; port-forward skipped)", len(got))
 		}
@@ -62,7 +62,7 @@ taskfile:
 	})
 
 	t.Run("parses verbatim args/dockerfile blocks and yaml subtrees", func(t *testing.T) {
-		got := ResolveBlueprints(merged, []cabin.FeatureRef{{Name: "base"}})
+		got := ResolveBlueprints(merged, []cabin.FeatureRef{{Name: "base"}}, cabin.AICabinHeader{})
 		if len(got) != 1 {
 			t.Fatalf("len(got) = %d, want 1", len(got))
 		}
@@ -90,7 +90,7 @@ taskfile:
 
 	t.Run("reports a malformed manifest per bundle without dropping the rest", func(t *testing.T) {
 		bundles := []cabin.FeatureRef{{Name: "base"}, {Name: "broken"}}
-		got := ResolveBlueprints(merged, bundles)
+		got := ResolveBlueprints(merged, bundles, cabin.AICabinHeader{})
 		if len(got) != 2 {
 			t.Fatalf("len(got) = %d, want 2 (base resolved, broken reported)", len(got))
 		}

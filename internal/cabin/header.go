@@ -22,7 +22,34 @@ import (
 type AICabinHeader struct {
 	Cabin    string       `yaml:"cabin"`
 	Agents   []string     `yaml:"agents"`
-	Features []FeatureRef `yaml:"features"`
+	Features []FeatureRef `yaml:"features,omitempty"`
+	// AuthoredWith records the authoring params used to generate this cabin, so
+	// `cabin authoring show`/`new` on it re-render the same image/user/home.
+	AuthoredWith AuthoringParams `yaml:"authored_with,omitempty"`
+}
+
+// AuthoringParams are the values a cabin was authored with: the assembled
+// base image (FROM), container user and container home. They are a record of
+// how the cabin was generated (kept so re-running authoring renders the same
+// choices), not runtime state. Empty fields fall back to the authoring defaults
+// (golang:1.26-trixie / ai_agent / /home/ai_agent).
+type AuthoringParams struct {
+	Image string `yaml:"image"`
+	User  string `yaml:"user"`
+	Home  string `yaml:"home"`
+}
+
+// ToMap renders the authoring params as the top-level template keys a
+// blueprint's {<.X>} actions reference ({<.Image>}/{<.User>}/{<.Home>}).
+func (p AuthoringParams) ToMap() map[string]any {
+	return map[string]any{"Image": p.Image, "User": p.User, "Home": p.Home}
+}
+
+// IsZero reports whether no authoring param is set. yaml.v3 consults it for
+// the omitempty tag, so an un-authored header (all params empty) omits the
+// authored_with block instead of emitting an empty map.
+func (p AuthoringParams) IsZero() bool {
+	return p.Image == "" && p.User == "" && p.Home == ""
 }
 
 // FeatureRef is a feature bundle selected in the header's `features:` list,
@@ -72,6 +99,18 @@ func (f *FeatureRef) UnmarshalYAML(value *yaml.Node) error {
 	default:
 		return fmt.Errorf("feature item must be a string or single-key mapping, got kind %d", value.Kind)
 	}
+}
+
+// MarshalYAML is the write side of the two YAML forms accepted under
+// features: implemented as the inverse of UnmarshalYAML, so a header
+// round-trips through the CLI. A feature without attrs encodes as a bare
+// string (`- go`); one with attrs encodes as a single-key mapping
+// (`- port-forward: {port: 5432}`).
+func (f FeatureRef) MarshalYAML() (any, error) {
+	if f.Attrs == nil {
+		return f.Name, nil
+	}
+	return map[string]any{f.Name: f.Attrs}, nil
 }
 
 // taskfileHeader wraps a Taskfile so we can unmarshal only the "ai-cabin:" key.

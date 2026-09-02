@@ -93,6 +93,25 @@ cabin authoring show path/to/project --agents pi --features go
 existing files are preserved (see Step 4/5). Use `--force` to overwrite the
 generated files.
 
+Beyond the agent/feature selection, assembly accepts project-level params that
+are baked into the generated files (see Step 4 for when to change them):
+
+- `--image <base>` — the base image `FROM` (default `golang:1.26-trixie`).
+- `--user <name>` and `--home <path>` — the container user and its home
+  (defaults `ai_agent` / `/home/ai_agent`).
+
+They are recorded in the `ai-cabin: {authored_with: {image, user, home}}`
+header (resolved values, defaults included), so re-running authoring
+reproduces the same assembly. Precedence is flag > recorded header > default.
+For a project that is already a cabin the header drives the values; pass a flag
+to override them.
+
+`show` also accepts `--write-prefix <p>` to materialize the three files
+(instead of stdout) with the prefix prepended to each name: a prefix ending in
+a separator writes them into another folder (`folder/`), a plain prefix yields
+no-collision files beside the originals (`.new.`). It creates the folder and
+truncates existing files, independent of `--force`.
+
 ---
 
 ## Step 3 — The `ai-cabin:` header
@@ -123,7 +142,9 @@ Edit it afterwards to adjust the cabin:
 ## Step 4 — Adapt the image to your project
 
 `cabin authoring` produces a working skeleton; adapting it to your project is
-usually one or two edits. There are two cases.
+usually one or two edits. When you know the image and user at scaffold time,
+pass them with `--image`/`--user`/`--home` (Step 2) and the generated files
+already point at them; otherwise edit them here. There are two cases.
 
 ### Case A — No existing Dockerfile (bring the toolchain)
 
@@ -176,14 +197,23 @@ For the agent to read and write them, the container user the agent runs as must
 have the **same uid** as the host user that owns those dirs — otherwise writes
 fail with a permission error (e.g. `go` cannot create its build cache).
 
-`cabin authoring` generates a dedicated `ai_agent` user (uid 1000), which
-matches a host user with uid 1000 out of the box. Adapt it when your base image
-already ships a default user, or when your host uid differs:
+`cabin authoring` generates a dedicated `ai_agent` user whose **uid is aligned
+with your host** at build time via the `HOST_UID` build arg (default `1000`,
+overridable through an exported `HOST_UID` env var or a `HOST_UID` line in the
+compose `.env`). The lifecycle Taskfile resolves it (`HOST_UID` > `id -u` >
+`1000`) and compose passes it through `build.args` into the `useradd -u`, so a
+host with a uid other than `1000` still gets writable mounts without touching
+the committed files. Adapt it only when your base image already ships a
+default user — pass `--user <name> --home <path>` (Step 2) so the assembled
+home paths are right from the start:
 
 - keep the base image's default user and set `CONTAINER_HOME` to its home. The
   `ubuntu` images ship an `ubuntu` user (uid 1000, home `/home/ubuntu`) — drop
-the generated `useradd`/`USER` block and use `WORKDIR /home/ubuntu`+
-`USER ubuntu`;
+the generated `useradd`/`USER` block and use `WORKDIR /home/ubuntu` +
+`USER ubuntu`. **This disables the `HOST_UID` logic** (no `useradd -u` runs),
+so verify yourself that the user the base image ships has the same uid as your
+host — Docker does not remap uids to match the host (userns remapping maps to
+a subuid range, not your uid), so a mismatch leaves the mounts unwritable.
 - or give the container user your host's uid, so the mounts are writable
   whatever the host uid is.
 

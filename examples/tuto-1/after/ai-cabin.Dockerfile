@@ -32,7 +32,7 @@ WORKDIR /home/ubuntu
 # Add a greywall sandbox indicator to the prompt
 RUN echo 'if [ "$GREYWALL_SANDBOX" = "1" ]; then debian_chroot="🔒"; fi' >> /home/ubuntu/.bashrc
 
-# Create future mount-points so their owner is the default user
+# Create future mount-points so their owner is the cabin user
 RUN mkdir -p .local/share .local/state .local/bin .cache .config/greywall desk go
 # Agent opencode: web UI (install.d/50-opencode reads OPENCODE_VERSION)
 RUN mkdir -p .config/opencode
