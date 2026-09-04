@@ -208,6 +208,13 @@ func InitProfile(name string, cliVars []string, force bool) (*Profile, error) {
 	return configService.InitProfile(name, cliVars, force)
 }
 
+// SetProfileVars sets several variables on a profile (resolved via
+// GetActiveProfile if name is empty -> current profile) and persists them in one
+// atomic write. It delegates to the global ConfigService.
+func SetProfileVars(name string, vars Vars) (*Profile, error) {
+	return configService.SetProfileVars(name, vars)
+}
+
 // SetProfileVar sets a single variable on a profile (resolved via
 // GetActiveProfile if name is empty -> current profile) and persists it
 // atomically. It delegates to the global ConfigService.

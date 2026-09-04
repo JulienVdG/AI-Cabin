@@ -39,6 +39,20 @@ release time.
   no-collision files beside the originals). It creates the folder and
   truncates existing files, independent of `--force`.
 
+- **`profile set` accepts `KEY=VALUE` and `--var` batching** — `cabin profile
+  set` now takes `KEY=VALUE` entries (single or many, for copy-pasting
+  `VAR=value` lines) in addition to the `KEY VALUE` pair, merged with the global
+  `--var` flags on the same command line (they win on key conflict); all are
+  persisted in one atomic write, and an empty command line errors instead of
+  silently doing nothing.
+
+- **`--var` tab completion** — the global `--var` flag now completes with known
+  profile variable names: the active profile's persisted vars (the
+  `--profile`-selected profile if given) plus the known default keys
+  (`AI_CABIN_HOME/DESK/WORKDIR`, `CONTAINER_WORKDIR`, `AI_CABIN_LAYER_DIRS`,
+  `CREDENTIAL_*`, ...), formatted as `KEY=` so the cursor lands right after the
+  `=`. Vars already given on the same command line are excluded.
+
 - **`HOST_UID` build arg** — the generated Dockerfile aligns the container
   user's uid with the host at build time (`ARG HOST_UID=1000` + `useradd -u
   ${HOST_UID}`), passed by compose `build.args: HOST_UID=${HOST_UID:-1000}` and

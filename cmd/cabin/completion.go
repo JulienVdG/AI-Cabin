@@ -88,10 +88,68 @@ func completeTaskArgs(cmd *cobra.Command, args []string, toComplete string) ([]s
 	return out, cobra.ShellCompDirectiveNoFileComp
 }
 
-// of the --profile flag value and `cabin profile use|show <name>`. Same shape as
-// completeCabinNames (prefix filter + exclude already-provided positionals).
-// of the --profile flag value and `cabin profile use|show <name>`. Same shape as
-// completeCabinNames (prefix filter + exclude already-provided positionals).
+// completeVarNames completes the value of the global --var flag with known
+// profile variable names: the union of the current profile's persisted vars
+// (the profile selected by --profile, default: current) and the known settable
+// keys — formatted as KEY= so the shell leaves the cursor after the '=' for the
+// value. Keys already given on the same command line are excluded. Resolution
+// errors are silently tolerated (the candidate set simply degrades to what is
+// available) so the completion never crashes the shell: the user can still type
+// the key by hand.
+func completeVarNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	keys := make(map[string]bool, len(knownConfigVarKeys))
+	for _, k := range knownConfigVarKeys {
+		keys[k] = true
+	}
+	if prof, err := config.GetActiveProfile(profileFlag); err == nil {
+		for k := range prof.Vars {
+			keys[k] = true
+		}
+	}
+	// Exclude vars already given on this command line (prior --var entries).
+	if given, err := cmd.Flags().GetStringArray("var"); err == nil {
+		for _, kv := range given {
+			if k, _, ok := strings.Cut(kv, "="); ok {
+				delete(keys, k)
+			}
+		}
+	}
+	var out []string
+	for k := range keys {
+		if strings.HasPrefix(k+"=", toComplete) {
+			out = append(out, k+"=")
+		}
+	}
+	sort.Strings(out)
+	// NoSpace so the shell does not append a trailing space after the single
+	// KEY= completion (the cursor is meant to stay right after the '=' for the
+	// value). Combined with NoFileComp (a var name is never an arbitrary path).
+	return out, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveNoSpace
+}
+
+// knownConfigVarKeys lists the known settable profile variables, forming the
+// base of the --var completion so a key is suggested even when the current
+// profile has not persisted it. It covers the structural keys and the
+// BuildDefaultProfile defaults (AI_CABIN_HOME/DESK/WORKDIR + GIT_AGENT_*,
+// the latter hardcoded as names because completion needs the key, not the value).
+var knownConfigVarKeys = [...]string{
+	config.HomeVar,
+	config.DeskVar,
+	config.WorkdirVar,
+	config.ContainerWorkdirVar,
+	config.FragmentsDirsEnvVar,
+	config.LayerDirsEnvVar,
+	config.SkeletonDirsEnvVar,
+	config.CredentialInjectEnvVar,
+	config.CredentialIgnoreEnvVar,
+	"GIT_AGENT_NAME",
+	"GIT_AGENT_EMAIL",
+}
+
+// completeProfileNames completes the value of the --profile flag and the
+// positional of `cabin profile use|show <name>`. Same shape as
+// completeCabinNames (prefix filter + exclude already-provided names +
+// NoFileComp): a profile is a registry entry, never an arbitrary path.
 func completeProfileNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	profiles, err := config.ListProfiles()
 	if err != nil {

@@ -43,3 +43,49 @@ func TestProfileLine(t *testing.T) {
 		})
 	}
 }
+
+// TestParseProfileSetArgs covers the positional parsing of `profile set`: the
+// copy-paste KEY=VALUE spellings (single and mass), the backwards-compatible
+// KEY VALUE pair, the empty case (everything from --var), and the ambiguous or
+// malformed shapes that must be rejected.
+func TestParseProfileSetArgs(t *testing.T) {
+	cases := []struct {
+		name    string
+		args    []string
+		want    config.Vars
+		wantErr bool
+	}{
+		{"empty args", nil, config.Vars{}, false},
+		{"single KEY=VALUE", []string{"A=1"}, config.Vars{"A": "1"}, false},
+		{"empty value KEY=", []string{"A="}, config.Vars{"A": ""}, false},
+		{"mass KEY=VALUE", []string{"A=1", "B=2", "C=3"}, config.Vars{"A": "1", "B": "2", "C": "3"}, false},
+		{"backwards-compatible pair", []string{"KEY", "value1"}, config.Vars{"KEY": "value1"}, false},
+		{"pair with value containing equal", []string{"KEY", "a=b"}, config.Vars{"KEY": "a=b"}, false},
+		{"single bare arg rejected", []string{"A"}, config.Vars{}, true},
+		{"KV then bare rejected", []string{"A=1", "bare"}, config.Vars{}, true},
+		{"bare pair plus extra rejected", []string{"A", "B", "C"}, config.Vars{}, true},
+		{"more than two bare rejected", []string{"A=1", "B=2", "C"}, config.Vars{}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := parseProfileSetArgs(tc.args)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("parseProfileSetArgs(%q) expected error, got %v", tc.args, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseProfileSetArgs(%q) error = %v", tc.args, err)
+			}
+			if len(got) != len(tc.want) {
+				t.Fatalf("parseProfileSetArgs(%q) = %v, want %v", tc.args, got, tc.want)
+			}
+			for k, v := range tc.want {
+				if got[k] != v {
+					t.Errorf("parseProfileSetArgs(%q)[%q] = %q, want %q", tc.args, k, got[k], v)
+				}
+			}
+		})
+	}
+}

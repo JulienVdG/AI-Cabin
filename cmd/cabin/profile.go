@@ -168,27 +168,98 @@ var profileUseCmd = &cobra.Command{
 	},
 }
 
-// profileSetCmd sets a single profile variable and persists it atomically. It
+// profileSetCmd sets one or several profile variables and persists them in a
+// single atomic write. It consumes positionals in two spellings (KEY VALUE, or
+// one/few KEY=VALUE for copy-paste of VAR=value lines) merged with the global
+// --var entries; --var wins on key conflict (documented highest precedence). It
 // targets the profile selected by --profile (default: the current profile),
-// matching the other runtime commands. It is the CRUD continuation of `profile init --var` (the initial set).
+// matching the other runtime commands, and is the CRUD continuation of `profile
+// init --var` (the initial set).
 var profileSetCmd = &cobra.Command{
-	Use:   "set <key> <value>",
-	Short: "Set a variable on a profile",
-	Long:  `Set a variable on the profile selected by --profile (default: the current profile) and persist it atomically. Any key is allowed; it is the runtime continuation of the --var CRUD (of which profile init --var is the initial set).`,
-	Args:  cobra.ExactArgs(2),
+	Use:   "set [KEY=VALUE ...] [KEY VALUE]",
+	Short: "Set variables on a profile",
+	Long:  `Set one or several variables on the profile selected by --profile (default: the current profile) and persist them in one atomic write. Vars are taken from positionals (KEY=VALUE, or the KEY VALUE pair) and the global --var entries (--var wins on conflict); both are exhausted for copy-paste of VAR=value lines. Any key is allowed; it is the runtime continuation of the --var CRUD (of which profile init --var is the initial set).`,
 	Run: func(cmd *cobra.Command, args []string) {
-		key, value := args[0], args[1]
+		vars, err := parseProfileSetArgs(args)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		cliVarsMap, err := config.ParseCLIVars(cliVars)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		// The global --var entry is the runtime override with highest
+		// precedence; it wins over a positional with the same key.
+		for k, v := range cliVarsMap {
+			vars[k] = v
+		}
+		if len(vars) == 0 {
+			fmt.Fprintf(os.Stderr, "Error: nothing to persist: pass KEY=VALUE or --var KEY=VALUE\n")
+			os.Exit(1)
+		}
 
-		profile, err := config.SetProfileVar(profileFlag, key, value)
+		profile, err := config.SetProfileVars(profileFlag, vars)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 
+		keys := make([]string, 0, len(vars))
+		for k := range vars {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
 		fmt.Printf("Profile: %s\n", profile.Name)
 		fmt.Printf("Path: %s\n", profile.Path())
-		fmt.Printf("Set %s=%s on profile %q\n", key, value, profile.Name)
+		for _, k := range keys {
+			fmt.Printf("Set %s=%s on profile %q\n", k, vars[k], profile.Name)
+		}
 	},
+}
+
+// parseProfileSetArgs maps the positionals of `profile set` into a Vars map:
+//   - empty        -> empty Vars (everything comes from --var)
+//   - KEY=VALUE    -> a single copy-paste entry
+//   - KEY=VALUE... -> every positional is a copy-paste entry (mass set)
+//   - KEY VALUE    -> the backwards-compatible pair (only when the first arg
+//     has no '=' and there are exactly two args)
+//
+// Any other shape (e.g. a KEY=VALUE followed by a bare arg) is ambiguous and
+// rejected with a clear error.
+func parseProfileSetArgs(args []string) (config.Vars, error) {
+	out := make(config.Vars)
+	if len(args) == 0 {
+		return out, nil
+	}
+	if len(args) == 1 {
+		k, v, ok := strings.Cut(args[0], "=")
+		if !ok || k == "" {
+			return nil, fmt.Errorf("invalid argument %q: expected KEY=VALUE", args[0])
+		}
+		out[k] = v
+		return out, nil
+	}
+	allKV := true
+	for _, a := range args {
+		if _, _, ok := strings.Cut(a, "="); !ok {
+			allKV = false
+			break
+		}
+	}
+	if allKV {
+		for _, a := range args {
+			k, v, _ := strings.Cut(a, "=")
+			out[k] = v
+		}
+		return out, nil
+	}
+	if len(args) == 2 && !strings.Contains(args[0], "=") {
+		out[args[0]] = args[1]
+		return out, nil
+	}
+	return nil, fmt.Errorf("invalid arguments %q: expected KEY=VALUE entries or a KEY VALUE pair", args)
 }
 
 // profileInitForce overwrites an existing profile (and re-copies the desk

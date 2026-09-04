@@ -231,7 +231,7 @@ func (s *ConfigService) ResolveProfile(name, profileFlag string, cliVars []strin
 		sel.Name, sel.Source = name, ProfileSourceArg
 		return sel, nil
 	}
-	cliVarsMap, err := parseCLIVars(cliVars)
+	cliVarsMap, err := ParseCLIVars(cliVars)
 	if err != nil {
 		return ProfileSelection{}, err
 	}
@@ -371,7 +371,7 @@ func (s *ConfigService) InitProfile(name string, cliVars []string, force bool) (
 		}
 	}
 
-	cliVarsMap, err := parseCLIVars(cliVars)
+	cliVarsMap, err := ParseCLIVars(cliVars)
 	if err != nil {
 		return nil, err
 	}
@@ -456,11 +456,13 @@ func (s *ConfigService) SaveProfile(profile *Profile) error {
 	return nil
 }
 
-// SetProfileVar sets a single variable on a profile and persists it atomically.
-// The profile is resolved like GetActiveProfile: an empty name selects the
-// current profile. It is the runtime continuation of the `--var` CRUD (of which
-// `profile init --var` is the initial set). It returns the updated profile.
-func (s *ConfigService) SetProfileVar(name, key, value string) (*Profile, error) {
+// SetProfileVars sets several variables on a profile and persists them in one
+// atomic write. The profile is resolved like GetActiveProfile: an empty name
+// selects the current profile. It is the runtime continuation of the `--var`
+// CRUD (of which `profile init --var` is the initial set) for `profile set`,
+// letting a batch of KEY=VAL entries (from positionals and --var) persist
+// together. It returns the updated profile.
+func (s *ConfigService) SetProfileVars(name string, vars Vars) (*Profile, error) {
 	profile, err := s.GetActiveProfile(name)
 	if err != nil {
 		return nil, err
@@ -468,9 +470,18 @@ func (s *ConfigService) SetProfileVar(name, key, value string) (*Profile, error)
 	if profile.Vars == nil {
 		profile.Vars = map[string]string{}
 	}
-	profile.Vars[key] = value
+	for k, v := range vars {
+		profile.Vars[k] = v
+	}
 	if err := s.SaveProfile(profile); err != nil {
 		return nil, fmt.Errorf("failed to save profile %q: %w", profile.Name, err)
 	}
 	return profile, nil
+}
+
+// SetProfileVar sets a single variable on a profile and persists it atomically,
+// delegating to SetProfileVars. It drives `cabin profile set KEY VALUE` (the
+// single-value spelling) and `cabin use` (CurrentCabinVar).
+func (s *ConfigService) SetProfileVar(name, key, value string) (*Profile, error) {
+	return s.SetProfileVars(name, Vars{key: value})
 }

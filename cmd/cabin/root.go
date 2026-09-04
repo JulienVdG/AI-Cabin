@@ -51,6 +51,9 @@ func init() {
 	if err := rootCmd.RegisterFlagCompletionFunc("cabin", completeCabinNames); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: could not register --cabin completion: %v\n", err)
 	}
+	if err := rootCmd.RegisterFlagCompletionFunc("var", completeVarNames); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not register --var completion: %v\n", err)
+	}
 	rootCmd.InitDefaultCompletionCmd()
 }
 

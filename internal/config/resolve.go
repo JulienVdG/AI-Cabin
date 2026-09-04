@@ -60,7 +60,7 @@ func (s *ConfigService) ResolveVars(profileFlag string, cliVars []string) (Vars,
 	view := make(Vars)
 
 	// CLI overrides (--var, --profile sets AI_CABIN_PROFILE).
-	cliVarsMap, err := parseCLIVars(cliVars)
+	cliVarsMap, err := ParseCLIVars(cliVars)
 	if err != nil {
 		return nil, err
 	}
@@ -135,9 +135,10 @@ func setIfAbsent(dst, src map[string]string) {
 	}
 }
 
-// parseCLIVars validates and maps a --var list (KEY=VAL) into a Vars map,
-// shared by ResolveVars and InitProfile so the KEY=VAL shape is enforced once.
-func parseCLIVars(cliVars []string) (Vars, error) {
+// ParseCLIVars validates and maps a --var list (KEY=VAL) into a Vars map,
+// shared by ResolveVars, InitProfile and `profile set`'s --var merge so the
+// KEY=VAL shape is enforced once.
+func ParseCLIVars(cliVars []string) (Vars, error) {
 	out := make(Vars, len(cliVars))
 	for _, kv := range cliVars {
 		k, v, ok := strings.Cut(kv, "=")

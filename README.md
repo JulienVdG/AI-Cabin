@@ -279,7 +279,7 @@ The active profile is selected with `--profile` (default: the active profile, in
 - `cabin profile init [name]` — create a profile and copy the desk skeleton (`--skeleton`, `--var`, `--force`)
 - `cabin profile list` — list available profiles
 - `cabin profile show` — show the active profile
-- `cabin profile set <key> <value>` — set a variable on a profile
+- `cabin profile set [KEY=VALUE ...] [KEY VALUE]` — set variables on a profile (`KEY=VALUE` entries for copy-pasting, or the `KEY VALUE` pair; merged with the global `--var`)
 - `cabin profile use <name>` — select the active profile
 
 Value resolution, highest to lowest: `--var KEY=VAL` (repeatable global flag), environment variables, the profile file, then built-in defaults. Since environment variables outrank the profile file, a profile variable can be silently shadowed by a same-named shell variable; `cabin profile show` warns when that happens (it prints each shadowed variable with its environment value), so it doubles as a debug tool for precedence surprises.
@@ -406,8 +406,7 @@ Both accept `--agents pi,opencode` and `--features git-agent,go`.
 
 ### Profile Variables
 
-The cabin reads its configuration from a **profile** (selected with `--profile`, defaulting to the active profile, initially `default`). Set variables per profile with `cabin profile set <key> <value>`
-and view them with `cabin profile show`. The essential ones:
+The cabin reads its configuration from a **profile** (selected with `--profile`, defaulting to the active profile, initially `default`). Set variables per profile with `cabin profile set [...]` and view them with `cabin profile show`. The essential ones:
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
