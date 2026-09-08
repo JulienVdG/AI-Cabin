@@ -604,6 +604,7 @@ not remove the `bwrap-userns-restrict` profile, which keeps denying
 capabilities (`net_admin`, `sys_admin`) no matter the sysctl value. Disable
 that profile instead (run once, persists across reboots):
 ```bash
+sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0
 sudo apt install apparmor-utils
 sudo aa-disable /etc/apparmor.d/bwrap-userns-restrict
 ```
