@@ -12,8 +12,8 @@
     "denyRead": [
       "~/.ssh/id_*",
       "~/.gnupg/**",
-      ".env",
-      ".env.*",
+      "**/.env",
+      "**/.env.*",
       "/etc/shadow",
       "/root"
     ],
