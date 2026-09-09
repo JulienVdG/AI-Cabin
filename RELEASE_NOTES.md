@@ -1,14 +1,6 @@
 # Release Notes
 
-Changes accumulated since the last release. Published as a versioned section at
-the next release. Until then, items live under **Unreleased**.
-
-A **breaking change** is one that requires action from an existing user before
-they can keep using AI-Cabin as before (migration step, removed command, changed
-format). Add it here as soon as it lands so the upgrade guide is ready at
-release time.
-
-## Unreleased
+## v1.3.0
 
 ### Features
 
@@ -59,6 +51,13 @@ release time.
   resolved by the lifecycle Taskfile (`HOST_UID` env > `id -u` > `1000`). The
   bind-mounted host dirs stay writable whatever the host uid, from committed
   files that never change.
+
+### Fixes
+
+- **Greywall profile denies `.env` in any directory** — the default workspace
+  profile now denies reads of `.env`, `.env.*` via the `**/.env`, `**/.env.*`
+  glob, so the exclusion holds in any subdirectory, not just at the workspace
+  root.
 
 ## v1.2.0
 
