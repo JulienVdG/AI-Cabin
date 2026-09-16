@@ -337,6 +337,39 @@ injects it, and the standalone `task` path resolves it the same way).
 
 ---
 
+### Hand-written cabins (pi-go / opencode-go style)
+
+The reference cabins under `cabin/` — and any cabin not assembled by `cabin
+authoring` — are **hand-written**: they carry their own `Dockerfile` and
+`docker-compose.yml`, and the CLI picks them up from the `ai-cabin:` header
+without rewriting them. `cabin authoring new` is non-destructive, so it never
+overwrites an existing compose; converting a hand-written cabin to authoring
+later (or conversely) keeps the files that already exist. The two styles stay
+supported side by side.
+
+Two responsibilities then fall on the hand-written cabin's writer:
+
+- **`image:` / `hostname:`** — the compose guidance above (explicit `image:` =
+  the cabin name, **no `container_name:`**) applies here too, but the tool does
+  not set them for you. A hand-written compose must itself pin `image:` to the
+  cabin name, or two instances (two profiles / two checkouts) would rebuild or
+  collide instead of sharing the pinned image.
+- **Build prerequisites from bundle blueprints** — a bundle's `apt:`/
+  `dockerfile:` blueprints only feed the Dockerfile that `cabin authoring`
+  assembles. A hand-written cabin's own Dockerfile does **not** pick them up;
+  the writer must add any package a selected bundle's blueprint declares (its
+  `apt:` block) to the cabin's own `apt-get install` list.
+
+`cabin authoring show`, run from a hand-written cabin directory, reads the
+`ai-cabin:` header for its agent/feature selection (no `--agents`/`--features`
+needed) and renders the assembled Dockerfile and compose to **stdout without
+writing**. It is a handy reference for the cabin's own files: the shown
+`apt-get install` list and compose bits mirror exactly what the selected
+bundles contribute, so you can transcribe them instead of inferring the
+prerequisites.
+
+---
+
 ## Next steps
 
 - Follow the tutorials: [`examples/tuto-1/`](../examples/tuto-1/) (no Dockerfile)
