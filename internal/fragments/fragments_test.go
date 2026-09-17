@@ -611,8 +611,13 @@ func TestBackupCreator(t *testing.T) {
 
 		// Target has new content.
 		assert.Equal(t, `{"v":2}`, readDest(t, dest, "conf.json"))
-		// Backup has old content.
-		assert.Equal(t, `{"v":1}`, readDest(t, dest, "conf.json"+writestrategy.BackupSuffix))
+		// Backup is timestamped (conf.json.cabin-bak.<ts>); glob it back.
+		matches, globErr := filepath.Glob(filepath.Join(dest, "conf.json"+writestrategy.BackupSuffix+".*"))
+		require.NoError(t, globErr)
+		require.Len(t, matches, 1, "one diff leaves one backup")
+		b, readErr := os.ReadFile(matches[0])
+		require.NoError(t, readErr)
+		assert.Equal(t, `{"v":1}`, string(b))
 	})
 
 	t.Run("NoBackupWithTruncateCreator", func(t *testing.T) {

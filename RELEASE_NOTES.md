@@ -10,6 +10,10 @@ release time.
 
 ## Unreleased
 
+### Changes
+
+- **`BackupCreator` backups are now timestamped** — `<file>.cabin-bak.<YYYYMMDD-HHMMSS>` (UTC, lexicographically sortable), disambiguated with a `-2`/`-3`... suffix when two backups land in the same second, instead of the former single-slot `.cabin-bak` that was overwritten at each setup re-run. A diff no longer erases the previous backup: each change keeps its own generation. The `.cabin-bak` prefix is kept stable, so backups stay findable by pattern (`find`, `gitignore`). The mark for cleanup is left to the user (`find`/`git status`) — cleanup is not automated.
+
 ## v1.3.0
 
 ### Features

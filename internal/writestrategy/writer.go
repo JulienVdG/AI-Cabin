@@ -12,6 +12,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"time"
 )
 
 // FilePerm is the mode used to create destination files: a plain 0666 so the
@@ -77,9 +78,33 @@ type skipWriter struct{}
 func (skipWriter) Write(p []byte) (int, error) { return len(p), nil }
 func (skipWriter) Close() error                { return nil }
 
-// BackupSuffix is appended to the target name to form the single-slot backup
-// path (<name>.cabin-bak).
+// BackupSuffix is the stable marker prefix appended to the target name to form
+// a backup path (<name>.cabin-bak.<timestamp>). Kept constant so backups stay
+// findable by pattern (find, gitignore, a future greywall deny).
 const BackupSuffix = ".cabin-bak"
+
+// backupTimeLayout formats the backup timestamp in UTC as a compact,
+// lexicographically sortable value (YYYYMMDD-HHMMSS), so backups of the same
+// target read chronologically with find | sort.
+const backupTimeLayout = "20060102-150405"
+
+// backupPath returns a non-colliding backup path for name: the BackupSuffix
+// marker followed by a UTC timestamp, read at commit time. Two backups landing
+// in the same second would otherwise collide and silently drop the older one,
+// so a short increment (-2, -3, ...) disambiguates instead — the point of
+// backing up is that a generation is never lost.
+func backupPath(name string) (string, error) {
+	base := name + BackupSuffix + "." + time.Now().UTC().Format(backupTimeLayout)
+	p := base
+	for i := 1; ; i++ {
+		if _, err := os.Stat(p); errors.Is(err, fs.ErrNotExist) {
+			return p, nil
+		} else if err != nil {
+			return "", fmt.Errorf("stat backup candidate %q: %w", p, err)
+		}
+		p = fmt.Sprintf("%s-%d", base, i)
+	}
+}
 
 // BackupCreator returns a backupWriter that buffers writes, then at Close
 // compares the buffered content against the existing target: identical is a
@@ -122,7 +147,10 @@ func (w *backupWriter) Close() error {
 		if bytes.Equal(oldContent, newContent) {
 			return nil
 		}
-		bak := w.name + BackupSuffix
+		bak, err := backupPath(w.name)
+		if err != nil {
+			return err
+		}
 		if err := os.Rename(w.name, bak); err != nil {
 			return fmt.Errorf("backup %q: %w", bak, err)
 		}

@@ -3,6 +3,7 @@ package writestrategy_test
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/JulienVdG/AI-Cabin/internal/writestrategy"
@@ -10,6 +11,26 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// listBackups returns the backup files for name (name.cabin-bak.<ts>[-n]),
+// sorted for deterministic assertions.
+func listBackups(t *testing.T, name string) []string {
+	t.Helper()
+	matches, err := filepath.Glob(name + writestrategy.BackupSuffix + ".*")
+	require.NoError(t, err)
+	sort.Strings(matches)
+	return matches
+}
+
+// readAll reads each file in names and returns the contents in order.
+func readAll(t *testing.T, names []string) []string {
+	t.Helper()
+	var contents []string
+	for _, n := range names {
+		contents = append(contents, readTarget(t, n))
+	}
+	return contents
+}
 
 // writeAll is the minimal driver the strategies share: open via Create, write
 // the bytes, close. The Materialize loop in internal/fragments does the same
@@ -105,8 +126,8 @@ func TestBackupCreator(t *testing.T) {
 
 	t.Run("BackupOnDiff", func(t *testing.T) {
 		// Write once, change content, write again: the previous version is
-		// backed up (.cabin-bak), the target has the new content. Single-slot
-		// backup: a second diff overwrites the first backup (no history chain).
+		// backed up (name.cabin-bak.<timestamp>), the target has the new content.
+		// A later diff adds a new generation instead of overwriting the first.
 		dest := t.TempDir()
 		name := filepath.Join(dest, "conf.json")
 		c := writestrategy.BackupCreator{}
@@ -115,7 +136,27 @@ func TestBackupCreator(t *testing.T) {
 		writeAll(t, c, name, `{"v":2}`)
 
 		assert.Equal(t, `{"v":2}`, readTarget(t, name))
-		assert.Equal(t, `{"v":1}`, readTarget(t, name+writestrategy.BackupSuffix))
+		backups := listBackups(t, name)
+		require.Len(t, backups, 1, "one diff leaves exactly one backup")
+		assert.Equal(t, `{"v":1}`, readTarget(t, backups[0]))
+	})
+
+	t.Run("MultipleDiffsKeepHistory", func(t *testing.T) {
+		// Two successive diffs keep both prior versions: each backup is
+		// timestamped, so the first is never overwritten (the single-slot
+		// behaviour is gone). This is the "never lose a generation" contract.
+		dest := t.TempDir()
+		name := filepath.Join(dest, "conf.json")
+		c := writestrategy.BackupCreator{}
+
+		writeAll(t, c, name, `{"v":1}`)
+		writeAll(t, c, name, `{"v":2}`)
+		writeAll(t, c, name, `{"v":3}`)
+
+		assert.Equal(t, `{"v":3}`, readTarget(t, name))
+		backups := listBackups(t, name)
+		assert.Len(t, backups, 2, "two diffs keep two generations")
+		assert.ElementsMatch(t, []string{`{"v":1}`, `{"v":2}`}, readAll(t, backups))
 	})
 
 	t.Run("DoubleCloseIsNoOp", func(t *testing.T) {
