@@ -196,7 +196,7 @@ var profileSetCmd = &cobra.Command{
 			vars[k] = v
 		}
 		if len(vars) == 0 {
-			fmt.Fprintf(os.Stderr, "Error: nothing to persist: pass KEY=VALUE or --var KEY=VALUE\n")
+			fmt.Fprintf(os.Stderr, "Error: nothing to persist: pass KEY=VALUE\n")
 			os.Exit(1)
 		}
 
