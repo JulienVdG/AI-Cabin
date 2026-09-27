@@ -5,10 +5,24 @@ set -e
 {{if .install}}
 GO_VERSION="{{default "1.26.3" .version}}"
 
-# Download the official Go tarball for linux-amd64 and extract it.
+# Resolve the target architecture: go.dev ships linux-amd64/arm64 tarballs.
+case "$(uname -m)" in
+  x86_64)
+    ARCH="linux-amd64"
+    ;;
+  aarch64)
+    ARCH="linux-arm64"
+    ;;
+  *)
+    echo "cabin: unsupported architecture: $(uname -m)" >&2
+    exit 1
+    ;;
+esac
+
+# Download the official Go tarball for the target arch and extract it.
 # profile.d/ai-cabin-go.sh puts /usr/local/go/bin on the agent's PATH when
 # install is set, so no symlinking is needed here.
-curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tar.gz
+curl -fsSL "https://go.dev/dl/go${GO_VERSION}.${ARCH}.tar.gz" -o /tmp/go.tar.gz
 rm -rf /usr/local/go
 tar -C /usr/local -xzf /tmp/go.tar.gz
 rm -f /tmp/go.tar.gz
