@@ -100,6 +100,11 @@ are baked into the generated files (see Step 4 for when to change them):
 - `--user <name>` and `--home <path>` — the container user and its home
   (defaults `ai_agent` / `/home/ai_agent`).
 
+**If the base image already ships the `--user` you pass, the generated
+`useradd` line fails the build** — `useradd` exits nonzero when the user
+already exists (the `ubuntu` images ship an `ubuntu` user). Remove that line
+from `ai-cabin.Dockerfile` (Step 4 shows the exact edit).
+
 They are recorded in the `ai-cabin: {authored_with: {image, user, home}}`
 header (resolved values, defaults included), so re-running authoring
 reproduces the same assembly. Precedence is flag > recorded header > default.
@@ -191,6 +196,11 @@ RedHat/Fedora), adapt two things:
 
 ### Match the container user to your host uid
 
+The generated Dockerfile starts with `USER root` (right after `FROM`), so the
+install steps (apt, the bundles' `install.sh`, `useradd`) run as root whatever
+user the base image ends on; the file then switches to the cabin user at the
+end.
+
 The compose bind-mounts your host dirs (cache, go, desk, workdir) into the
 container, and they keep their **host ownership** (the uid of your host user).
 For the agent to read and write them, the container user the agent runs as must
@@ -207,13 +217,16 @@ the committed files. Adapt it only when your base image already ships a
 default user — pass `--user <name> --home <path>` (Step 2) so the assembled
 home paths are right from the start:
 
-- keep the base image's default user and set `CONTAINER_HOME` to its home. The
-  `ubuntu` images ship an `ubuntu` user (uid 1000, home `/home/ubuntu`) — drop
-the generated `useradd`/`USER` block and use `WORKDIR /home/ubuntu` +
-`USER ubuntu`. **This disables the `HOST_UID` logic** (no `useradd -u` runs),
-so verify yourself that the user the base image ships has the same uid as your
-host — Docker does not remap uids to match the host (userns remapping maps to
-a subuid range, not your uid), so a mismatch leaves the mounts unwritable.
+- **remove the generated `useradd` line** (the assembly always emits one for
+  `--user`; `useradd` exits nonzero when the user already exists, failing the
+  build) — keep the base image's default user and set `CONTAINER_HOME` to its
+  home. The `ubuntu` images ship an `ubuntu` user (uid 1000, home `/home/ubuntu`)
+ — drop the generated `useradd`/`USER` block and use `WORKDIR /home/ubuntu` +
+  `USER ubuntu`. **This disables the `HOST_UID` logic** (no `useradd -u` runs),
+  so verify yourself that the user the base image ships has the same uid as
+  your host — Docker does not remap uids to match the host (userns remapping
+  maps to a subuid range, not your uid), so a mismatch leaves the mounts
+  unwritable.
 - or give the container user your host's uid, so the mounts are writable
   whatever the host uid is.
 

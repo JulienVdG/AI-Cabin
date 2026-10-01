@@ -28,7 +28,6 @@ dockerfile: |
   # compose passes it through build.args; the Dockerfile default is 1000.
   ARG HOST_UID=1000
   RUN useradd -m -u ${HOST_UID} {<.User>}
-  WORKDIR {<.Home>}
   # Own the whole home so the agent can write anywhere it needs
   RUN chown -R {<.User>}:{<.User>} {<.Home>}
   USER {<.User>}
