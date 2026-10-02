@@ -13,11 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// expectedBundles is the public contract: the bundle names referenced by
-// cabin.ActiveBundles (base, git-agent, go, agent-pi, agent-opencode) plus
-// port-forward (the declarative service-forwarding bundle, one instance per
-// forwarded service). A rename
-// here must break a test rather than silently orphan a bundle.
+// expectedBundles is the public contract: the bundle names referenced
+// by cabin.ActiveBundles (base, git-agent, go, agent-pi, agent-opencode) plus
+// port-forward (the declarative service-forwarding bundle, one instance
+// per forwarded service). A rename here must break a test
+// rather than silently orphan a bundle.
 var expectedBundles = []string{"agent-opencode", "agent-pi", "base", "git-agent", "go", "port-forward"}
 
 // mirrorBundles are the bundles that mirror their deps/ subtree (the v1 default
@@ -29,8 +29,8 @@ var mirrorBundles = []string{"agent-opencode", "agent-pi", "base", "git-agent", 
 // TestFragments verifies the embedded base layer exposes the expected bundles
 // and that the structure is self-consistent, without hardcoding the full file
 // list (which would require manual edits on every added fragment). It walks
-// the FS so a deleted/renamed file is caught by the walk itself rather than by
-// a stale expected-path list.
+// the FS so a deleted/renamed file is caught by the walk itself rather
+// than by a stale expected-path list.
 func TestFragments(t *testing.T) {
 	fsys, err := embedded.Fragments()
 	require.NoError(t, err)
@@ -48,10 +48,10 @@ func TestFragments(t *testing.T) {
 	})
 
 	t.Run("EveryBundleHasDepsManifest", func(t *testing.T) {
-		// Each bundle's deps.yaml is the manifest Materialize reads for the
-		// deps facet; it must exist for every bundle (the build facet always
-		// contributes). setup.yaml is optional (a bundle may have no setup
-		// facet — e.g. git-agent, go, port-forward).
+		// Each bundle's deps.yaml is the manifest Materialize reads
+		// for the deps facet; it must exist for every bundle
+		// (the build facet always contributes). setup.yaml is optional
+		// (a bundle may have no setup facet — e.g. git-agent, go, port-forward).
 		for _, b := range expectedBundles {
 			t.Run(b, func(t *testing.T) {
 				_, err := fs.ReadFile(fsys, b+"/deps.yaml")
@@ -61,8 +61,8 @@ func TestFragments(t *testing.T) {
 	})
 
 	t.Run("MirrorBundlesDeclareMirrorDeps", func(t *testing.T) {
-		// The v1 default bundles all mirror their deps/ subtree. Asserting the
-		// exact content catches a manifest rewritten to entries: by mistake.
+		// The v1 default bundles all mirror their deps/ subtree. Asserting
+		// the exact content catches a manifest rewritten to entries: by mistake.
 		// port-forward is excluded (it uses explicit entries: with templated dst,
 		// one instance per forwarded service) and is covered by its own Materialize
 		// test in internal/fragments.
@@ -79,9 +79,9 @@ func TestFragments(t *testing.T) {
 	t.Run("EveryFileIsReadableAndUnderBundleFacet", func(t *testing.T) {
 		// Walking catches a deleted or renamed fragment without a stale path
 		// list: any ReadFile error fails here. It also asserts the on-disk
-		// shape (every file lives under <bundle>/{deps,setup}/, with the
-		// {deps,setup}.yaml manifests at the bundle root — no stray files, no
-		// leaked cabin/ subtree).
+		// shape (every file lives under <bundle>/{deps,setup}/,
+		// with the {deps,setup}.yaml manifests at the bundle root — no stray files,
+		// no leaked cabin/ subtree).
 		var count int
 		err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
 			if err != nil {
@@ -160,9 +160,9 @@ var expectedDesks = []string{"minimal"}
 // minimalDeskFiles are the content files the minimal desk skeleton must ship
 // under content/: the base agent rules, a minimal TODO, the retro process doc,
 // and the retro-process skill. `cabin setup` copies this whole content/ tree
-// to AI_CABIN_DESK (the manifest declares mirror: content). The list is
-// exhaustive of the content/: a stray file (.swp, .DS_Store, ...) breaks the
-// MinimalDeskHasNoStrayFiles sub-case rather than being silently embedded.
+// to AI_CABIN_DESK (the manifest declares mirror: content). The list
+// is exhaustive of the content/: a stray file (.swp, .DS_Store, ...) breaks
+// the MinimalDeskHasNoStrayFiles sub-case rather than being silently embedded.
 var minimalDeskFiles = []string{
 	"AGENTS.md",
 	"TODO.md",
@@ -171,10 +171,10 @@ var minimalDeskFiles = []string{
 }
 
 func TestSkeletons(t *testing.T) {
-	// Skeletons() ships the embedded Class 1 scaffolding trees, typed by
-	// concern. `desks/minimal/` is the contract `cabin setup` / `cabin profile
-	// init` (default skeleton) relies on: dropping a file breaks the
-	// zero-config onboarding.
+	// Skeletons() ships the embedded Class 1 scaffolding trees, typed
+	// by concern. `desks/minimal/` is the contract
+	// `cabin setup` / `cabin profile init` (default skeleton) relies on:
+	// dropping a file breaks the zero-config onboarding.
 	fsys, err := embedded.Skeletons()
 	require.NoError(t, err)
 
@@ -205,8 +205,8 @@ func TestSkeletons(t *testing.T) {
 	t.Run("MinimalDeskHasNoStrayFiles", func(t *testing.T) {
 		// Walk the minimal desk and assert every file is either the manifest
 		// (skeleton.yaml at the root) or a content/ file in minimalDeskFiles.
-		// Catches a stray editor swap file (.swp) or OS file (.DS_Store) that
-		// //go:embed all:root would silently ship — a clean tree is the contract.
+		// Catches a stray editor swap file (.swp) or OS file (.DS_Store)
+		// that //go:embed all:root would silently ship — a clean tree is the contract.
 		want := make(map[string]bool, len(minimalDeskFiles)+1)
 		want["skeleton.yaml"] = true
 		for _, f := range minimalDeskFiles {

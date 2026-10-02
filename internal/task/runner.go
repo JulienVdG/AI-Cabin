@@ -21,14 +21,14 @@ import (
 
 // Run executes a Taskfile target located in cabinPath.
 //
-// envVars are set on the process env before execution; the task compiler reads
-// os.Environ(), and tasks run `docker compose exec` which resolves ${VAR} from
-// there (the Executor has no WithEnv, so env is the only channel). One-shot
-// process, so mutating the global env is acceptable.
+// envVars are set on the process env before execution: the task compiler
+// reads os.Environ(), and tasks run `docker compose exec` which resolves ${VAR}
+// from there (the Executor has no WithEnv, so env is the only channel).
+// One-shot process, so mutating the global env is acceptable.
 //
-// rawArgs (agent params captured raw by Cobra) are forwarded as
-// {{.CLI_ARGS}} (shell-quoted) and {{.CLI_ARGS_LIST}} (raw []string), like the
-// task CLI does. Without this, {{.CLI_ARGS}} is empty when using the lib.
+// rawArgs (agent params captured raw by Cobra) are forwarded
+// as {{.CLI_ARGS}} (shell-quoted) and {{.CLI_ARGS_LIST}} (raw []string),
+// like the task CLI does. Without this, {{.CLI_ARGS}} is empty when using the lib.
 func Run(ctx context.Context, cabinPath, taskName string, rawArgs []string, envVars map[string]string, stdout, stderr io.Writer) error {
 	for k, v := range envVars {
 		if err := os.Setenv(k, v); err != nil {
@@ -57,12 +57,12 @@ func Run(ctx context.Context, cabinPath, taskName string, rawArgs []string, envV
 
 // ListTargets parses the Taskfile at cabinPath and returns the names of all
 // its targets (after includes are merged by Setup, so flattened lifecycle
-// docker-* targets appear too). Used for shell completion of `cabin task
-// <cabin> <TAB>` — a read-only parse, it does not execute any target.
+// docker-* targets appear too). Used for shell completion
+// of `cabin task <cabin> <TAB>` — a read-only parse, it does not execute any target.
 //
 // The caller is responsible for the env Setup() needs to resolve includes:
-// AI_CABIN_LIFECYCLE_TASKFILE (the materialized lifecycle Taskfile path) must
-// be set in the process env, otherwise the lifecycle include is skipped
+// AI_CABIN_LIFECYCLE_TASKFILE (the materialized lifecycle Taskfile path)
+// must be set in the process env, otherwise the lifecycle include is skipped
 // (optional: true) and only cabin-local targets are returned.
 func ListTargets(cabinPath string) ([]string, error) {
 	exec := tasklib.NewExecutor(

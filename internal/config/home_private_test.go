@@ -5,7 +5,7 @@ import "testing"
 // Test_expandHome is table-driven and asserts both the expanded output AND
 // which injected closure was called. expandHome is private, hence this whitebox
 // file; ExpandHome (public) is a thin wrapper not worth re-testing (delegation
-// only, per skill:go-test-patterns).
+// only).
 func Test_expandHome(t *testing.T) {
 	testData := []struct {
 		In   string

@@ -66,9 +66,9 @@ func TestBuildLayers(t *testing.T) {
 	})
 
 	t.Run("MultipleConfDirsFirstWins", func(t *testing.T) {
-		// Two conf dirs in the list: the first wins for a shared file, the
-		// second contributes its own files. (Comma-split and ~ expansion are
-		// covered by config.SplitPathList tests; here only the union order.)
+		// Two conf dirs in the list: the first wins for a shared file,
+		// the second contributes its own files. (Comma-split and ~ expansion
+		// are covered by config.SplitPathList tests; here only the union order.)
 		dir1 := t.TempDir()
 		dir2 := t.TempDir()
 		writeLayer(t, dir1, map[string]string{"base/x.txt": "1"})
@@ -88,9 +88,9 @@ func TestBuildLayers(t *testing.T) {
 	})
 
 	t.Run("LayerDirsRankAboveCabinLocal", func(t *testing.T) {
-		// A layer's <root>/fragments sits between explicit conf dirs and the
-		// cabin-local dir: it shadows cabin-local + embed but yields to the
-		// explicit conf dirs (which were asserted above).
+		// A layer's <root>/fragments sits between explicit conf dirs
+		// and the cabin-local dir: it shadows cabin-local + embed but yields
+		// to the explicit conf dirs (which were asserted above).
 		layerDir := t.TempDir()
 		writeLayer(t, layerDir, map[string]string{"base/shared.txt": "layer", "base/only-layer.txt": "layer"})
 		cabinDir := t.TempDir()
@@ -106,8 +106,8 @@ func TestBuildLayers(t *testing.T) {
 	})
 
 	t.Run("MultipleLayerDirsFirstWins", func(t *testing.T) {
-		// Two layer-derived fragment dirs in AI_CABIN_LAYER_DIRS order: the
-		// first wins, the second contributes its own files.
+		// Two layer-derived fragment dirs in AI_CABIN_LAYER_DIRS order:
+		// the first wins, the second contributes its own files.
 		l1 := t.TempDir()
 		writeLayer(t, l1, map[string]string{"base/x.txt": "1", "base/only-1.txt": "1"})
 		l2 := t.TempDir()
@@ -123,8 +123,8 @@ func TestBuildLayers(t *testing.T) {
 
 	t.Run("MissingLayerSubdirIsTolerated", func(t *testing.T) {
 		// A layer root without a fragments/ subdir is skipped, not a strict
-		// error (a layer may carry only some subdirs — e.g. skeletons-only, or
-		// the fragments-only reference layer when resolving skeletons).
+		// error (a layer may carry only some subdirs — e.g. skeletons-only,
+		// or the fragments-only reference layer when resolving skeletons).
 		layerRoot := t.TempDir() // exists but has no fragments/ subdir
 		emb := fstest.MapFS{"base/shared.txt": {Data: []byte("embed")}}
 
@@ -156,8 +156,8 @@ func readFS(t *testing.T, fsys fs.FS, name string) string {
 
 func TestMaterialize(t *testing.T) {
 	t.Run("DepsMirror", func(t *testing.T) {
-		// base/deps.yaml mirrors deps/; a .tmpl is rendered (suffix stripped from
-		// the dst name), a plain file is copied as-is, subdirs are preserved.
+		// base/deps.yaml mirrors deps/; a .tmpl is rendered (suffix stripped
+		// from the dst name), a plain file is copied as-is, subdirs are preserved.
 		merged := fstest.MapFS{
 			"base/deps.yaml":              {Data: []byte("mirror: deps/\n")},
 			"base/deps/entrypoint.sh":     {Data: []byte("#!/bin/bash\nexec $@\n")},
@@ -242,8 +242,8 @@ func TestMaterialize(t *testing.T) {
 		assert.Equal(t, []string{"docker-entrypoint.d/50-socat-apache-8080.sh"}, w2)
 
 		// Third instance: same target (mariadb:3306) on a distinct local
-		// socket. listen decouples the socat socket from the target port, and
-		// the dst names key on the listen socket so both bridges coexist.
+		// socket. listen decouples the socat socket from the target port,
+		// and the dst names key on the listen socket so both bridges coexist.
 		attrs3 := map[string]any{"host": "mariadb", "port": "3306", "listen": "13306"}
 		w3, err := depsMat.Materialize("port-forward", attrs3)
 		require.NoError(t, err)
@@ -339,11 +339,11 @@ func TestMaterialize(t *testing.T) {
 	})
 
 	t.Run("UndefinedVarCollectedAndContinues", func(t *testing.T) {
-		// A .tmpl references an undefined var: the broken content (with <no
-		// value>) is written (écriture-malgré-erreur) and left on disk, the error is
-		// collected, and materialization continues for the other fragments. The
-		// broken file is NOT in the success list (written = ok.txt only) but is
-		// readable on disk for the user to locate the missing var.
+		// A .tmpl references an undefined var: the broken content
+		// (with <no value>) is written (écriture-malgré-erreur) and left on disk,
+		// the error is collected, and materialization continues for the other
+		// fragments. The broken file is NOT in the success list (written = ok.txt
+		// only) but is readable on disk for the user to locate the missing var.
 		merged := fstest.MapFS{
 			"base/deps.yaml":        {Data: []byte("entries:\n  - src: deps/broken.tmpl\n    dst: broken.txt\n  - src: deps/ok.txt\n    dst: ok.txt\n")},
 			"base/deps/broken.tmpl": {Data: []byte("v={{.Vars.MISSING}}")},
@@ -404,10 +404,10 @@ func TestMaterialize(t *testing.T) {
 
 	t.Run("UsesUmaskMode", func(t *testing.T) {
 		// The destination mode is always writestrategy.FilePerm (0666 & ^umask): the source
-		// mode is not preserved (embed.FS exposes every file as 0444, an
-		// artifact; the executable bit is the Dockerfile's authority via
-		// RUN chmod +x). So a 0755 wrapper and a 0644 plain file both land at
-		// the same mode as os.Create (0666 & ^umask), whatever the runtime
+		// mode is not preserved (embed.FS exposes every file as 0444,
+		// an artifact; the executable bit is the Dockerfile's authority
+		// via RUN chmod +x). So a 0755 wrapper and a 0644 plain file both land
+		// at the same mode as os.Create (0666 & ^umask), whatever the runtime
 		// umask is. The expected mode is derived from a sentinel file created
 		// with os.Create in the same dest dir (same umask), instead of being
 		// hardcoded to 0644 — a umask of 0002 (group-writable) would otherwise
@@ -427,8 +427,8 @@ func TestMaterialize(t *testing.T) {
 		_, err = truncateMat(t, merged, "deps.yaml", dest, nil).Materialize("base", nil)
 		require.NoError(t, err)
 
-		// Sentinel: os.Create applies 0666 & ^umask, the same contract as
-		// Materialize. Comparing to it makes the test umask-agnostic.
+		// Sentinel: os.Create applies 0666 & ^umask, the same contract
+		// as Materialize. Comparing to it makes the test umask-agnostic.
 		sentinel, err := os.Create(filepath.Join(dest, ".sentinel"))
 		require.NoError(t, err)
 		require.NoError(t, sentinel.Close())
@@ -445,8 +445,8 @@ func TestMaterialize(t *testing.T) {
 	})
 
 	t.Run("DriftCollectedNotAborted", func(t *testing.T) {
-		// Drift is collected (no fail-fast): both missing srcs are reported in
-		// one run so the user fixes all manifest issues at once.
+		// Drift is collected (no fail-fast): both missing srcs are reported
+		// in one run so the user fixes all manifest issues at once.
 		merged := fstest.MapFS{
 			"base/deps.yaml": {Data: []byte("entries:\n  - src: deps/missing.sh\n    dst: a.sh\n  - src: deps/also-missing.sh\n    dst: b.sh\n")},
 		}
@@ -461,11 +461,11 @@ func TestMaterialize(t *testing.T) {
 	t.Run("SkipCreatorNoOverwrite", func(t *testing.T) {
 		// The FileCreator.ErrSkip contract: a creator that declines to write
 		// (SkipCreator skips existing files; a future InteractiveCreator may
-		// decline per user choice) is non-fatal. The skipped file is neither in
-		// the written list nor in the aggregated error, and materialization
-		// continues for the rest. This is the no-overwrite default of the
-		// skeletons facade (re-running `cabin profile init` without --force is a
-		// silent no-op, not an error). deps/setup use
+		// decline per user choice) is non-fatal. The skipped file is neither
+		// in the written list nor in the aggregated error, and materialization
+		// continues for the rest. This is the no-overwrite default
+		// of the skeletons facade (re-running `cabin profile init`
+		// without --force is a silent no-op, not an error). deps/setup use
 		// TruncateCreator/BackupCreator and never trip ErrSkip, so the contract
 		// is exercised here via SkipCreator.
 		merged := fstest.MapFS{
@@ -511,8 +511,8 @@ func TestMaterialize(t *testing.T) {
 		})
 
 		t.Run("EmptyManifestRejected", func(t *testing.T) {
-			// A manifest declaring none of mirror/entries/greywall_profiles is
-			// rejected as useless (validate extended for the new field).
+			// A manifest declaring none of mirror/entries/greywall_profiles
+			// is rejected as useless (validate extended for the new field).
 			merged := fstest.MapFS{
 				"go/setup.yaml": {Data: []byte("--- {}\n")},
 			}
@@ -525,9 +525,9 @@ func TestMaterialize(t *testing.T) {
 	})
 
 	t.Run("GoToolchainInstallFromEmbedded", func(t *testing.T) {
-		// Materialize the real embedded go bundle's deps facet and assert the
-		// attrs gate both the toolchain install and the PATH addition: with
-		// go: {install: true} the install.d step downloads Go at the pinned
+		// Materialize the real embedded go bundle's deps facet and assert
+		// the attrs gate both the toolchain install and the PATH addition:
+		// with go: {install: true} the install.d step downloads Go at the pinned
 		// version and profile.d appends /usr/local/go/bin; without the attr
 		// the install is a no-op and PATH is unchanged. Validates the shipped
 		// fragments end-to-end through BuildLayers + Materialize.
@@ -612,8 +612,8 @@ func TestBackupCreator(t *testing.T) {
 	})
 
 	t.Run("BackupOnDiff", func(t *testing.T) {
-		// Materialize once, change source content, materialize again: the
-		// previous version is backed up (.cabin-bak), target has new content.
+		// Materialize once, change source content, materialize again:
+		// the previous version is backed up (.cabin-bak), target has new content.
 		merged := fstest.MapFS{
 			"base/setup.yaml":      {Data: []byte("entries:\n  - src: setup/conf.json\n    dst: conf.json\n")},
 			"base/setup/conf.json": {Data: []byte(`{"v":1}`)},
@@ -666,8 +666,8 @@ func TestBackupCreator(t *testing.T) {
 // TestResolveGreywallProfiles covers the derivation of the greywall profile
 // list from active bundles: shipped profiles (detected by their learned/
 // destination, name = stem of the rendered dst) plus built-in references
-// (greywall_profiles: manifest field). The list is ordered (bundle order) and
-// deduplicated by first occurrence.
+// (greywall_profiles: manifest field). The list is ordered (bundle order)
+// and deduplicated by first occurrence.
 func TestResolveGreywallProfiles(t *testing.T) {
 	// A merged FS with all bundles' setup.yaml manifests. ResolveGreywallProfiles
 	// reads only the manifests (not the shipped .json src files), so the src
@@ -704,9 +704,9 @@ func TestResolveGreywallProfiles(t *testing.T) {
 	})
 
 	t.Run("PortForwardTemplatedDst", func(t *testing.T) {
-		// port-forward's dst is templated; the profile name is derived from
-		// the rendered dst (forward-mariadb-3306), proving resolution uses the
-		// rendered destination, not the source path.
+		// port-forward's dst is templated; the profile name is derived
+		// from the rendered dst (forward-mariadb-3306), proving resolution uses
+		// the rendered destination, not the source path.
 		bundles := []cabin.FeatureRef{
 			{Name: "base"},
 			{Name: "agent-pi"},
@@ -736,8 +736,8 @@ func TestResolveGreywallProfiles(t *testing.T) {
 	})
 
 	t.Run("BothAgentsUnion", func(t *testing.T) {
-		// When both agents are active, the union includes both profiles in
-		// bundle order (subagent pattern: opencode can carry pi).
+		// When both agents are active, the union includes both profiles
+		// in bundle order (subagent pattern: opencode can carry pi).
 		bundles := []cabin.FeatureRef{{Name: "base"}, {Name: "agent-pi"}, {Name: "agent-opencode"}}
 		got, err := fragments.ResolveGreywallProfiles(fullFS, bundles, nil)
 		require.NoError(t, err)
@@ -746,10 +746,10 @@ func TestResolveGreywallProfiles(t *testing.T) {
 
 	t.Run("FromEmbeddedPiGo", func(t *testing.T) {
 		// The real embedded fragments resolved through the full fallback
-		// chain, with bundles derived from a Taskfile header (matching the
-		// real cabin internal greywall-profile path). pi-go's header is
-		// agents:[pi] features:[git-agent, go] -> [workspace, pi, go], which
-		// reproduces the profile list the pi wrapper consumes.
+		// chain, with bundles derived from a Taskfile header (matching
+		// the real cabin internal greywall-profile path). pi-go's header
+		// is agents:[pi] features:[git-agent, go] -> [workspace, pi, go],
+		// which reproduces the profile list the pi wrapper consumes.
 		embedFS, err := embedded.Fragments()
 		require.NoError(t, err)
 		merged, err := fragments.BuildLayers(nil, nil, "", embedFS)

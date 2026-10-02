@@ -82,8 +82,8 @@ func TestTruncateCreator(t *testing.T) {
 	})
 
 	t.Run("CreatesParentDirsAndNestedFile", func(t *testing.T) {
-		// TruncateCreator itself does not mkdir (the Materialize loop does); the
-		// contract is "open for write at an existing path". Asserting Create
+		// TruncateCreator itself does not mkdir (the Materialize loop does);
+		// the contract is "open for write at an existing path". Asserting Create
 		// fails on a missing parent documents that boundary so a future caller
 		// does not assume mkdir is baked in.
 		dest := t.TempDir()
@@ -110,8 +110,8 @@ func TestBackupCreator(t *testing.T) {
 
 	t.Run("NoOpOnIdentical", func(t *testing.T) {
 		// Second write with identical content: no-op (no .cabin-bak, target
-		// unchanged). Idempotent on re-run — no backup churn. This is the
-		// copy-if-different contract that makes re-running setup safe.
+		// unchanged). Idempotent on re-run — no backup churn.
+		// This is the copy-if-different contract that makes re-running setup safe.
 		dest := t.TempDir()
 		name := filepath.Join(dest, "conf.json")
 		c := writestrategy.BackupCreator{}
@@ -125,8 +125,8 @@ func TestBackupCreator(t *testing.T) {
 	})
 
 	t.Run("BackupOnDiff", func(t *testing.T) {
-		// Write once, change content, write again: the previous version is
-		// backed up (name.cabin-bak.<timestamp>), the target has the new content.
+		// Write once, change content, write again: the previous version
+		// is backed up (name.cabin-bak.<timestamp>), the target has the new content.
 		// A later diff adds a new generation instead of overwriting the first.
 		dest := t.TempDir()
 		name := filepath.Join(dest, "conf.json")
@@ -142,8 +142,8 @@ func TestBackupCreator(t *testing.T) {
 	})
 
 	t.Run("MultipleDiffsKeepHistory", func(t *testing.T) {
-		// Two successive diffs keep both prior versions: each backup is
-		// timestamped, so the first is never overwritten (the single-slot
+		// Two successive diffs keep both prior versions: each backup
+		// is timestamped, so the first is never overwritten (the single-slot
 		// behaviour is gone). This is the "never lose a generation" contract.
 		dest := t.TempDir()
 		name := filepath.Join(dest, "conf.json")
@@ -176,9 +176,9 @@ func TestBackupCreator(t *testing.T) {
 }
 
 func TestBackupWriter_WriteAfterClose(t *testing.T) {
-	// Writing to a backupWriter after Close errors: the writer is sealed at
-	// Close (content committed), a later Write would otherwise append to a
-	// buffer whose content is no longer read by Close — silently dropped data.
+	// Writing to a backupWriter after Close errors: the writer is sealed
+	// at Close (content committed), a later Write would otherwise append
+	// to a buffer whose content is no longer read by Close — silently dropped data.
 	dest := t.TempDir()
 	name := filepath.Join(dest, "conf.json")
 

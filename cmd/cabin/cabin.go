@@ -21,7 +21,7 @@ import (
 //   - name not in registry           -> AddCabin (new entry)
 //   - name exists with SAME path     -> idempotent warning on stderr, exit 0
 //     (so scripts re-running `add` don't fail on a clean re-run)
-//   - name exists with DIFFERENT path -> error unless --force, exit non-zero
+//   - name exists with DIFFERENT path -> error unless --force, exit non-zero.
 var cabinAddCmd = &cobra.Command{
 	Use:   "add <path> [name]",
 	Short: "Register or update a cabin",
@@ -73,8 +73,8 @@ exit 0). Re-adding with a different path errors out unless --force is given.`,
 			result = fmt.Sprintf("Updated cabin path (was: %s)", existing.Path)
 		default:
 			// Different path, no --force: refuse. The structural block always goes
-			// to stdout (context); only the result line is routed to stderr and the
-			// exit code is non-zero, so the stream + code signal the failure.
+			// to stdout (context); only the result line is routed to stderr
+			// and the exit code is non-zero, so the stream + code signal the failure.
 			displayPath = existing.Path
 			result = fmt.Sprintf("Error: cabin %q already exists at %s; use --force to overwrite with %s",
 				name, existing.Path, normalizedPath)
@@ -131,8 +131,8 @@ var cabinListCmd = &cobra.Command{
 		}
 		fmt.Printf("Cabin registry: %s\n", cabinsPath)
 
-		// Sort by name for stable output (registry preserves insertion order, but
-		// the user expects alphabetical listing).
+		// Sort by name for stable output (registry preserves insertion order,
+		// but the user expects alphabetical listing).
 		sort.Slice(cabins, func(i, j int) bool {
 			return cabins[i].Name < cabins[j].Name
 		})
@@ -153,8 +153,8 @@ func init() {
 // printValidateError renders a ValidateCabin error with actionable guidance.
 // Sentinel errors (ErrNoHeader) get a richer message with a snippet; other
 // errors (path/IO/yaml) are printed as-is since they already carry context.
-// normalizedPath is the resolved cabin path ValidateCabin returns even on
-// error (valid once the path has been resolved, before the header check).
+// normalizedPath is the resolved cabin path ValidateCabin returns even
+// on error (valid once the path has been resolved, before the header check).
 func printValidateError(w io.Writer, err error, normalizedPath string) {
 	if errors.Is(err, cabin.ErrNoHeader) {
 		fmt.Fprintf(w, "Error: %s: %v\n\n", normalizedPath, err)

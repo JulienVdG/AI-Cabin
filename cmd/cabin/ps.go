@@ -17,16 +17,16 @@ import (
 )
 
 // Docker Compose labels set on every container it creates. `cabin ps` reads
-// them to resolve a container to its cabin (config_files -> cabin dir) and to
-// identify the agent service (service), without relying on a hardcoded service
-// name or the registry alone. The project label carries the compose project
-// name (<profile>_<cabin> or <cabin> alone) from which the active profile is
-// derived.
+// them to resolve a container to its cabin (config_files -> cabin dir)
+// and to identify the agent service (service), without relying on a hardcoded
+// service name or the registry alone. The project label carries the compose
+// project name (<profile>_<cabin> or <cabin> alone) from which the active
+// profile is derived.
 //
 // Compose v2 prefixes several labels with ".project."; the config_files label
-// is "com.docker.compose.project.config_files" on v2 and "com.docker.compose.
-// config_files" on legacy v1. Both are checked so `cabin ps` works across
-// Compose versions. The service and project labels are the same on both.
+// is "com.docker.compose.project.config_files" on v2 and "com.docker.compose.config_files"
+// on legacy v1. Both are checked so `cabin ps` works across Compose
+// versions. The service and project labels are the same on both.
 const (
 	labelComposeService       = "com.docker.compose.service"
 	labelComposeProject       = "com.docker.compose.project"
@@ -36,12 +36,12 @@ const (
 
 // psCmd lists agent containers. Discovery is label-driven: it queries
 // `docker ps` for all containers, keeps those created by Docker Compose (they
-// carry com.docker.compose.* labels), and resolves each to a cabin via its
-// compose config_files path. The cabin name comes from the registry when the
-// dir is registered (fast path), or from Taskfile header validation otherwise
-// (unregistered cabins are discovered too). The agent container is the one
-// whose com.docker.compose.service matches the cabin's AGENT_SERVICE (default
-// "agent"). Only running containers are listed unless --all is set.
+// carry com.docker.compose.* labels), and resolves each to a cabin
+// via its compose config_files path. The cabin name comes from the registry
+// when the dir is registered (fast path), or from Taskfile header validation
+// otherwise (unregistered cabins are discovered too). The agent container
+// is the one whose com.docker.compose.service matches the cabin's AGENT_SERVICE
+// (default "agent"). Only running containers are listed unless --all is set.
 var psCmd = &cobra.Command{
 	Use:   "ps",
 	Short: "List agent containers across cabins",
@@ -51,8 +51,8 @@ var psCmd = &cobra.Command{
 }
 
 // allFlag (-a, --all) shows stopped containers too (default: running only).
-// Matches the `docker ps -a` convention: a stopped agent is useful when
-// debugging why a cabin does not respond (exited/restarting vs absent).
+// Matches the `docker ps -a` convention: a stopped agent is useful
+// when debugging why a cabin does not respond (exited/restarting vs absent).
 var allFlag bool
 
 func init() {
@@ -78,10 +78,10 @@ type dockerContainer struct {
 //   - a CSV string (older Docker, or the `{{json .}}` template):
 //     "key=value,key2=value2"
 //
-// The CSV form is the one Docker Compose labels take: keys/values use '=' as
-// the separator and ',' between pairs. Values may contain '=' (e.g. URLs);
-// only the first '=' splits a pair, the rest is the value. Values do not
-// contain ',' in practice for the compose labels `cabin ps` reads.
+// The CSV form is the one Docker Compose labels take: keys/values use '='
+// as the separator and ',' between pairs. Values may contain '=' (e.g. URLs);
+// only the first '=' splits a pair, the rest is the value. Values do not contain
+// ',' in practice for the compose labels `cabin ps` reads.
 type dockerLabels map[string]string
 
 // UnmarshalJSON implements the dual-shape parsing. An empty/absent label set
@@ -100,8 +100,8 @@ func (l *dockerLabels) UnmarshalJSON(data []byte) error {
 		*l = m
 		return nil
 	}
-	// String form: parse the CSV "k=v,k2=v2". Unquote first (the value is a
-	// JSON string); an empty string means no labels.
+	// String form: parse the CSV "k=v,k2=v2". Unquote first (the value
+	// is a JSON string); an empty string means no labels.
 	var s string
 	if err := json.Unmarshal(trimmed, &s); err != nil {
 		return err
@@ -142,9 +142,9 @@ type agentRow struct {
 // listRunningAgents queries docker for all containers, filters to Docker
 // Compose containers that resolve to an AI-Cabin cabin and match the agent
 // service, and prints them as "cabin-name\tcontainer-name\tstate". Containers
-// whose cabin dir is not a valid AI-Cabin cabin (no ai-cabin: header) are
-// skipped silently. A docker failure is fatal; a registry load failure is
-// reported but does not abort (label discovery still resolves unregistered
+// whose cabin dir is not a valid AI-Cabin cabin (no ai-cabin: header)
+// are skipped silently. A docker failure is fatal; a registry load failure
+// is reported but does not abort (label discovery still resolves unregistered
 // cabins via Taskfile validation).
 func listRunningAgents(stdout, stderr io.Writer, all bool) {
 	// Load the registry as a path->name map (fast lookup for registered cabins).
@@ -181,12 +181,12 @@ func listRunningAgents(stdout, stderr io.Writer, all bool) {
 	}
 }
 
-// mapContainersToAgents filters and resolves Docker Compose containers to
-// agent rows. The running-state filter runs first (skip stopped containers
+// mapContainersToAgents filters and resolves Docker Compose containers
+// to agent rows. The running-state filter runs first (skip stopped containers
 // unless all=true) so the cabin resolution (registry lookup + Taskfile read)
-// is not done for containers that would be omitted anyway. Containers without
-// the config_files label (not from Docker Compose) or not resolving to an
-// AI-Cabin cabin are skipped silently.
+// is not done for containers that would be omitted anyway. Containers
+// without the config_files label (not from Docker Compose) or not resolving
+// to an AI-Cabin cabin are skipped silently.
 func mapContainersToAgents(containers []dockerContainer, registry map[string]string, all bool) []agentRow {
 	var rows []agentRow
 	for _, ct := range containers {
@@ -219,8 +219,8 @@ func mapContainersToAgents(containers []dockerContainer, registry map[string]str
 }
 
 // parseDockerPS decodes the NDJSON output of `docker ps --format '{{json .}}'`
-// (one JSON object per line) into a slice of dockerContainer. Empty lines are
-// skipped. A malformed line is a hard error: docker output is machine-generated,
+// (one JSON object per line) into a slice of dockerContainer. Empty lines
+// are skipped. A malformed line is a hard error: docker output is machine-generated,
 // and a parse failure signals a real mismatch (e.g. a Docker version producing
 // a different shape).
 func parseDockerPS(data []byte) ([]dockerContainer, error) {
@@ -239,9 +239,9 @@ func parseDockerPS(data []byte) ([]dockerContainer, error) {
 	return containers, nil
 }
 
-// composeLabelsOf extracts the Docker Compose labels `cabin ps` reads off a
-// container. Returns ok=false when the container has no labels or no
-// com.docker.compose.config_files label (i.e. not created by Docker Compose).
+// composeLabelsOf extracts the Docker Compose labels `cabin ps` reads off
+// a container. Returns ok=false when the container has no labels
+// or no com.docker.compose.config_files label (i.e. not created by Docker Compose).
 func composeLabelsOf(ct dockerContainer) (composeLabels, bool) {
 	if ct.Labels == nil {
 		return composeLabels{}, false
@@ -277,9 +277,9 @@ type composeLabels struct {
 }
 
 // cabinDirFromConfigFiles derives the cabin directory (where the Taskfile
-// lives) from the com.docker.compose.config_files label. The label holds the
-// absolute path to the compose file(s); the cabin dir is the parent of the
-// first one. Docker Compose may list multiple comma-separated paths (extends /
+// lives) from the com.docker.compose.config_files label. The label holds
+// the absolute path to the compose file(s); the cabin dir is the parent
+// of the first one. Docker Compose may list multiple comma-separated paths (extends /
 // overrides); the first is the primary compose file, and its parent is where
 // `cabin up` ran (the cabin dir).
 func cabinDirFromConfigFiles(configFiles string) string {
@@ -301,11 +301,11 @@ func registryByPath() (map[string]string, error) {
 	return m, nil
 }
 
-// resolveCabinName resolves a cabin directory to its name: registry lookup by
-// canonical path first (fast, no Taskfile read), then Taskfile header
+// resolveCabinName resolves a cabin directory to its name: registry lookup
+// by canonical path first (fast, no Taskfile read), then Taskfile header
 // validation (derives the name and confirms it is an AI-Cabin cabin). Returns
-// ok=false when the dir is not an AI-Cabin cabin (no ai-cabin: header) — the
-// container is skipped. A path that cannot be normalized is also skipped
+// ok=false when the dir is not an AI-Cabin cabin (no ai-cabin: header) —
+// the container is skipped. A path that cannot be normalized is also skipped
 // rather than aborting the whole listing.
 func resolveCabinName(dir string, registry map[string]string) (string, bool) {
 	// Normalize the dir the same way ValidateCabin does (absolute + symlinks)
@@ -321,8 +321,8 @@ func resolveCabinName(dir string, registry map[string]string) (string, bool) {
 	if name, ok := registry[resolved]; ok {
 		return name, true
 	}
-	// Unregistered: validate it is an AI-Cabin cabin (header present) and
-	// derive the name. ErrNoHeader means it is not a cabin — skip silently.
+	// Unregistered: validate it is an AI-Cabin cabin (header present)
+	// and derive the name. ErrNoHeader means it is not a cabin — skip silently.
 	name, _, err := cabin.ValidateCabin(dir, "")
 	if err != nil {
 		return "", false
@@ -344,9 +344,9 @@ func agentServiceForCabin(dir string) string {
 	return cabin.AgentService(data)
 }
 
-// runDockerPS queries all containers as JSON (one object per line) via the
-// Docker CLI. Uses the Go template form '{{json .}}' for portability: the
-// 'json' format shorthand requires Docker 25+, while the template form works
+// runDockerPS queries all containers as JSON (one object per line)
+// via the Docker CLI. Uses the Go template form '{{json .}}' for portability:
+// the 'json' format shorthand requires Docker 25+, while the template form works
 // on older versions too. Requires Docker to be installed and reachable.
 func runDockerPS() ([]byte, error) {
 	cmd := exec.Command("docker", "ps", "--format", "{{json .}}")

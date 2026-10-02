@@ -10,11 +10,11 @@ import (
 	"github.com/JulienVdG/AI-Cabin/internal/cabin"
 )
 
-// TestResolveBlueprints covers the blueprint facet resolution: a bundle with
-// no blueprint.yaml is skipped, a malformed manifest surfaces a per-bundle
-// error, verbatim args/dockerfile blocks are parsed into line lists, the
-// compose/taskfile subtrees are kept as yaml.Node mappings, and bundle order
-// is preserved.
+// TestResolveBlueprints covers the blueprint facet resolution: a bundle
+// with no blueprint.yaml is skipped, a malformed manifest surfaces
+// a per-bundle error, verbatim args/dockerfile blocks are parsed
+// into line lists, the compose/taskfile subtrees are kept as yaml.Node
+// mappings, and bundle order is preserved.
 func TestResolveBlueprints(t *testing.T) {
 	merged := fstest.MapFS{
 		"base/blueprint.yaml": {Data: []byte(`
@@ -103,10 +103,10 @@ taskfile:
 	})
 }
 
-// TestVerbatimList covers the verbatim args/dockerfile line-list reader: a
-// missing key returns nil, a scalar block goes through splitLines (outer blank
-// lines stripped, inner blanks kept), a sequence node collects the values, and
-// any other node kind returns nil.
+// TestVerbatimList covers the verbatim args/dockerfile line-list reader:
+// a missing key returns nil, a scalar block goes through splitLines
+// (outer blank lines stripped, inner blanks kept), a sequence node collects
+// the values, and any other node kind returns nil.
 func TestVerbatimList(t *testing.T) {
 	t.Run("missing key returns nil", func(t *testing.T) {
 		if got := verbatimList(parseRootNode(t, "other: 1\n"), "args"); got != nil {

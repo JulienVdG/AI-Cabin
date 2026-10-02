@@ -8,8 +8,8 @@ import (
 	"github.com/JulienVdG/AI-Cabin/internal/cabin"
 )
 
-// validTaskfile is a Taskfile with a complete ai-cabin header, used as the
-// baseline; tests mutate it to exercise one field at a time.
+// validTaskfile is a Taskfile with a complete ai-cabin header,
+// used as the baseline; tests mutate it to exercise one field at a time.
 const validTaskfile = `# ai-cabin metadata (read by the CLI at runtime, ignored by task)
 ai-cabin:
   cabin: blog
@@ -193,8 +193,8 @@ ai-cabin: {}
 	})
 
 	t.Run("invalid yaml falls back to default", func(t *testing.T) {
-		// A malformed Taskfile is not fatal for the lookup: `cabin ps` reports the
-		// docker error separately, and a parse failure falls back to the default
+		// A malformed Taskfile is not fatal for the lookup: `cabin ps` reports
+		// the docker error separately, and a parse failure falls back to the default
 		// rather than dropping the cabin from the listing.
 		data := []byte("vars: [unclosed")
 		if got := cabin.AgentService(data); got != cabin.DefaultAgentService {
@@ -290,10 +290,10 @@ func TestParseHeader_Features(t *testing.T) {
 	})
 
 	t.Run("scalar value for mapping feature is rejected", func(t *testing.T) {
-		// "- port-forward: 3306" (scalar instead of a mapping): the value is
-		// not null and cannot decode into map[string]any, so UnmarshalYAML
-		// surfaces a decode error naming the feature (useful UX for the
-		// common "forgot the braces" mistake).
+		// "- port-forward: 3306" (scalar instead of a mapping): the value
+		// is not null and cannot decode into map[string]any, so UnmarshalYAML
+		// surfaces a decode error naming the feature (useful UX
+		// for the common "forgot the braces" mistake).
 		_, err := cabin.ParseHeader([]byte(`ai-cabin:
   features:
     - port-forward: 3306
@@ -331,8 +331,9 @@ func TestParseHeader_Features(t *testing.T) {
 	})
 }
 
-// TestActiveBundles covers the resolution from header to the ordered, deduped
-// active bundle list (base always first, agents -> agent-<name>, then features).
+// TestActiveBundles covers the resolution from header to the ordered,
+// deduped active bundle list (base always first, agents -> agent-<name>,
+// then features).
 func TestActiveBundles(t *testing.T) {
 	t.Run("nil header returns nil", func(t *testing.T) {
 		if got := cabin.ActiveBundles(nil); got != nil {
@@ -404,8 +405,8 @@ func TestActiveBundles(t *testing.T) {
 
 	t.Run("port-forward multi-instance keeps distinct attrs", func(t *testing.T) {
 		// port-forward models one instance per forwarded service, so two entries
-		// with different attrs are both kept — dedup would silently drop the
-		// second forward (a real, breaking bug). Both carry their own attrs.
+		// with different attrs are both kept — dedup would silently drop
+		// the second forward (a real, breaking bug). Both carry their own attrs.
 		h, err := cabin.ParseHeader([]byte(`ai-cabin:
   agents: [pi]
   features:

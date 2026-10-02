@@ -179,8 +179,8 @@ func TestComposeLabelsOf(t *testing.T) {
 	})
 }
 
-// TestCabinDirFromConfigFiles covers deriving the cabin dir from the
-// com.docker.compose.config_files label: single file and multiple files.
+// TestCabinDirFromConfigFiles covers deriving the cabin dir
+// from the com.docker.compose.config_files label: single file and multiple files.
 func TestCabinDirFromConfigFiles(t *testing.T) {
 	t.Run("single compose file", func(t *testing.T) {
 		got := cabinDirFromConfigFiles("/home/u/blog/docker-compose.yml")
@@ -198,13 +198,13 @@ func TestCabinDirFromConfigFiles(t *testing.T) {
 	})
 }
 
-// TestMapContainersToAgents covers the filtering and resolution logic with a
-// real temp dir + Taskfile (registered cabin) and a non-existent dir
-// (skipped). The running-state filter runs first; non-compose containers and
-// non-agent services are skipped; registered cabins use the registry name.
+// TestMapContainersToAgents covers the filtering and resolution logic
+// with a real temp dir + Taskfile (registered cabin) and a non-existent dir
+// (skipped). The running-state filter runs first; non-compose containers
+// and non-agent services are skipped; registered cabins use the registry name.
 func TestMapContainersToAgents(t *testing.T) {
-	// Registered cabin: a real temp dir with a valid ai-cabin header and an
-	// AGENT_SERVICE var so agentServiceForCabin reads it.
+	// Registered cabin: a real temp dir with a valid ai-cabin header
+	// and an AGENT_SERVICE var so agentServiceForCabin reads it.
 	blogDir := t.TempDir()
 	writeTaskfileMain(t, blogDir, "ai-cabin: {}\nvars:\n  AGENT_SERVICE: agent\n")
 	// The registry stores the canonical path (EvalSymlinks, like ValidateCabin).
@@ -257,8 +257,8 @@ func TestMapContainersToAgents(t *testing.T) {
 	t.Run("default: running agent only", func(t *testing.T) {
 		// Only the running agent of the registered cabin matches. The db service,
 		// the exited agent, the ghost (dir does not exist), and the raw container
-		// (no compose labels) are all skipped. The profile is derived from the
-		// project label: "default_blog" -> "default".
+		// (no compose labels) are all skipped. The profile is derived
+		// from the project label: "default_blog" -> "default".
 		got := mapContainersToAgents(containers, registry, false)
 		want := []agentRow{
 			{name: "blog", profile: "default", container: "blog-agent-1", state: "running"},

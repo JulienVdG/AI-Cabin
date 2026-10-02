@@ -8,8 +8,8 @@ import (
 
 // TestProfileLine covers the list marker rendering: a plain entry, the active
 // profile marked current, the source annotation when the active profile
-// overrides the use-selected one (--profile / AI_CABIN_PROFILE), and the
-// (overridden) flag on the use-selected profile that is not in effect.
+// overrides the use-selected one (--profile / AI_CABIN_PROFILE),
+// and the (overridden) flag on the use-selected profile that is not in effect.
 func TestProfileLine(t *testing.T) {
 	configSelection := config.ProfileSelection{Name: "work", Source: config.ProfileSourceConfig, Use: "work"}
 	envSelection := config.ProfileSelection{Name: "envprof", Source: config.ProfileSourceEnv, Use: "work"}
@@ -44,10 +44,10 @@ func TestProfileLine(t *testing.T) {
 	}
 }
 
-// TestParseProfileSetArgs covers the positional parsing of `profile set`: the
-// copy-paste KEY=VALUE spellings (single and mass), the backwards-compatible
-// KEY VALUE pair, the empty case (everything from --var), and the ambiguous or
-// malformed shapes that must be rejected.
+// TestParseProfileSetArgs covers the positional parsing of `profile set`:
+// the copy-paste KEY=VALUE spellings (single and mass),
+// the backwards-compatible KEY VALUE pair, the empty case
+// (everything from --var), and the ambiguous or malformed shapes that must be rejected.
 func TestParseProfileSetArgs(t *testing.T) {
 	cases := []struct {
 		name    string

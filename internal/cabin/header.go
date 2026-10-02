@@ -7,69 +7,70 @@ import (
 )
 
 // AICabinHeader is the metadata read from a Taskfile's top-level "ai-cabin:"
-// key. task ignores this key (it does not know it), but the cabin CLI reads it
-// as the source of cabin identity: the registry name, the declared agents,
-// and the feature bundles. `agents: [pi]` is a shorthand for
-// `features: [agent-pi]`; see ActiveBundles for the resolution.
+// key. task ignores this key (it does not know it), but the cabin CLI reads
+// it as the source of cabin identity: the registry name, the declared
+// agents, and the feature bundles. `agents: [pi]` is a shorthand
+// for `features: [agent-pi]`; see ActiveBundles for the resolution.
 //
 // All fields are optional: a header declaring only "ai-cabin: {}" (empty map)
 // is valid, and the cabin name then falls back to the directory basename.
 // The contract for a valid cabin is "the ai-cabin: block exists".
 //
 // Note on "empty": yaml.v3 decodes a bare "ai-cabin:" (YAML null) as a nil
-// pointer, indistinguishable from an absent block. To declare an empty but
-// present header, use "ai-cabin: {}" (empty map).
+// pointer, indistinguishable from an absent block. To declare an empty
+// but present header, use "ai-cabin: {}" (empty map).
 type AICabinHeader struct {
 	Cabin    string       `yaml:"cabin"`
 	Agents   []string     `yaml:"agents"`
 	Features []FeatureRef `yaml:"features,omitempty"`
-	// AuthoredWith records the authoring params used to generate this cabin, so
-	// `cabin authoring show`/`new` on it re-render the same image/user/home.
+	// AuthoredWith records the authoring params used to generate this cabin,
+	// so `cabin authoring show`/`new` on it re-render the same image/user/home.
 	AuthoredWith AuthoringParams `yaml:"authored_with,omitempty"`
 }
 
 // AuthoringParams are the values a cabin was authored with: the assembled
-// base image (FROM), container user and container home. They are a record of
-// how the cabin was generated (kept so re-running authoring renders the same
-// choices), not runtime state. Empty fields fall back to the authoring defaults
-// (golang:1.26-trixie / ai_agent / /home/ai_agent).
+// base image (FROM), container user and container home. They are a record
+// of how the cabin was generated (kept so re-running authoring renders
+// the same choices), not runtime state. Empty fields fall back to the authoring
+// defaults (golang:1.26-trixie / ai_agent / /home/ai_agent).
 type AuthoringParams struct {
 	Image string `yaml:"image"`
 	User  string `yaml:"user"`
 	Home  string `yaml:"home"`
 }
 
-// ToMap renders the authoring params as the top-level template keys a
-// blueprint's {<.X>} actions reference ({<.Image>}/{<.User>}/{<.Home>}).
+// ToMap renders the authoring params as the top-level template keys
+// a blueprint's {<.X>} actions reference ({<.Image>}/{<.User>}/{<.Home>}).
 func (p AuthoringParams) ToMap() map[string]any {
 	return map[string]any{"Image": p.Image, "User": p.User, "Home": p.Home}
 }
 
-// IsZero reports whether no authoring param is set. yaml.v3 consults it for
-// the omitempty tag, so an un-authored header (all params empty) omits the
-// authored_with block instead of emitting an empty map.
+// IsZero reports whether no authoring param is set. yaml.v3 consults
+// it for the omitempty tag, so an un-authored header (all params empty)
+// omits the authored_with block instead of emitting an empty map.
 func (p AuthoringParams) IsZero() bool {
 	return p.Image == "" && p.User == "" && p.Home == ""
 }
 
 // FeatureRef is a feature bundle selected in the header's `features:` list,
-// carrying optional attrs used as top-level template vars ({{.port}}) by
-// internal/render (profile vars are namespaced as {{.Vars.X}}). Two YAML forms
-// are accepted under `features:`:
+// carrying optional attrs used as top-level template vars ({{.port}})
+// by internal/render (profile vars are namespaced as {{.Vars.X}}). Two YAML
+// forms are accepted under `features:`:
 //   - a bare string:        `- git-agent`
 //   - a single-key mapping: `- port-forward: {port: 3306, host: mariadb}`
 //
-// Attrs travel with the bundle so the CLI can pass them to
-// fragments.MaterializeDeps/MaterializeSetup alongside the bundle name.
+// Attrs travel with the bundle: the CLI passes them (alongside the bundle
+// name) to fragments.MaterializeDeps/MaterializeSetup.
 type FeatureRef struct {
 	Name  string
 	Attrs map[string]any
 }
 
-// UnmarshalYAML accepts both the bare-string and single-key-mapping forms for
-// a features: entry. A bare string yields Name with no attrs. A mapping must
-// have exactly one key (the feature name); its value is the attrs map (or null
-// for no attrs, e.g. `- git-agent:`). Any other YAML kind is a strict error.
+// UnmarshalYAML accepts both the bare-string and single-key-mapping forms
+// for a features: entry. A bare string yields Name with no attrs. A mapping
+// must have exactly one key (the feature name); its value is the attrs map
+// (or null for no attrs, e.g. `- git-agent:`). Any other YAML
+// kind is a strict error.
 func (f *FeatureRef) UnmarshalYAML(value *yaml.Node) error {
 	switch value.Kind {
 	case yaml.ScalarNode:
@@ -101,8 +102,8 @@ func (f *FeatureRef) UnmarshalYAML(value *yaml.Node) error {
 	}
 }
 
-// MarshalYAML is the write side of the two YAML forms accepted under
-// features: implemented as the inverse of UnmarshalYAML, so a header
+// MarshalYAML is the write side of the two YAML forms accepted
+// under features:, implemented as the inverse of UnmarshalYAML, so a header
 // round-trips through the CLI. A feature without attrs encodes as a bare
 // string (`- go`); one with attrs encodes as a single-key mapping
 // (`- port-forward: {port: 5432}`).
@@ -113,8 +114,9 @@ func (f FeatureRef) MarshalYAML() (any, error) {
 	return map[string]any{f.Name: f.Attrs}, nil
 }
 
-// taskfileHeader wraps a Taskfile so we can unmarshal only the "ai-cabin:" key.
-// Unknown top-level keys (version, vars, tasks, ...) are ignored by yaml.Unmarshal.
+// taskfileHeader wraps a Taskfile so we can unmarshal only the "ai-cabin:"
+// key. Unknown top-level keys (version, vars, tasks, ...) are ignored
+// by yaml.Unmarshal.
 //
 // AICabin is a pointer so yaml distinguishes the three cases natively:
 //   - "ai-cabin:" absent from the YAML     -> AICabin == nil
@@ -132,18 +134,18 @@ type taskfileHeader struct {
 // contract requires Taskfile.yml specifically (one canonical name).
 const TaskfileName = "Taskfile.yml"
 
-// DefaultAgentService is the v1 convention for the compose service running the
-// agent in a cabin (vars.AGENT_SERVICE in the Taskfile). `cabin ps` matches
-// the agent container via its com.docker.compose.service label against this
-// name when AGENT_SERVICE is not declared in the Taskfile.
+// DefaultAgentService is the v1 convention for the compose service
+// running the agent in a cabin (vars.AGENT_SERVICE in the Taskfile).
+// `cabin ps` matches the agent container via its com.docker.compose.service
+// label against this name when AGENT_SERVICE is not declared in the Taskfile.
 const DefaultAgentService = "agent"
 
 // AgentService extracts the agent compose service name from a Taskfile's
-// top-level vars: block (vars.AGENT_SERVICE). Returns DefaultAgentService when
-// the var is absent, not a string, or empty — a cabin relying on the v1
-// convention. Never errors: this is a lookup with a fallback, not a
-// validation. Used by `cabin ps` to identify the agent container among a
-// compose project's services.
+// top-level vars: block (vars.AGENT_SERVICE). Returns DefaultAgentService
+// when the var is absent, not a string, or empty — a cabin relying
+// on the v1 convention. Never errors: this is a lookup with a fallback,
+// not a validation. Used by `cabin ps` to identify the agent container
+// among a compose project's services.
 func AgentService(data []byte) string {
 	var tf taskfileHeader
 	if err := yaml.Unmarshal(data, &tf); err != nil {
@@ -157,11 +159,12 @@ func AgentService(data []byte) string {
 	return DefaultAgentService
 }
 
-// ParseHeader parses the ai-cabin metadata from raw Taskfile bytes. It returns
-// a non-nil *AICabinHeader when the "ai-cabin:" block is present (even if
-// empty), and nil when the block is absent. A nil pointer is NOT an error:
-// callers decide whether a missing header is a problem (ValidateCabin treats
-// it as "not a cabin"). An error is returned only for invalid YAML.
+// ParseHeader parses the ai-cabin metadata from raw Taskfile bytes.
+// It returns a non-nil *AICabinHeader when the "ai-cabin:" block is present
+// (even if empty), and nil when the block is absent. A nil pointer is NOT
+// an error: callers decide whether a missing header is a problem
+// (ValidateCabin treats it as "not a cabin"). An error is returned only
+// for invalid YAML.
 func ParseHeader(data []byte) (*AICabinHeader, error) {
 	var tf taskfileHeader
 	if err := yaml.Unmarshal(data, &tf); err != nil {
@@ -175,16 +178,17 @@ func ParseHeader(data []byte) (*AICabinHeader, error) {
 // (first in the active list) and is not selectable in the header.
 const BaseBundle = "base"
 
-// ActiveBundles returns the active feature bundles for a cabin, derived from
-// its header and ordered: base (always first), then each `agents:` entry as
-// `agent-<name>` (the shorthand: `agents:[pi]` == `features:[agent-pi]`), then
-// each `features:` entry in declaration order. There is no deduplication: a
-// bundle may legitimately appear more than once — most notably port-forward,
-// which models one instance per forwarded service (two entries with different
-// attrs are both kept, not collapsed). A genuine duplicate (e.g. the same
-// agent declared via both `agents:` and `features:`) is a user mistake that
-// surfaces as a benign double-write in Materialize (idempotent on .deps/).
-// Returns nil if header is nil (an invalid cabin).
+// ActiveBundles returns the active feature bundles for a cabin, derived
+// from its header and ordered: base (always first), then each `agents:` entry
+// as `agent-<name>` (the shorthand: `agents:[pi]` == `features:[agent-pi]`),
+// then each `features:` entry in declaration order. There is no deduplication:
+// a bundle may legitimately appear more than once — most notably
+// port-forward, which models one instance per forwarded service
+// (two entries with different attrs are both kept, not collapsed).
+// A genuine duplicate (e.g. the same agent declared via both `agents:`
+// and `features:`) is a user mistake that surfaces as a benign double-write
+// in Materialize (idempotent on .deps/). Returns nil if header is nil
+// (an invalid cabin).
 func ActiveBundles(header *AICabinHeader) []FeatureRef {
 	if header == nil {
 		return nil

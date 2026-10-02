@@ -17,8 +17,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// internalCmd groups internal commands invoked by Taskfile targets (not by
-// users directly). Hidden from the default help; still runnable for debugging.
+// internalCmd groups internal commands invoked by Taskfile targets
+// (not by users directly). Hidden from the default help; still runnable for debugging.
 var internalCmd = &cobra.Command{
 	Use:   "internal",
 	Short: "Internal commands invoked by Taskfile targets",
@@ -39,19 +39,19 @@ const depsManifest = "deps.yaml"
 const setupManifest = "setup.yaml"
 
 // fragmentsSubdir is the cabin-local override layer subdir. A cabin opts into
-// fragment overrides by creating <cabin>/fragments/; absent means no
-// cabin-local layer (the dev layer is optional). Kept under a subdir (not the
-// cabin root) so cabin files (Taskfile, Dockerfile, compose) cannot accidentally
-// shadow an embedded fragment path, and the override layout mirrors the
-// embedded root/fragments/ tree.
+// fragment overrides by creating <cabin>/fragments/; absent means
+// no cabin-local layer (the dev layer is optional). Kept under a subdir
+// (not the cabin root) so cabin files (Taskfile, Dockerfile, compose) cannot
+// accidentally shadow an embedded fragment path, and the override layout
+// mirrors the embedded root/fragments/ tree.
 const fragmentsSubdir = "fragments"
 
 // buildFragmentLayers builds the merged fragment fallback chain for a cabin:
 // the cabin-local override layer (<cabin>/fragments when it exists) layered
-// over the configured fragment dirs and the embedded fragments, resolved with
-// the given vars. Returns the merged FS and the cabin-local layer path (empty
-// when the cabin has none). Shared by the cabin runtime resolution and
-// `cabin authoring`.
+// over the configured fragment dirs and the embedded fragments, resolved
+// with the given vars. Returns the merged FS and the cabin-local layer path
+// (empty when the cabin has none). Shared by the cabin runtime resolution
+// and `cabin authoring`.
 func buildFragmentLayers(cabinPath string, vars config.Vars) (fs.FS, string, error) {
 	cabinLocal := ""
 	if cabinPath != "" {
@@ -78,8 +78,8 @@ func buildFragmentLayers(cabinPath string, vars config.Vars) (fs.FS, string, err
 // specifically and falls back to a generic message otherwise).
 // resolveCabinFragments resolves the active bundles for the cabin at cabinPath
 // (header agents:/features:), the resolved vars, and the merged fallback chain.
-// Hidden internal commands pass "." (CWD); the task runner passes the
-// registered cabin's path so behavior is independent of the caller's CWD.
+// Hidden internal commands pass "." (CWD); the task runner passes
+// the registered cabin's path so behavior is independent of the caller's CWD.
 func resolveCabinFragments(cabinPath string) ([]cabin.FeatureRef, config.Vars, fs.FS, string, error) {
 	header, resolvedPath, err := cabin.Header(cabinPath)
 	if err != nil {
@@ -101,14 +101,14 @@ func resolveCabinFragments(cabinPath string) ([]cabin.FeatureRef, config.Vars, f
 	return bundles, vars, merged, resolvedPath, nil
 }
 
-// composeProjectName resolves the docker compose project name for a cabin: the
-// active profile's name and the cabin's canonical name (ai-cabin.cabin header
-// > basename), sanitized and joined so two profiles operating the same cabin
-// get distinct projects while sharing the image build. A missing profile
-// yields the canonical name alone. The returned resolvedPath is populated even
-// on error so callers can surface which directory was inspected. Shared by
-// runCabinTask (CLI path) and `cabin internal compose-project-name` (standalone
-// `task` path).
+// composeProjectName resolves the docker compose project name for a cabin:
+// the active profile's name and the cabin's canonical name
+// (ai-cabin.cabin header > basename), sanitized and joined so two profiles
+// operating the same cabin get distinct projects while sharing
+// the image build. A missing profile yields the canonical name alone.
+// The returned resolvedPath is populated even on error so callers
+// can surface which directory was inspected. Shared by runCabinTask (CLI path)
+// and `cabin internal compose-project-name` (standalone `task` path).
 func composeProjectName(cabinPath string) (name, resolvedPath string, err error) {
 	canonical, resolvedPath, err := cabin.ValidateCabin(cabinPath, "")
 	if err != nil {
@@ -122,8 +122,8 @@ func composeProjectName(cabinPath string) (name, resolvedPath string, err error)
 }
 
 // internalDepsCmd materializes <cabin>/.deps/ from the active bundles declared
-// in the cabin's Taskfile header (agents:/features:), resolved through the
-// fallback chain (AI_CABIN_FRAGMENTS_DIRS > <cabin>/fragments/ > embedded).
+// in the cabin's Taskfile header (agents:/features:), resolved
+// through the fallback chain (AI_CABIN_FRAGMENTS_DIRS > <cabin>/fragments/ > embedded).
 //
 // Invoked from the Taskfile `deps` target via $AI_CABIN_CMD self-delegation:
 // the task runs in the cabin dir, so this command resolves the cabin
@@ -172,10 +172,10 @@ var internalDepsCmd = &cobra.Command{
 	},
 }
 
-// internalSetupCmd materializes agent configs into $AI_CABIN_HOME from the
-// active bundles' setup facet, resolved through the fallback chain. Uses
-// BackupCreator (copy-if-different + backup) since the destination is
-// persistent (and may be a shared global config when AI_CABIN_HOME=$HOME).
+// internalSetupCmd materializes agent configs into $AI_CABIN_HOME
+// from the active bundles' setup facet, resolved through the fallback chain. Uses
+// BackupCreator (copy-if-different + backup) since the destination
+// is persistent (and may be a shared global config when AI_CABIN_HOME=$HOME).
 var internalSetupCmd = &cobra.Command{
 	Use:   "setup",
 	Short: "Materialize agent configs into $AI_CABIN_HOME from active bundles",
@@ -215,11 +215,11 @@ var internalSetupCmd = &cobra.Command{
 	},
 }
 
-// internalGreywallProfileCmd resolves the greywall profile list from the
-// cabin's active bundles (header agents:/features:), through the fallback
-// chain. It prints the comma-joined list to stdout (e.g.
-// "workspace,pi,go,forward-mariadb-3306") so the Taskfile can capture it via
-// `env: sh:` on the standalone path. The CLI path (cabin task/cabin up)
+// internalGreywallProfileCmd resolves the greywall profile list
+// from the cabin's active bundles (header agents:/features:),
+// through the fallback chain. It prints the comma-joined list to stdout (e.g.
+// "workspace,pi,go,forward-mariadb-3306") so the Taskfile can capture
+// it via `env: sh:` on the standalone path. The CLI path (cabin task/cabin up)
 // sets GREYWALL_PROFILE on the process directly, short-circuiting the sh: (no
 // subprocess). This is the hidden command the wrapper's $GREYWALL_PROFILE
 // resolves to when not preset.
@@ -242,10 +242,10 @@ var internalGreywallProfileCmd = &cobra.Command{
 	},
 }
 
-// internalComposeProjectNameCmd resolves the docker compose project name for
-// the cabin in the current directory (active profile + cabin canonical name).
-// It prints the name to stdout so the Taskfile can capture it via `env: sh:` on
-// the standalone path. The CLI path (cabin task/cabin up) sets
+// internalComposeProjectNameCmd resolves the docker compose project name
+// for the cabin in the current directory (active profile + cabin canonical name).
+// It prints the name to stdout so the Taskfile can capture it via `env: sh:`
+// on the standalone path. The CLI path (cabin task/cabin up) sets
 // COMPOSE_PROJECT_NAME on the process directly, short-circuiting the sh: (no
 // subprocess). This is the hidden command the wrapper's $COMPOSE_PROJECT_NAME
 // resolves to when not preset — same convergence pattern as greywall-profile.

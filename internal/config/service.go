@@ -20,7 +20,7 @@ type ConfigService struct {
 }
 
 // NewConfigService creates a new ConfigService with all dependencies explicit.
-// This is the canonical DI constructor (see skill:go-test-patterns):
+// This is the canonical DI constructor:
 //   - gitProvider: Git user identity source (nil if unused by the tested method).
 //   - homeDir: user home directory source (nil if unused).
 //   - filesystem: fs.FS rooted at the config dir, used for reads (nil for write-only tests).
@@ -70,10 +70,10 @@ func (s *ConfigService) LoadProfile(name string) (*Profile, error) {
 	if err := yaml.Unmarshal(data, &profile); err != nil {
 		return nil, fmt.Errorf("failed to parse profile %q: %w", name, err)
 	}
-	// Resolve the absolute file path (the read above goes through fs with a
-	// relative path, but Path() must surface a real, operator-facing absolute
-	// path so output like `profile show`/`set` points the user at the exact
-	// YAML to inspect or fix by hand). GetProfilesDir is host-resolved.
+	// Resolve the absolute file path (the read above goes through fs
+	// with a relative path, but Path() must surface a real, operator-facing
+	// absolute path so output like `profile show`/`set` points the user
+	// at the exact YAML to inspect or fix by hand). GetProfilesDir is host-resolved.
 	profilesDir, err := GetProfilesDir()
 	if err != nil {
 		return nil, fmt.Errorf("resolve profiles dir: %w", err)
@@ -176,8 +176,8 @@ func (s *ConfigService) ProfileExists(name string) (bool, error) {
 }
 
 // GetActiveProfile resolves and loads the active profile. The selector follows
-// the same precedence as ResolveVars: an explicit name (--profile) wins, then
-// AI_CABIN_PROFILE env (set by `cabin setenv`, so the standalone `task` path
+// the same precedence as ResolveVars: an explicit name (--profile) wins,
+// then AI_CABIN_PROFILE env (set by `cabin setenv`, so the standalone `task` path
 // selects the right profile), then the current profile from config.yaml.
 // Returns a user-friendly error if the profile doesn't exist or can't be loaded.
 func (s *ConfigService) GetActiveProfile(name string) (*Profile, error) {
@@ -214,11 +214,11 @@ func (s *ConfigService) GetActiveProfile(name string) (*Profile, error) {
 // ResolveProfile resolves the active profile name and its origin without
 // loading the file. Precedence: explicit positional name (profile show
 // <name>) > --profile flag > --var AI_CABIN_PROFILE > AI_CABIN_PROFILE env >
-// current profile from config.yaml. Use records the persisted selection so
-// callers can warn when the effective profile diverges from the one set with
-// `cabin profile use`. The name is resolved through resolveProfileName, the
-// same selector ResolveVars uses, so the displayed active profile always
-// matches what the runtime commands pick. Never errors on an empty selection
+// current profile from config.yaml. Use records the persisted selection
+// so callers can warn when the effective profile diverges from the one set
+// with `cabin profile use`. The name is resolved through resolveProfileName,
+// the same selector ResolveVars uses, so the displayed active profile
+// always matches what the runtime commands pick. Never errors on an empty selection
 // (no config yet); a malformed --var is rejected like ResolveVars.
 func (s *ConfigService) ResolveProfile(name, profileFlag string, cliVars []string) (ProfileSelection, error) {
 	use, err := s.GetCurrentProfile()
@@ -242,16 +242,16 @@ func (s *ConfigService) ResolveProfile(name, profileFlag string, cliVars []strin
 	return sel, nil
 }
 
-// resolveProfileName returns the selected profile name and its source. It is
-// THE single place that decides which profile file is loaded, shared by
-// ResolveVars (runtime view) and ResolveProfile (cabin profile display), so
-// the two always agree on the active profile. Precedence: --profile flag >
-// --var AI_CABIN_PROFILE > AI_CABIN_PROFILE env > current profile from
-// config.yaml. cliVars is the already-validated --var map and envMap the
-// sanitized process env (EnvironMap); both callers pass the same env source
-// they use for their own assembly, so the selector has no hidden dependency
-// on the raw process env. Never errors on an empty selection (no config yet);
-// the config read error is wrapped.
+// resolveProfileName returns the selected profile name and its source.
+// It is THE single place that decides which profile file is loaded, shared
+// by ResolveVars (runtime view) and ResolveProfile (cabin profile display),
+// so the two always agree on the active profile. Precedence: --profile flag >
+// --var AI_CABIN_PROFILE > AI_CABIN_PROFILE env > current profile
+// from config.yaml. cliVars is the already-validated --var map and envMap
+// the sanitized process env (EnvironMap); both callers pass the same env
+// source they use for their own assembly, so the selector has no hidden
+// dependency on the raw process env. Never errors on an empty selection
+// (no config yet); the config read error is wrapped.
 func (s *ConfigService) resolveProfileName(profileFlag string, cliVars, envMap map[string]string) (string, ProfileSource, error) {
 	switch {
 	case profileFlag != "":
@@ -280,11 +280,11 @@ func (s *ConfigService) BuildDefaultProfile(name string) (*Profile, error) {
 		return nil, fmt.Errorf("failed to get user home directory: %w", err)
 	}
 
-	// Get Git user name from host config (mimics bootstrap-cabin.sh)
+	// Git user name/email defaults, overridden by the host git config
+	// (best effort, git may not be configured).
 	gitAgentName := "AI Agent"
 	gitAgentEmail := "ai-agent@localhost"
 
-	// Try to get git config (best effort, may fail if git not configured)
 	if name, err := s.gitProvider.GetUserName(); err == nil {
 		if name != "" {
 			gitAgentName = "AI Agent + " + name
@@ -316,28 +316,28 @@ func (s *ConfigService) BuildDefaultProfile(name string) (*Profile, error) {
 //
 // The persisted key set is bounded — never the whole env:
 //   - defaults (BuildDefaultProfile: AI_CABIN_HOME/DESK/WORKDIR + GIT_AGENT_*)
-//   - the layer vars (LayerVars: a layer's layer.yaml vars: block, when the
-//     resolved AI_CABIN_LAYER_DIRS is non-empty — see the body)
+//   - the layer vars (LayerVars: a layer's layer.yaml vars: block,
+//     when the resolved AI_CABIN_LAYER_DIRS is non-empty — see the body)
 //   - the --var keys (cliVars), which act as the initial `set` of the profile
 //     CRUD and DO enlarge the set (e.g. --var AI_CABIN_DESK=/custom)
 //   - on --force with an existing profile, the existing profile's keys
 //
 // Values are resolved with ResolveVars precedence (--var > env > existing >
 // layer vars > defaults): an env override on a bounded key (e.g. AI_CABIN_DESK
-// in env) is picked up for the value, but env vars outside the bounded set are
-// dropped (no PATH, no stray SCW_PROJECT_ID unless passed as --var).
+// in env) is picked up for the value, but env vars outside the bounded set
+// are dropped (no PATH, no stray SCW_PROJECT_ID unless passed as --var).
 //
 // On a new profile (does not exist, force ignored): persisted = defaults ∪
-// layer vars ∪ --var. On --force with an existing profile: persisted =
-// defaults ∪ layer vars ∪ --var ∪ existing. On an existing profile without
-// --force: no-op, returns the existing profile (the CLI warns + exit 0,
-// mirroring `cabin add`).
+// layer vars ∪ --var. On --force with an existing profile:
+// persisted = defaults ∪ layer vars ∪ --var ∪ existing. On an existing profile
+// without --force: no-op, returns the existing profile (the CLI warns
+// + exit 0, mirroring `cabin add`).
 //
 // The merge precedence mirrors ResolveVars (--var > env > existing > defaults)
-// but is not delegated to it: ResolveVars loads the *selected* profile (axis A)
+// but is not delegated to it: ResolveVars loads the *selected* profile
 // and includes the whole env in its view, whereas InitProfile loads the named
-// profile under creation/update and persists only a bounded key set (env
-// overrides values but does not enlarge the set). The two share the same
+// profile under creation/update and persists only a bounded key set
+// (env overrides values but does not enlarge the set). The two share the same
 // precedence rule by design; a future refactor could extract the shared merge
 // if the bounded-set concern is factored out, but inlining keeps InitProfile
 // readable and decoupled from the profile-selection axis.
@@ -397,8 +397,8 @@ func (s *ConfigService) InitProfile(name string, cliVars []string, force bool) (
 	}
 
 	// Env overrides only the persisted bounded set (defaults, layer and existing
-	// keys), never stray env vars (no PATH, no SCW_PROJECT_ID unless passed as
-	// --var). Build that set, then the env slice restricted to it. The layer
+	// keys), never stray env vars (no PATH, no SCW_PROJECT_ID unless passed
+	// as --var). Build that set, then the env slice restricted to it. The layer
 	// dirs var is added explicitly — it is not a default, but an env-exported
 	// value must persist when it activates a layer.
 	bounded := make(Vars, 1+len(defaults.Vars)+len(layerVars))
@@ -480,8 +480,8 @@ func (s *ConfigService) SetProfileVars(name string, vars Vars) (*Profile, error)
 }
 
 // SetProfileVar sets a single variable on a profile and persists it atomically,
-// delegating to SetProfileVars. It drives `cabin profile set KEY VALUE` (the
-// single-value spelling) and `cabin use` (CurrentCabinVar).
+// delegating to SetProfileVars. It drives `cabin profile set KEY VALUE`
+// (the single-value spelling) and `cabin use` (CurrentCabinVar).
 func (s *ConfigService) SetProfileVar(name, key, value string) (*Profile, error) {
 	return s.SetProfileVars(name, Vars{key: value})
 }

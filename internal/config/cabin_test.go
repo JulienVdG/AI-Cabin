@@ -16,8 +16,8 @@ import (
 	mock_fs "github.com/JulienVdG/AI-Cabin/internal/mocks/io/fs"
 )
 
-// newCabinStore builds a cabinFileStore for tests, using a real fs.FS (mapFS or
-// os.DirFS) and an optional FileWriter (nil for read-only tests).
+// newCabinStore builds a cabinFileStore for tests, using a real fs.FS
+// (mapFS or os.DirFS) and an optional FileWriter (nil for read-only tests).
 func newCabinStore(t *testing.T, filesystem fs.FS, writer FileWriter) *cabinFileStore {
 	t.Helper()
 	absPath, err := getCabinsPath()
@@ -28,8 +28,8 @@ func newCabinStore(t *testing.T, filesystem fs.FS, writer FileWriter) *cabinFile
 }
 
 // setupCabinTest sets XDG_CONFIG_HOME to a temp dir for the whitebox cabin tests
-// (config_test.go's setupTestConfig lives in package config_test and is not
-// accessible from this package config file).
+// (config_test.go's setupTestConfig lives in package config_test
+// and is not accessible from this package config file).
 func setupCabinTest(t *testing.T) {
 	t.Helper()
 	tmpDir := t.TempDir()
@@ -336,8 +336,8 @@ func TestCabinFileStore_Get(t *testing.T) {
 
 	t.Run("empty registry returns ErrCabinNotFound not disk error", func(t *testing.T) {
 		// No cabins.yaml at all (fresh install): get returns ErrCabinNotFound,
-		// not a disk error. The store's load() treats a missing file as an
-		// empty registry (see cabinFileStore.load), so absence is normal.
+		// not a disk error. The store's load() treats a missing file
+		// as an empty registry (see cabinFileStore.load), so absence is normal.
 		_, err := store.get("anything")
 		if !errors.Is(err, ErrCabinNotFound) {
 			t.Errorf("get() on empty registry error = %v, want ErrCabinNotFound", err)

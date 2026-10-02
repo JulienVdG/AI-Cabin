@@ -21,7 +21,7 @@ func setupTestConfig(t *testing.T) {
 func TestGetConfigDir(t *testing.T) {
 	t.Run("uses_default_XDG_CONFIG_HOME_when_not_set", func(t *testing.T) {
 		setupTestConfig(t)
-		// Clear XDG_CONFIG_HOME to test default behavior
+		// Clear XDG_CONFIG_HOME to test default behavior.
 		t.Setenv("XDG_CONFIG_HOME", "")
 
 		home, _ := os.UserHomeDir()

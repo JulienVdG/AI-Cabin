@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// rootCmd represents the base command when called without any subcommands
+// rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
 	Use:   "cabin",
 	Short: "AI-Cabin CLI: Manage your AI agent cabins",
@@ -39,8 +39,8 @@ func init() {
 	rootCmd.PersistentFlags().StringArrayVar(&cliVars, "var", nil, "var override KEY=VAL (repeatable; highest precedence)")
 	rootCmd.PersistentFlags().BoolVar(&noRelpathFlag, "no-relpath", false, "skip path shadowing (launch the agent at the workdir root instead of the host CWD sub-path)")
 
-	// Dynamic completion: --profile <TAB> suggests available profiles, and
-	// --cabin <TAB> suggests registered cabins. Registered on root so every
+	// Dynamic completion: --profile <TAB> suggests available profiles,
+	// and --cabin <TAB> suggests registered cabins. Registered on root so every
 	// subcommand (task, up, ...) inherits them. The completion subcommand
 	// itself is Cobra's default (bash/zsh/fish script generation).
 	if err := rootCmd.RegisterFlagCompletionFunc("profile", completeProfileNames); err != nil {

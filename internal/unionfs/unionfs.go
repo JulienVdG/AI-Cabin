@@ -5,16 +5,16 @@
 // (first-wins), for both Open and ReadDir entries. ReadDir unions entries
 // across layers with first-wins deduplication per entry name.
 //
-// The returned value implements fs.FS, fs.ReadDirFS and fs.StatFS, so the
-// stdlib helpers (fs.WalkDir, fs.ReadDir, fs.Stat, fs.ReadFile) work over the
-// union via type assertion. The concrete type is unexported: callers program
-// to fs.FS.
+// The returned value implements fs.FS, fs.ReadDirFS and fs.StatFS,
+// so the stdlib helpers (fs.WalkDir, fs.ReadDir, fs.Stat, fs.ReadFile) work
+// over the union via type assertion. The concrete type is unexported:
+// callers program to fs.FS.
 //
-// Resolution results are cached lazily: a ReadDir pre-populates the cache for
-// its entries, so subsequent Opens are O(1). A negative lookup (no layer has
-// the path) is memoized too, so a missing path is not re-walked on the next
-// access. Layers are assumed read-only for the lifetime of the union: there
-// is no cache invalidation.
+// Resolution results are cached lazily: a ReadDir pre-populates the cache
+// for its entries, so subsequent Opens are O(1). A negative lookup
+// (no layer has the path) is memoized too, so a missing path is not re-walked
+// on the next access. Layers are assumed read-only for the lifetime
+// of the union: there is no cache invalidation.
 //
 // Example:
 //
@@ -32,8 +32,8 @@ import (
 )
 
 // New returns a read-only union of the given layers, ordered highest priority
-// first (first-wins for Open and ReadDir entries). The concrete type is
-// unexported: callers program to fs.FS (and its optional ReadDirFS / StatFS).
+// first (first-wins for Open and ReadDir entries). The concrete type
+// is unexported: callers program to fs.FS (and its optional ReadDirFS / StatFS).
 func New(layers ...fs.FS) fs.FS {
 	return &unionFS{
 		layers: layers,
@@ -41,9 +41,9 @@ func New(layers ...fs.FS) fs.FS {
 	}
 }
 
-// unionFS caches resolution results so a ReadDir pre-populates the cache and
-// subsequent Opens are O(1). Layers are assumed read-only for the lifetime of
-// the union: there is no cache invalidation.
+// unionFS caches resolution results so a ReadDir pre-populates the cache
+// and subsequent Opens are O(1). Layers are assumed read-only for the lifetime
+// of the union: there is no cache invalidation.
 type unionFS struct {
 	layers []fs.FS
 	cache  map[string]int // path -> owning layer index, or notFound; lazy
@@ -61,7 +61,7 @@ func (u *unionFS) Open(name string) (fs.File, error) {
 	return u.layers[idx].Open(name)
 }
 
-// Stat implements fs.StatFS, required by fs.WalkDir to walk the root.
+// Stat implements fs.StatFS: it resolves through the owning layer, like Open.
 func (u *unionFS) Stat(name string) (fs.FileInfo, error) {
 	idx, err := u.resolve(name)
 	if err != nil {
@@ -70,6 +70,7 @@ func (u *unionFS) Stat(name string) (fs.FileInfo, error) {
 	return fs.Stat(u.layers[idx], name)
 }
 
+// ReadDir unions entries across layers, first-wins per entry name.
 func (u *unionFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	var entries []fs.DirEntry
 	seen := make(map[string]bool)
@@ -102,8 +103,8 @@ func (u *unionFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	return entries, nil
 }
 
-// resolve returns the owning layer index for name, using and populating the
-// cache. A negative result is memoized as notFound so it is not re-walked.
+// resolve returns the owning layer index for name, using and populating
+// the cache. A negative result is memoized as notFound so it is not re-walked.
 func (u *unionFS) resolve(name string) (int, error) {
 	if idx, ok := u.cache[name]; ok {
 		if idx == notFound {

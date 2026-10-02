@@ -47,7 +47,7 @@ func TestAtomicFileWriter_WriteFile(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetConfigDir() error = %v", err)
 		}
-		// "profiles" subdir does not exist yet
+		// "profiles" subdir does not exist yet.
 		path := filepath.Join(configDir, "profiles", "perso.yaml")
 
 		if err := writer.WriteFile(path, []byte("name: perso"), 0o644); err != nil {
@@ -65,7 +65,7 @@ func TestAtomicFileWriter_WriteFile(t *testing.T) {
 			t.Fatalf("GetConfigDir() error = %v", err)
 		}
 		path := filepath.Join(configDir, "out.yaml")
-		// Seed with old content
+		// Seed with old content.
 		if err := os.MkdirAll(configDir, 0o755); err != nil {
 			t.Fatalf("MkdirAll() error = %v", err)
 		}

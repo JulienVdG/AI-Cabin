@@ -80,8 +80,8 @@ func TestMergeMapping(t *testing.T) {
 	})
 }
 
-// TestCloneNode covers cloneNode: the nil guard and a real deep copy that
-// preserves fields (comments, style) and does not alias the source children.
+// TestCloneNode covers cloneNode: the nil guard and a real deep copy
+// that preserves fields (comments, style) and does not alias the source children.
 func TestCloneNode(t *testing.T) {
 	t.Run("Nil", func(t *testing.T) {
 		if got := cloneNode(nil); got != nil {
@@ -132,8 +132,8 @@ type failWriter struct{}
 func (failWriter) Write(p []byte) (int, error) { return 0, errors.New("boom") }
 
 // TestErrWriter covers the errWriter contract: a successful run buffers every
-// part and stays error-free; a failing writer records the first error and
-// drops every later write.
+// part and stays error-free; a failing writer records the first error
+// and drops every later write.
 func TestErrWriter(t *testing.T) {
 	t.Run("propagates first error and drops later writes", func(t *testing.T) {
 		ew := &errWriter{w: failWriter{}}

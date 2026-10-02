@@ -2,12 +2,12 @@
 // compose + Taskfile) from the active bundles' resolved blueprints. The merge
 // is a single format-agnostic operation (append lists, deep-merge YAML maps,
 // override scalars) over all blueprints; only the writers differ per target
-// format: Dockerfile text (verbatim concatenation), the apt-get RUN, and the
-// YAML compose/Taskfile (deep-merged yaml.Node subtrees re-serialized with
-// comments preserved).
+// format: Dockerfile text (verbatim concatenation), the apt-get RUN,
+// and the YAML compose/Taskfile (deep-merged yaml.Node subtrees re-serialized
+// with comments preserved).
 //
-// internal/fragments resolves the per-bundle blueprint content through the
-// fallback chain; cmd/cabin wires resolution and write/display. No UX here.
+// internal/fragments resolves the per-bundle blueprint content
+// through the fallback chain; cmd/cabin wires resolution and write/display. No UX here.
 package authoring
 
 import (
@@ -25,26 +25,26 @@ import (
 // DefaultBaseImage is the FROM the assembled Dockerfile ships: the Debian Go
 // image the reference cabins use (greywall's CA step is Debian-specific, hence
 // the Debian base assumption). The author adapts it to their project image
-// (via `--image`, the `ai-cabin: {authored_with: {image}}` record, or by
-// editing the assembled Dockerfile).
+// (via `--image`, the `ai-cabin: {authored_with: {image}}` record,
+// or by editing the assembled Dockerfile).
 const DefaultBaseImage = "golang:1.26-trixie"
 
 // DefaultUser and DefaultHome are the container user and home the assembled
-// cabin ships, matching the reference cabins (pi-go / opencode-go). They are
-// the fallbacks when no authoring param is set.
+// cabin ships, matching the reference cabins (pi-go / opencode-go).
+// They are the fallbacks when no authoring param is set.
 const (
 	DefaultUser = "ai_agent"
 	DefaultHome = "/home/ai_agent"
 )
 
-// CabinDockerfile is the filename the assembled Dockerfile is written to by
-// `cabin authoring new`. It is distinct from a project's own Dockerfile so a
-// non-destructive write never collides with existing project files.
+// CabinDockerfile is the filename the assembled Dockerfile is written
+// to by `cabin authoring new`. It is distinct from a project's own Dockerfile
+// so a non-destructive write never collides with existing project files.
 const CabinDockerfile = "ai-cabin.Dockerfile"
 
 // Files is the write target for Assemble: the destination writer for each
-// cabin artifact, chosen by the caller (e.g. a writestrategy.FileCreator for a
-// non-destructive write).
+// cabin artifact, chosen by the caller (e.g. a writestrategy.FileCreator
+// for a non-destructive write).
 type Files struct {
 	Dockerfile io.Writer
 	Compose    io.Writer
@@ -62,11 +62,11 @@ type MergedBlueprint struct {
 	Taskfile   *yaml.Node
 }
 
-// Assemble renders the three cabin files from the resolved blueprints into the
-// provided writers; a nil writer field means that artifact is not requested. base
-// (the minimal default structure) must be merged first by the caller-provided
-// order of blueprints. It returns the first write error (Dockerfile text or YAML
-// encode).
+// Assemble renders the three cabin files from the resolved blueprints
+// into the provided writers; a nil writer field means that artifact
+// is not requested. base (the minimal default structure) must be merged
+// first by the caller-provided order of blueprints. It returns the first
+// write error (Dockerfile text or YAML encode).
 func Assemble(bps []fragments.BundleBlueprint, h cabin.AICabinHeader, w *Files) error {
 	m := Merge(bps)
 	var errs []error
@@ -107,8 +107,8 @@ func Merge(bps []fragments.BundleBlueprint) MergedBlueprint {
 
 // mergeMapping deep-merges src into dst (a mapping node). Both-mapping values
 // recurse; both-sequence values append; anything else is overridden by src.
-// dst is mutated and returned; src is never mutated (its nodes are cloned on
-// insertion). A nil dst starts as a clone of src.
+// dst is mutated and returned; src is never mutated (its nodes are cloned
+// on insertion). A nil dst starts as a clone of src.
 func mergeMapping(dst, src *yaml.Node) *yaml.Node {
 	if src == nil {
 		return dst
@@ -154,8 +154,8 @@ func cloneSeq(nodes []*yaml.Node) []*yaml.Node {
 	return out
 }
 
-// cloneNode deep-copies a yaml.Node, preserving style and comments so the
-// merged output keeps the author's formatting.
+// cloneNode deep-copies a yaml.Node, preserving style and comments
+// so the merged output keeps the author's formatting.
 func cloneNode(n *yaml.Node) *yaml.Node {
 	if n == nil {
 		return nil
@@ -181,10 +181,10 @@ func cloneNode(n *yaml.Node) *yaml.Node {
 
 // writeDockerfile lays out FROM + args + merged apt RUN + the verbatim
 // dockerfile body. A default CMD is appended unless a body line already
-// declares one (opencode's CMD wins over the interactive sleep default). The
-// body is emitted as many small writes, so it is buffered through an errWriter
-// (the first error is returned once at the end); the caller just provides an
-// io.Writer like the YAML writers.
+// declares one (opencode's CMD wins over the interactive sleep default).
+// The body is emitted as many small writes, so it is buffered through an errWriter
+// (the first error is returned once at the end); the caller just provides
+// an io.Writer like the YAML writers.
 func (m MergedBlueprint) writeDockerfile(ww io.Writer, h cabin.AICabinHeader) error {
 	w := &errWriter{w: ww}
 	w.printf("# Generated by cabin authoring. Adapt FROM to your project base image.\n")
@@ -215,9 +215,9 @@ func (m MergedBlueprint) writeDockerfile(ww io.Writer, h cabin.AICabinHeader) er
 	return w.err
 }
 
-// writeApt merges the apt lists (deduplicated here — a writer concern, the
-// merge stays generic) into the classic Debian apt-get RUN with the usual
-// lists cleanup. Emits nothing when no bundle contributes packages.
+// writeApt merges the apt lists (deduplicated here — a writer concern,
+// the merge stays generic) into the classic Debian apt-get RUN
+// with the usual lists cleanup. Emits nothing when no bundle contributes packages.
 func (m MergedBlueprint) writeApt(w *errWriter) {
 	if len(m.Apt) == 0 {
 		return
@@ -240,9 +240,9 @@ func (m MergedBlueprint) writeApt(w *errWriter) {
 	w.printf("    && rm -rf /var/lib/apt/lists/*\n\n")
 }
 
-// errWriter records the first write error and drops subsequent writes, so a
-// writer that emits many parts can check its error once at the end instead of
-// after every call.
+// errWriter records the first write error and drops subsequent writes,
+// so a writer that emits many parts can check its error once at the end
+// instead of after every call.
 type errWriter struct {
 	w   io.Writer
 	err error
@@ -270,9 +270,9 @@ func (e *errWriter) printf(format string, a ...any) {
 // hostname) followed by the merged compose content. The explicit image tag
 // keeps the build shared across profile instances; container_name is omitted
 // (daemon-global, would collide across projects). The build args pass
-// HOST_UID to the Dockerfile (the lifecycle resolves it, default 1000), so the
-// container user's uid matches the host at build time and the bind-mounts stay
-// writable. Comment nodes inside the merged content are preserved on marshal.
+// HOST_UID to the Dockerfile (the lifecycle resolves it, default 1000),
+// so the container user's uid matches the host at build time and the bind-mounts
+// stay writable. Comment nodes inside the merged content are preserved on marshal.
 func (m MergedBlueprint) writeCompose(w io.Writer, h cabin.AICabinHeader) error {
 	service := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
 

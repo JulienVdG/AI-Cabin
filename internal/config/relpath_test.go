@@ -9,8 +9,8 @@ import (
 
 // TestRelPath covers the path-shadowing host-side computation: the agent
 // launches into a sub-directory inside the sandbox matching the host CWD
-// sub-path. Cases use a real tmp tree (t.TempDir) so symlinks resolve as in
-// production; RelPath is an os-level function (EvalSymlinks), not fstest.
+// sub-path. Cases use a real tmp tree (t.TempDir) so symlinks resolve
+// as in production; RelPath is an os-level function (EvalSymlinks), not fstest.
 func TestRelPath(t *testing.T) {
 	tmp := t.TempDir()
 	workdir := filepath.Join(tmp, "workdir")

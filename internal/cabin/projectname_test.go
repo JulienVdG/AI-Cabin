@@ -9,10 +9,10 @@ import (
 	"github.com/JulienVdG/AI-Cabin/internal/cabin"
 )
 
-// TestComposeProjectName covers the project name derivation: profile and
-// canonical are joined with a separator, both sanitized to the compose charset,
-// and a missing profile yields the canonical name alone (the convergence
-// fallback).
+// TestComposeProjectName covers the project name derivation: profile
+// and canonical are joined with a separator, both sanitized to the compose
+// charset, and a missing profile yields the canonical name alone
+// (the convergence fallback).
 func TestComposeProjectName(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -45,10 +45,10 @@ func TestComposeProjectName(t *testing.T) {
 	}
 }
 
-// TestCanonicalName covers the name derivation from a cabin path: the
-// ai-cabin.cabin header field wins, the directory basename is the fallback, and
-// an invalid cabin (no Taskfile, no header) errors so the caller can skip the
-// injection instead of producing a blank name.
+// TestCanonicalName covers the name derivation from a cabin path:
+// the ai-cabin.cabin header field wins, the directory basename is the fallback,
+// and an invalid cabin (no Taskfile, no header) errors so the caller can skip
+// the injection instead of producing a blank name.
 func TestCanonicalName(t *testing.T) {
 	t.Run("header cabin field used", func(t *testing.T) {
 		dir := t.TempDir()
@@ -104,11 +104,11 @@ tasks:
 	})
 }
 
-// TestDeriveProfile covers the reverse of ComposeProjectName: extracting the
-// profile from a compose project label. The canonical-only form yields ""
-// (no profile), the <profile>_<canonical> form yields the profile, and a
-// manually-set project that does not match the expected shape yields "" rather
-// than a misleading guess.
+// TestDeriveProfile covers the reverse of ComposeProjectName: extracting
+// the profile from a compose project label. The canonical-only form yields ""
+// (no profile), the <profile>_<canonical> form yields the profile,
+// and a manually-set project that does not match the expected shape
+// yields "" rather than a misleading guess.
 func TestDeriveProfile(t *testing.T) {
 	cases := []struct {
 		name      string

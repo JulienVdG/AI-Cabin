@@ -6,20 +6,20 @@ import (
 	"strings"
 )
 
-// RelPath computes the sub-path of cwd relative to workdir, for the
-// CABIN_REL_PATH container env var (path shadowing: the host CWD sub-path the
-// agent launches into inside the greywall sandbox, via the two-step cd). Returns
-// "" when cwd is workdir itself (the agent launches at the workdir root).
-// Returns an error when cwd is outside workdir: the host-side validation that
-// prevents the container-side cd from landing in the wrong directory
-// (fail-fast, no silent fallback to the root — a fallback would make the
-// agent run in the wrong dir while the user believes it is in the sub-path).
+// RelPath computes the sub-path of cwd relative to workdir,
+// for the CABIN_REL_PATH container env var (path shadowing: the host CWD sub-path
+// the agent launches into inside the greywall sandbox, via the two-step cd).
+// Returns "" when cwd is workdir itself (the agent launches at the workdir root).
+// Returns an error when cwd is outside workdir: the host-side validation
+// that prevents the container-side cd from landing in the wrong directory
+// (fail-fast, no silent fallback to the root — a fallback would make
+// the agent run in the wrong dir while the user believes it is in the sub-path).
 //
 // Symlinks in both paths are resolved (EvalSymlinks) so a CWD reached through
 // a symlink of the workdir resolves to the same sub-path as the canonical
-// form. This makes transparent mode (CONTAINER_WORKDIR=AI_CABIN_WORKDIR) and
-// remap mode (=/workspace) produce the same relpath, since relpath is relative
-// to the workdir root in both cases.
+// form. This makes transparent mode (CONTAINER_WORKDIR=AI_CABIN_WORKDIR)
+// and remap mode (=/workspace) produce the same relpath, since relpath
+// is relative to the workdir root in both cases.
 func RelPath(cwd, workdir string) (string, error) {
 	cwdReal, err := filepath.EvalSymlinks(cwd)
 	if err != nil {

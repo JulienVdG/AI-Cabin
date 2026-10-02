@@ -87,8 +87,8 @@ taskfile:
         - 'echo "AI Agent (pi.dev TUI): Use ''task pi'''
 `
 
-// TestAssemble groups the Assemble writer cases under one function with a
-// sub-test per artifact and per edge case.
+// TestAssemble groups the Assemble writer cases under one function
+// with a sub-test per artifact and per edge case.
 func TestAssemble(t *testing.T) {
 	t.Run("DockerfileMerge", func(t *testing.T) {
 		fs := bundleFS(map[string]string{cabin.BaseBundle: baseBP, "agent-pi": piBP})
@@ -252,8 +252,8 @@ dockerfile: |
 	})
 
 	// TaskfileAuthoredWith covers the authored_with record: the resolved params
-	// are written into the ai-cabin: header so re-running authoring on the
-	// cabin reuses the same image/user/home.
+	// are written into the ai-cabin: header so re-running authoring
+	// on the cabin reuses the same image/user/home.
 	t.Run("TaskfileAuthoredWith", func(t *testing.T) {
 		fs := bundleFS(map[string]string{cabin.BaseBundle: baseBP})
 		bps := fragments.ResolveBlueprints(fs, refs(), cabin.AICabinHeader{})
@@ -288,8 +288,8 @@ dockerfile: |
 		}
 	})
 
-	// AptDedup covers the writeApt de-duplication: a package contributed by
-	// several bundles (or repeated within one) appears once in the RUN.
+	// AptDedup covers the writeApt de-duplication: a package contributed
+	// by several bundles (or repeated within one) appears once in the RUN.
 	t.Run("AptDedup", func(t *testing.T) {
 		dupBP := `
 apt: [git, dupe, dupe]
@@ -331,9 +331,9 @@ dockerfile: |
 		}
 	})
 
-	// AuthoringParams covers the authoring substitutions: image/user/home are
-	// rendered into the blueprint (at parse time, before YAML unmarshal, via
-	// {<.Image>}/{<.User>}/{<.Home>} actions) and so appear in the assembled
+	// AuthoringParams covers the authoring substitutions: image/user/home
+	// are rendered into the blueprint (at parse time, before YAML unmarshal,
+	// via {<.Image>}/{<.User>}/{<.Home>} actions) and so appear in the assembled
 	// dockerfile/compose/taskfile scalar values, while task-time {{...}} vars
 	// stay literal (the {< >} delimiters cannot collide with them).
 	t.Run("AuthoringParams", func(t *testing.T) {
@@ -379,8 +379,8 @@ taskfile:
 		}
 	})
 
-	// AuthoringParamsDefaults covers the fallback: an empty Image/User/Home in
-	// the selection renders the package defaults, matching the reference cabins.
+	// AuthoringParamsDefaults covers the fallback: an empty Image/User/Home
+	// in the selection renders the package defaults, matching the reference cabins.
 	t.Run("AuthoringParamsDefaults", func(t *testing.T) {
 		paramsBP := `
 dockerfile: |

@@ -36,11 +36,11 @@ func GetConfigDir() (string, error) {
 	return filepath.Join(configDir, "ai-cabin"), nil
 }
 
-// GetStateDir returns ~/.local/state/ai-cabin (respects XDG_STATE_HOME). It
-// holds runtime artifacts the CLI materializes (e.g. the lifecycle Taskfile)
+// GetStateDir returns ~/.local/state/ai-cabin (respects XDG_STATE_HOME).
+// It holds runtime artifacts the CLI materializes (e.g. the lifecycle Taskfile)
 // so they pre-exist before `task` parses a cabin Taskfile. Redirecting
-// XDG_STATE_HOME matters in dev: ~/.local/state is read-only under the
-// greywall sandbox.
+// XDG_STATE_HOME matters in dev: ~/.local/state is read-only
+// under the greywall sandbox.
 func GetStateDir() (string, error) {
 	stateDir := os.Getenv("XDG_STATE_HOME")
 	if stateDir == "" {
@@ -142,18 +142,18 @@ const (
 // ProfileSelection describes the resolved active profile. Name is the active
 // profile following the standard precedence (explicit positional name > root
 // --profile flag / --var AI_CABIN_PROFILE > AI_CABIN_PROFILE env > current
-// profile from config.yaml). Source records which layer selected it. Use is
-// the profile persisted in config.yaml currentProfile (the one set with
-// `cabin profile use`), for callers that warn when the effective profile
-// diverges from the persisted selection.
+// profile from config.yaml). Source records which layer selected it.
+// Use is the profile persisted in config.yaml currentProfile (the one set
+// with `cabin profile use`), for callers that warn when the effective
+// profile diverges from the persisted selection.
 type ProfileSelection struct {
 	Name   string
 	Source ProfileSource
 	Use    string
 }
 
-// Overridden reports whether the effective profile (Name) diverges from the
-// use-selected profile (Use) because it was chosen via --profile,
+// Overridden reports whether the effective profile (Name) diverges
+// from the use-selected profile (Use) because it was chosen via --profile,
 // --var AI_CABIN_PROFILE or AI_CABIN_PROFILE. A positional name
 // (ProfileSourceArg) is never an override (the user asked for that profile
 // explicitly). It drives both the origin annotation and the divergence warning.
@@ -167,8 +167,8 @@ func (sel ProfileSelection) Overridden() bool {
 }
 
 // OverrideWarning returns a stderr warning (or empty) when the effective
-// profile differs from the profile persisted with `cabin profile use`. It is
-// empty when there is no override (including an explicit positional name).
+// profile differs from the profile persisted with `cabin profile use`.
+// It is empty when there is no override (including an explicit positional name).
 func (sel ProfileSelection) OverrideWarning() string {
 	if !sel.Overridden() {
 		return ""
@@ -184,18 +184,18 @@ func (sel ProfileSelection) OverrideWarning() string {
 // ResolveProfile resolves the active profile name and its origin. It follows
 // the standard precedence (explicit name > --profile > --var AI_CABIN_PROFILE >
 // AI_CABIN_PROFILE env > current profile from config.yaml) and returns Use
-// separately so display sites (profile list/show/group help) can warn when the
-// effective profile differs from the one set with `cabin profile use`. It
-// resolves through the same selector as ResolveVars, so the displayed active
-// profile is guaranteed to match the one the runtime commands use. It does not
-// check existence nor load the file; callers that load also use GetActiveProfile.
+// separately so display sites (profile list/show/group help) can warn
+// when the effective profile differs from the one set with `cabin profile use`.
+// It resolves through the same selector as ResolveVars, so the displayed active profile
+// is guaranteed to match the one the runtime commands use. It does not check existence
+// nor load the file; callers that load also use GetActiveProfile.
 func ResolveProfile(name, profileFlag string, cliVars []string) (ProfileSelection, error) {
 	return configService.ResolveProfile(name, profileFlag, cliVars)
 }
 
 // ResolveCabin returns the target cabin for cabin-scoped commands, resolving
-// --cabin > AI_CABIN_CURRENT_CABIN env > active profile var. It delegates to the
-// global ConfigService.
+// --cabin > AI_CABIN_CURRENT_CABIN env > active profile var. It delegates
+// to the global ConfigService.
 func ResolveCabin(cabinFlag, profileFlag string) (string, error) {
 	return configService.ResolveCabin(cabinFlag, profileFlag)
 }
@@ -208,16 +208,16 @@ func InitProfile(name string, cliVars []string, force bool) (*Profile, error) {
 	return configService.InitProfile(name, cliVars, force)
 }
 
-// SetProfileVars sets several variables on a profile (resolved via
-// GetActiveProfile if name is empty -> current profile) and persists them in one
+// SetProfileVars sets several variables on a profile (resolved
+// via GetActiveProfile if name is empty -> current profile) and persists them in one
 // atomic write. It delegates to the global ConfigService.
 func SetProfileVars(name string, vars Vars) (*Profile, error) {
 	return configService.SetProfileVars(name, vars)
 }
 
-// SetProfileVar sets a single variable on a profile (resolved via
-// GetActiveProfile if name is empty -> current profile) and persists it
-// atomically. It delegates to the global ConfigService.
+// SetProfileVar sets a single variable on a profile (resolved
+// via GetActiveProfile if name is empty -> current profile) and persists
+// it atomically. It delegates to the global ConfigService.
 func SetProfileVar(name, key, value string) (*Profile, error) {
 	return configService.SetProfileVar(name, key, value)
 }

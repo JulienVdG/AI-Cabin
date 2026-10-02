@@ -64,10 +64,10 @@ func unsetEnv(t *testing.T, keys ...string) {
 	})
 }
 
-// newInitService builds a ConfigService backed by a temp config dir with a
-// fixed home (/tmp/test-home) and git identity, so the defaults are stable
-// across sub-cases. TestMain blanks the AI_CABIN_*/GIT_AGENT_* host env, so
-// the defaults from the mock providers apply; sub-cases that test env
+// newInitService builds a ConfigService backed by a temp config dir
+// with a fixed home (/tmp/test-home) and git identity, so the defaults are stable
+// across sub-cases. TestMain blanks the AI_CABIN_*/GIT_AGENT_* host env,
+// so the defaults from the mock providers apply; sub-cases that test env
 // override set them explicitly via t.Setenv.
 func newInitService(t *testing.T) *config.ConfigService {
 	t.Helper()
@@ -294,16 +294,16 @@ func TestConfigService_BuildDefaultProfile(t *testing.T) {
 	t.Run("nominal case with git config", func(t *testing.T) {
 		setupTestConfig(t)
 
-		// Create mock Git provider
+		// Create mock Git provider.
 		mockGit := &mock_config.GitConfigProvider{}
 		mockGit.On("GetUserName").Return("Test User", nil)
 		mockGit.On("GetUserEmail").Return("test@example.com", nil)
 
-		// Create mock HomeDir provider
+		// Create mock HomeDir provider.
 		mockHomeDir := &mock_config.HomeDirProvider{}
 		mockHomeDir.On("GetHomeDir").Return("/tmp/test-home", nil)
 
-		// Create service with mocks
+		// Create service with mocks.
 		svc := config.NewConfigService(mockGit, mockHomeDir, nil, nil)
 
 		// Build profile (logic only, no I/O)
@@ -312,12 +312,12 @@ func TestConfigService_BuildDefaultProfile(t *testing.T) {
 			t.Fatalf("BuildDefaultProfile() error = %v", err)
 		}
 
-		// Verify profile name
+		// Verify profile name.
 		if profile.Name != "test" {
 			t.Errorf("BuildDefaultProfile() Name = %q, want %q", profile.Name, "test")
 		}
 
-		// Verify variables
+		// Verify variables.
 		expectedVars := map[string]string{
 			"AI_CABIN_HOME":    "/tmp/test-home",
 			"AI_CABIN_DESK":    "/tmp/test-home/Documents/desk",
@@ -337,7 +337,7 @@ func TestConfigService_BuildDefaultProfile(t *testing.T) {
 			}
 		}
 
-		// Verify mock expectations
+		// Verify mock expectations.
 		mockGit.AssertExpectations(t)
 		mockHomeDir.AssertExpectations(t)
 	})
@@ -345,16 +345,16 @@ func TestConfigService_BuildDefaultProfile(t *testing.T) {
 	t.Run("uses defaults when git fails", func(t *testing.T) {
 		setupTestConfig(t)
 
-		// Create mock Git provider that returns errors
+		// Create mock Git provider that returns errors.
 		mockGit := &mock_config.GitConfigProvider{}
 		mockGit.On("GetUserName").Return("", fmt.Errorf("git not configured"))
 		mockGit.On("GetUserEmail").Return("", fmt.Errorf("git not configured"))
 
-		// Create mock HomeDir provider
+		// Create mock HomeDir provider.
 		mockHomeDir := &mock_config.HomeDirProvider{}
 		mockHomeDir.On("GetHomeDir").Return("/tmp/test-home", nil)
 
-		// Create service with mocks
+		// Create service with mocks.
 		svc := config.NewConfigService(mockGit, mockHomeDir, nil, nil)
 
 		// Build profile (should succeed with defaults)
@@ -363,7 +363,7 @@ func TestConfigService_BuildDefaultProfile(t *testing.T) {
 			t.Fatalf("BuildDefaultProfile() error = %v", err)
 		}
 
-		// Verify default values are used when git fails
+		// Verify default values are used when git fails.
 		if profile.Vars["GIT_AGENT_NAME"] != "AI Agent" {
 			t.Errorf("BuildDefaultProfile() GIT_AGENT_NAME = %q, want %q", profile.Vars["GIT_AGENT_NAME"], "AI Agent")
 		}
@@ -378,14 +378,14 @@ func TestConfigService_BuildDefaultProfile(t *testing.T) {
 	t.Run("returns error when homeDir fails", func(t *testing.T) {
 		setupTestConfig(t)
 
-		// Create mock HomeDir provider that returns error
+		// Create mock HomeDir provider that returns error.
 		mockHomeDir := &mock_config.HomeDirProvider{}
 		mockHomeDir.On("GetHomeDir").Return("", fmt.Errorf("home dir not found"))
 
-		// Create service with mock
+		// Create service with mock.
 		svc := config.NewConfigService(&mock_config.GitConfigProvider{}, mockHomeDir, nil, nil)
 
-		// Build profile should fail
+		// Build profile should fail.
 		_, err := svc.BuildDefaultProfile("test")
 		if err == nil {
 			t.Fatal("BuildDefaultProfile() expected error, got nil")
@@ -405,7 +405,7 @@ func TestConfigService_SaveProfile(t *testing.T) {
 		// SaveProfile doesn't use gitProvider or homeDir, so nil is safe.
 		svc := config.NewConfigService(nil, nil, nil, config.AtomicFileWriter{})
 
-		// Build a profile
+		// Build a profile.
 		profile := &config.Profile{
 			Name: "test-save",
 			Vars: map[string]string{
@@ -413,13 +413,13 @@ func TestConfigService_SaveProfile(t *testing.T) {
 			},
 		}
 
-		// Save the profile
+		// Save the profile.
 		err := svc.SaveProfile(profile)
 		if err != nil {
 			t.Fatalf("SaveProfile() error = %v", err)
 		}
 
-		// Verify file was created
+		// Verify file was created.
 		if profile.Path() == "" {
 			t.Error("SaveProfile() Path() is empty after save")
 		}
@@ -427,7 +427,7 @@ func TestConfigService_SaveProfile(t *testing.T) {
 			t.Errorf("SaveProfile() profile file not created at %q", profile.Path())
 		}
 
-		// Verify file content
+		// Verify file content.
 		data, err := os.ReadFile(profile.Path())
 		if err != nil {
 			t.Fatalf("failed to read profile file: %v", err)
@@ -525,7 +525,7 @@ func TestConfigService_SetCurrentProfile(t *testing.T) {
 	t.Run("nominal set", func(t *testing.T) {
 		svc := newTestService(t)
 
-		// Create a profile first
+		// Create a profile first.
 		profilesDir, _ := config.GetProfilesDir()
 		if err := os.MkdirAll(profilesDir, 0o755); err != nil {
 			t.Fatalf("failed to create profiles dir: %v", err)
@@ -534,13 +534,13 @@ func TestConfigService_SetCurrentProfile(t *testing.T) {
 			t.Fatalf("failed to write profile: %v", err)
 		}
 
-		// Set current profile
+		// Set current profile.
 		err := svc.SetCurrentProfile("perso")
 		if err != nil {
 			t.Fatalf("SetCurrentProfile() error = %v", err)
 		}
 
-		// Verify it was set
+		// Verify it was set.
 		current, err := svc.GetCurrentProfile()
 		if err != nil {
 			t.Fatalf("GetCurrentProfile() error = %v", err)
@@ -603,7 +603,7 @@ func TestConfigService_GetActiveProfile(t *testing.T) {
 		if err := os.MkdirAll(configDir, 0o755); err != nil {
 			t.Fatalf("failed to create config dir: %v", err)
 		}
-		// Create the profile first
+		// Create the profile first.
 		profilesDir, _ := config.GetProfilesDir()
 		if err := os.MkdirAll(profilesDir, 0o755); err != nil {
 			t.Fatalf("failed to create profiles dir: %v", err)
@@ -629,7 +629,7 @@ func TestConfigService_GetActiveProfile(t *testing.T) {
 	t.Run("uses explicit profile name when provided", func(t *testing.T) {
 		svc := newTestService(t)
 
-		// Create the profile first
+		// Create the profile first.
 		profilesDir, _ := config.GetProfilesDir()
 		if err := os.MkdirAll(profilesDir, 0o755); err != nil {
 			t.Fatalf("failed to create profiles dir: %v", err)
@@ -732,8 +732,8 @@ func TestConfigService_ResolveProfile(t *testing.T) {
 	writeConfig := func(t *testing.T, svc *config.ConfigService, current string) {
 		t.Helper()
 		// Compute the dir after newTestService/setupTestConfig redirected
-		// XDG_CONFIG_HOME to a writable temp dir (the sandbox ~/.config is
-		// read-only).
+		// XDG_CONFIG_HOME to a writable temp dir (the sandbox ~/.config
+		// is read-only).
 		configDir, err := config.GetConfigDir()
 		if err != nil {
 			t.Fatalf("GetConfigDir() error = %v", err)
@@ -885,10 +885,10 @@ func TestConfigService_ResolveProfile(t *testing.T) {
 	})
 }
 
-// TestProfileSelection covers the Overridden and OverrideWarning helpers on
-// ProfileSelection: an override only arises when --profile or AI_CABIN_PROFILE
-// selected a name different from the use-selected profile; an explicit
-// positional name is never an override.
+// TestProfileSelection covers the Overridden and OverrideWarning helpers
+// on ProfileSelection: an override only arises when --profile
+// or AI_CABIN_PROFILE selected a name different from the use-selected
+// profile; an explicit positional name is never an override.
 func TestProfileSelection(t *testing.T) {
 	configSel := config.ProfileSelection{Name: "work", Source: config.ProfileSourceConfig, Use: "work"}
 	envSel := config.ProfileSelection{Name: "envprof", Source: config.ProfileSourceEnv, Use: "work"}
@@ -1110,11 +1110,11 @@ func TestConfigService_InitProfile(t *testing.T) {
 
 	t.Run("ForceOverwritesAndKeepsExistingKeys", func(t *testing.T) {
 		// --force overwrites: persisted = defaults ∪ --var ∪ existing. Keys
-		// already in the existing profile (not in defaults, not in --var) are
-		// kept; values are resolved (--var > env > existing > defaults).
-		// Unset OPENCODE_SERVER_PASSWORD from the host env so the existing value
-		// is the resolved one — env > existing would otherwise override it with
-		// the host value (correct behaviour, but it masks the "existing key
+		// already in the existing profile (not in defaults, not in --var)
+		// are kept; values are resolved (--var > env > existing > defaults).
+		// Unset OPENCODE_SERVER_PASSWORD from the host env so the existing
+		// value is the resolved one — env > existing would otherwise override
+		// it with the host value (correct behaviour, but it masks the "existing key
 		// kept" assertion under test).
 		unsetEnv(t, "OPENCODE_SERVER_PASSWORD")
 		svc := newInitService(t)
@@ -1171,8 +1171,8 @@ func TestConfigService_InitProfile(t *testing.T) {
 	})
 
 	t.Run("InvalidVar", func(t *testing.T) {
-		// A --var without `=` is rejected with a clear error (same shape as
-		// ResolveVars).
+		// A --var without `=` is rejected with a clear error (same shape
+		// as ResolveVars).
 		svc := newInitService(t)
 		_, err := svc.InitProfile("dev", []string{"NO_EQUALS"}, false)
 		require.Error(t, err)
@@ -1217,8 +1217,8 @@ func TestConfigService_InitProfile(t *testing.T) {
 	})
 
 	t.Run("NoLayerLeavesKeyAbsent", func(t *testing.T) {
-		// No layer anywhere: AI_CABIN_LAYER_DIRS is not persisted at all — it
-		// is a normal var, present only when set (layer is an advanced opt-in).
+		// No layer anywhere: AI_CABIN_LAYER_DIRS is not persisted at all —
+		// it is a normal var, present only when set (layer is an advanced opt-in).
 		unsetEnv(t, config.LayerDirsEnvVar)
 		svc := newInitService(t)
 
@@ -1262,8 +1262,8 @@ func TestConfigService_InitProfile(t *testing.T) {
 
 	t.Run("LayerVarAsVarIsPersisted", func(t *testing.T) {
 		// The documented activation path (cabin setup --var
-		// AI_CABIN_LAYER_DIRS=...): the var is passed as --var and its
-		// layer.yaml vars are contributed as defaults.
+		// AI_CABIN_LAYER_DIRS=...): the var is passed as --var
+		// and its layer.yaml vars are contributed as defaults.
 		unsetEnv(t, config.LayerDirsEnvVar)
 		layerRoot := t.TempDir()
 		require.NoError(t, os.MkdirAll(layerRoot, 0o755))
@@ -1305,9 +1305,9 @@ func TestConfigService_InitProfile(t *testing.T) {
 }
 
 // TestResolveProfileMatchesResolveVars locks the guarantee that `cabin profile`
-// resolves the same active profile as the runtime commands: both go through the
-// same selector (resolveProfileName), so for identical inputs ResolveProfile's
-// Name equals the AI_CABIN_PROFILE value ResolveVars reflects into its view.
+// resolves the same active profile as the runtime commands: both go through
+// the same selector (resolveProfileName), so for identical inputs
+// ResolveProfile's Name equals the AI_CABIN_PROFILE value ResolveVars reflects into its view.
 func TestResolveProfileMatchesResolveVars(t *testing.T) {
 	writeProfile := func(t *testing.T, name string) {
 		t.Helper()

@@ -38,8 +38,8 @@ func TestParse(t *testing.T) {
 	})
 
 	t.Run("NameWithDirIsExecutable", func(t *testing.T) {
-		// Regression: ParseFS names the parsed body by the file's base name, so a
-		// name with a directory component left the returned template unexecutable
+		// Regression: ParseFS names the parsed body by the file's base name,
+		// so a name with a directory component left the returned template unexecutable
 		// ("incomplete or empty template"). Parse must return a template whose
 		// Execute works regardless of the name's path.
 		fsys := fstest.MapFS{"base/deps/t.tmpl": {Data: []byte("hi {{.Vars.X}}")}}
@@ -57,8 +57,8 @@ func TestParse(t *testing.T) {
 	})
 
 	t.Run("CustomDelims", func(t *testing.T) {
-		// Custom delims ({</>}) resolve the scaffold-time action while a
-		// standard {{.X}} passes through literally (a Taskfile runtime var).
+		// Custom delims ({</>}) resolve the scaffold-time action
+		// while a standard {{.X}} passes through literally (a Taskfile runtime var).
 		// This is the go_taskfile case: {<.project>} is baked at copy time,
 		// {{.project}} is left for task to resolve at runtime.
 		fsys := fstest.MapFS{"t.tmpl": {Data: []byte("baked={<.project>} runtime={{.project}}")}}
@@ -116,8 +116,8 @@ func TestExecute(t *testing.T) {
 			wantOut: "NO",
 		},
 		{
-			// default func handles absent keys (received as nil under
-			// missingkey=invalid) — Ansible-like fallback, no error.
+			// default func handles absent keys (received as nil
+			// under missingkey=invalid) — Ansible-like fallback, no error.
 			name:    "DefaultOnAbsent",
 			tmpl:    `{{default "x" .ABSENT}}`,
 			wantOut: "x",

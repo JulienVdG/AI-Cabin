@@ -18,9 +18,9 @@ func writeLayerFile(t *testing.T, root, name, content string) {
 	require.NoError(t, os.WriteFile(filepath.Join(root, name), []byte(content), 0o644))
 }
 
-// TestLayerVars covers the layer.yaml vars: contribution: first layer with a
-// manifest wins (file-level, no merge), later layers ignored, absent manifest
-// contributes nothing, and a malformed present manifest is an error.
+// TestLayerVars covers the layer.yaml vars: contribution: first layer
+// with a manifest wins (file-level, no merge), later layers ignored, absent
+// manifest contributes nothing, and a malformed present manifest is an error.
 func TestLayerVars(t *testing.T) {
 	t.Run("NoLayersReturnsEmpty", func(t *testing.T) {
 		out, err := config.LayerVars(nil)
@@ -43,8 +43,8 @@ func TestLayerVars(t *testing.T) {
 
 	t.Run("AbsentManifestSkipped", func(t *testing.T) {
 		// A layer root with no layer.yaml contributes nothing and is skipped;
-		// a later layer with a manifest contributes. This mirrors a
-		// fragments-only layer preceding one that ships a manifest.
+		// a later layer with a manifest contributes. This mirrors
+		// a fragments-only layer preceding one that ships a manifest.
 		a := t.TempDir() // no layer.yaml
 		b := t.TempDir()
 		writeLayerFile(t, b, "layer.yaml", "vars:\n  DEFAULT_MODEL: Qwen3\n")
@@ -55,8 +55,8 @@ func TestLayerVars(t *testing.T) {
 	})
 
 	t.Run("EmptyVarsBlockStillCaptured", func(t *testing.T) {
-		// The first layer with a manifest captures the contribution even when
-		// its vars: block is empty (later manifests still ignored).
+		// The first layer with a manifest captures the contribution
+		// even when its vars: block is empty (later manifests still ignored).
 		a := t.TempDir()
 		b := t.TempDir()
 		writeLayerFile(t, a, "layer.yaml", "vars: {}\n")

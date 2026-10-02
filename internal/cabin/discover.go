@@ -8,11 +8,11 @@ import (
 	"github.com/JulienVdG/AI-Cabin/internal/config"
 )
 
-// ValidateCabin validates that path points to a valid cabin directory and
-// returns the cabin name and the normalized absolute path to register.
+// ValidateCabin validates that path points to a valid cabin directory
+// and returns the cabin name and the normalized absolute path to register.
 //
 // A valid cabin is a directory containing a Taskfile.yml whose top-level
-// "ai-cabin:" header exists. (could be empty {})
+// "ai-cabin:" header exists (an empty map "{}" is valid, not YAML null).
 //
 // Name derivation (first non-empty wins):
 //  1. nameOverride (explicit "[name]" arg on the CLI)
@@ -20,21 +20,21 @@ import (
 //  3. basename of the normalized path
 //
 // Path normalization: "~"/"~user" expansion, then made absolute, then
-// symlinks resolved. The registry stores this canonical absolute path so
-// "cd <path>" at run time never breaks on relative paths, unexpanded "~",
+// symlinks resolved. The registry stores this canonical absolute path
+// so "cd <path>" at run time never breaks on relative paths, unexpanded "~",
 // or symlinks.
 //
 // Errors are strict: a non-directory path, a missing Taskfile, or a missing
-// "ai-cabin:" header all fail registration. This catches typos and
-// non-cabin-like paths at registration time rather than at run time.
+// "ai-cabin:" header all fail registration. This catches typos
+// and non-cabin-like paths at registration time rather than at run time.
 //
-// Convention (non-standard): on error, normalizedPath is still populated when
-// known (i.e. once the path has been resolved, before the header check), so
-// callers can surface it in UX without re-deriving it. name is always empty
-// on error.
+// Convention (non-standard): on error, normalizedPath is still populated
+// when known (i.e. once the path has been resolved, before the header check),
+// so callers can surface it in UX without re-deriving it.
+// name is always empty on error.
 //
-// See Header for callers that need the parsed ai-cabin header (agents:/
-// features:) without re-reading the Taskfile.
+// See Header for callers that need the parsed ai-cabin header
+// (agents:/features:) without re-reading the Taskfile.
 func ValidateCabin(path, nameOverride string) (name, normalizedPath string, err error) {
 	var name2 string
 	_, name2, normalizedPath, err = validateCabin(path, nameOverride)
@@ -44,15 +44,16 @@ func ValidateCabin(path, nameOverride string) (name, normalizedPath string, err 
 	return name2, normalizedPath, nil
 }
 
-// Header resolves and parses the ai-cabin header of the cabin at path. It is
-// the variant of ValidateCabin for callers that consume the header (agents:/
-// features: via ActiveBundles) and need the normalized path, without deriving
-// the cabin name (e.g. cabin internal deps/setup). It reuses the same path
-// normalization and validation as ValidateCabin (one read of the Taskfile).
+// Header resolves and parses the ai-cabin header of the cabin at path.
+// It is the variant of ValidateCabin for callers that consume the header
+// (agents:/features: via ActiveBundles) and need the normalized path,
+// without deriving the cabin name (e.g. cabin internal deps/setup).
+// It reuses the same path normalization and validation as ValidateCabin
+// (one read of the Taskfile).
 //
-// Returns the parsed header, the normalized absolute path, and an error on
-// validation failure (same strict errors + ErrNoHeader sentinel as
-// ValidateCabin; normalizedPath is populated when known, by the same
+// Returns the parsed header, the normalized absolute path, and an error
+// on validation failure (same strict errors + ErrNoHeader sentinel
+// as ValidateCabin; normalizedPath is populated when known, by the same
 // convention).
 func Header(path string) (header *AICabinHeader, normalizedPath string, err error) {
 	header, _, normalizedPath, err = validateCabin(path, "")
@@ -68,8 +69,8 @@ func validateCabin(path, nameOverride string) (header *AICabinHeader, name, norm
 	// Expand "~"/"~user" before any FS operation (these are pure string ops).
 	expanded := config.ExpandHome(path)
 
-	// Make absolute relative to the process CWD. EvalSymlinks requires an
-	// absolute path to behave predictably across platforms.
+	// Make absolute relative to the process CWD. EvalSymlinks requires
+	// an absolute path to behave predictably across platforms.
 	absPath, err := filepath.Abs(expanded)
 	if err != nil {
 		return nil, "", "", fmt.Errorf("resolve absolute path: %w", err)
@@ -85,8 +86,8 @@ func validateCabin(path, nameOverride string) (header *AICabinHeader, name, norm
 		return nil, "", "", fmt.Errorf("cabin path %q is not a directory", absPath)
 	}
 
-	// Resolve symlinks to a canonical path. The directory itself may be a
-	// symlink, and Taskfile.yml inside may sit behind a symlinked parent.
+	// Resolve symlinks to a canonical path. The directory itself
+	// may be a symlink, and Taskfile.yml inside may sit behind a symlinked parent.
 	resolved, err := filepath.EvalSymlinks(absPath)
 	if err != nil {
 		return nil, "", "", fmt.Errorf("resolve symlinks: %w", err)

@@ -162,8 +162,8 @@ func TestUnionFS_ReadFile(t *testing.T) {
 	assert.Equal(t, "b-mid", string(b))
 }
 
-// countStatFS counts fs.Stat calls into its layer, so cache memoization is
-// observable: a cache hit performs zero layer Stats.
+// countStatFS counts fs.Stat calls into its layer, so cache memoization
+// is observable: a cache hit performs zero layer Stats.
 type countStatFS struct {
 	fs.FS
 	stats *int

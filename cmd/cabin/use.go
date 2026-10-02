@@ -12,9 +12,9 @@ import (
 
 // useCmd sets the current cabin for the active profile. It is thin sugar over
 // `cabin profile set AI_CABIN_CURRENT_CABIN <cabin>`, adding what the generic
-// var set cannot: registry validation (the cabin must exist) and completion of
-// registered names. The current cabin lets cabin-scoped commands (up, task, ...)
-// omit --cabin; the environment outranks it, so an exported
+// var set cannot: registry validation (the cabin must exist) and completion
+// of registered names. The current cabin lets cabin-scoped commands
+// (up, task, ...) omit --cabin; the environment outranks it, so an exported
 // AI_CABIN_CURRENT_CABIN takes precedence over the profile file.
 var useCmd = &cobra.Command{
 	Use:   "use <cabin>",
@@ -37,9 +37,9 @@ current cabin of the active profile.
 	Run: func(cmd *cobra.Command, args []string) {
 		cabinName := args[0]
 
-		// The registry is the source of truth: the current cabin must name a
-		// registered cabin (a per-profile var would accept anything, which
-		// would make the first future `cabin up` fail with a confusing
+		// The registry is the source of truth: the current cabin must name
+		// a registered cabin (a per-profile var would accept anything,
+		// which would make the first future `cabin up` fail with a confusing
 		// not-registered error).
 		if _, err := config.GetCabin(cabinName); err != nil {
 			if errors.Is(err, config.ErrCabinNotFound) {

@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// testdataDir is the Taskfile dir for integration tests. go test runs with
-// CWD set to the package dir, so the relative path resolves (same convention
-// as the go-task/task/v3 library's own tests).
+// testdataDir is the Taskfile dir for integration tests. go test runs
+// with CWD set to the package dir, so the relative path resolves
+// (same convention as the go-task/task/v3 library's own tests).
 const testdataDir = "testdata"
 
 func TestBuildCLIArgs(t *testing.T) {

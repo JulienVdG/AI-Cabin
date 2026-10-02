@@ -6,8 +6,8 @@ import (
 )
 
 // TestEmitEnvVar covers the per-shell statement format of `cabin setenv
-// <shell>`: bash and zsh share the export form, fish uses set -gx. Values are
-// single-quoted so $, backticks and history are never expanded — critical
+// <shell>`: bash and zsh share the export form, fish uses set -gx. Values
+// are single-quoted so $, backticks and history are never expanded — critical
 // because setenv materializes credentials.
 func TestEmitEnvVar(t *testing.T) {
 	cases := []struct {
@@ -33,8 +33,8 @@ func TestEmitEnvVar(t *testing.T) {
 }
 
 // TestSetenvDelta covers the shell-delta selection: a variable the shell env
-// already carries unchanged is a no-op, a resolved empty value is skipped, and
-// only what materializes or changes is emitted, sorted.
+// already carries unchanged is a no-op, a resolved empty value is skipped,
+// and only what materializes or changes is emitted, sorted.
 func TestSetenvDelta(t *testing.T) {
 	cases := []struct {
 		name string

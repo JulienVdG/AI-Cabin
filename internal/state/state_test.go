@@ -91,8 +91,8 @@ func TestEnsureArtifact(t *testing.T) {
 	})
 
 	t.Run("CreatesParentDir", func(t *testing.T) {
-		// A namespaced name (future state artifacts may be namespaced): the
-		// parent dir is created if missing.
+		// A namespaced name (future state artifacts may be namespaced):
+		// the parent dir is created if missing.
 		const subName = "sub/dir/artifact.txt"
 		stateDir := setStateDir(t)
 		srcFS := fstest.MapFS{subName: {Data: src}}

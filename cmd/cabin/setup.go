@@ -10,8 +10,8 @@ import (
 )
 
 // setupCmd is the zero-config env bootstrap (Class 1): it prepares the host-side
-// environment so a cabin can run. It materializes the lifecycle Taskfile to
-// XDG state (so `task` resolves the cabin's includes: at parse time), creates
+// environment so a cabin can run. It materializes the lifecycle Taskfile
+// to XDG state (so `task` resolves the cabin's includes: at parse time), creates
 // the default dirs (~/Documents/desk, ~/projects), and creates the profile
 // named by --profile (default: default) pointing at them with the minimal desk
 // skeleton copied to AI_CABIN_DESK.
@@ -36,12 +36,12 @@ Agent-config materialization stays lazy, triggered on the first cabin task.`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Lifecycle first: the cabin is unusable without it, so fail fast (and
-		// loudly) before touching the profile or desk. A read-only state dir is
-		// worked around by redirecting the XDG vars to a writable path.
+		// loudly) before touching the profile or desk. A read-only state dir
+		// is worked around by redirecting the XDG vars to a writable path.
 		//
-		// The profile to bootstrap: honor --profile when given, else the
-		// zero-config default. setup never reads the current profile from the
-		// config file — it always targets this explicit name (and activates it).
+		// The profile to bootstrap: honor --profile when given, else
+		// the zero-config default. setup never reads the current profile
+		// from the config file — it always targets this explicit name (and activates it).
 		profileName := profileFlag
 		if profileName == "" {
 			profileName = "default"
@@ -66,8 +66,8 @@ Agent-config materialization stays lazy, triggered on the first cabin task.`,
 		// Target profile: self-healing bootstrap. The forced merge
 		// (defaults ∪ --var ∪ existing) refills missing structural vars (e.g.
 		// a corrupted AI_CABIN_DESK) while preserving user-set keys. The --var
-		// global flag sets a custom desk path the same way as
-		// `cabin profile init --var AI_CABIN_DESK=...`.
+		// global flag sets a custom desk path the same way
+		// as `cabin profile init --var AI_CABIN_DESK=...`.
 		profile, err := config.InitProfile(profileName, cliVars, true)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -86,9 +86,9 @@ Agent-config materialization stays lazy, triggered on the first cabin task.`,
 			fmt.Fprintf(os.Stderr, "Error: AI_CABIN_DESK is not set in the profile\n")
 			os.Exit(1)
 		}
-		// Resolve against the bootstrapped profile (not the current one from
-		// config.yaml), so the desk skeleton catalogue is independent of the
-		// already-active profile when --profile is omitted.
+		// Resolve against the bootstrapped profile (not the current one
+		// from config.yaml), so the desk skeleton catalogue is independent
+		// of the already-active profile when --profile is omitted.
 		resolvedVars, err := config.ResolveVars(profileName, cliVars)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)

@@ -40,12 +40,12 @@ func TestSplitPathList(t *testing.T) {
 	}
 }
 
-// TestSanitizeNameList covers the normalization of the CREDENTIAL_INJECT and
-// CREDENTIAL_IGNORE profile/env vars into the raw content of a JSON array
+// TestSanitizeNameList covers the normalization of the CREDENTIAL_INJECT
+// and CREDENTIAL_IGNORE profile/env vars into the raw content of a JSON array
 // (the greywall.json.tmpl wraps them as "inject": [{{.Vars.CREDENTIAL_INJECT}}]
-// and "ignore": [{{.Vars.CREDENTIAL_IGNORE}}]). Accepts CSV, JSON array, or
-// bracketed CSV — quoted or not; quotes are stripped unconditionally (env
-// var names carry none) and empty entries drop.
+// and "ignore": [{{.Vars.CREDENTIAL_IGNORE}}]). Accepts CSV, JSON array,
+// or bracketed CSV — quoted or not; quotes are stripped unconditionally
+// (env var names carry none) and empty entries drop.
 func TestSanitizeNameList(t *testing.T) {
 	cases := []struct {
 		name string
@@ -71,11 +71,11 @@ func TestSanitizeNameList(t *testing.T) {
 	}
 }
 
-// TestEnvShadowed covers the warning helper behind `cabin profile show`: a
-// profile var is shadowed when a same-named process-env var carries a value
+// TestEnvShadowed covers the warning helper behind `cabin profile show`:
+// a profile var is shadowed when a same-named process-env var carries a value
 // (env wins over profile in the resolved view). Keys are isolated to the test
-// so the surrounding process env (or a leak from another case) cannot make an
-// assertion flaky.
+// so the surrounding process env (or a leak from another case) cannot make
+// an assertion flaky.
 func TestEnvShadowed(t *testing.T) {
 	const (
 		shadowKey  = "CABIN_TEST_SHADOWED"
@@ -141,11 +141,11 @@ func TestEnvironMap(t *testing.T) {
 	assert.False(t, hasUnderscore)
 }
 
-// TestLayerDirs covers the layer-root parsing (AI_CABIN_LAYER_DIRS) and the
-// <root>/<subdir> derivation shared by the fragment-chain and skeleton-catalogue
-// contributions of a layer. LayerDirs reuses SplitPathList (comma split + ~
-// expansion, covered there), so here we only pin the subdir join and the
-// empty/no-layer cases.
+// TestLayerDirs covers the layer-root parsing (AI_CABIN_LAYER_DIRS)
+// and the <root>/<subdir> derivation shared by the fragment-chain
+// and skeleton-catalogue contributions of a layer. LayerDirs reuses
+// SplitPathList (comma split + ~ expansion, covered there), so here we only
+// pin the subdir join and the empty/no-layer cases.
 func TestLayerDirs(t *testing.T) {
 	t.Run("EmptyIsNoLayer", func(t *testing.T) {
 		v := config.Vars{}

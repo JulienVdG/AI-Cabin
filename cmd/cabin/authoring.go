@@ -34,14 +34,14 @@ the files to stdout (non-destructive), ` + "`authoring new`" + ` writes them to 
 directory (new files only, never overwrites).`,
 }
 
-// authoringAgents and authoringFeatures select which bundles to assemble when
-// the target path is not a cabin yet (no header); for an existing cabin the
-// header drives the selection and these flags are ignored. authoringForce lets
-// new overwrite existing files. authoringImage/User/Home are project-level
-// authoring params (FROM / container user / container home), resolved with
-// precedence header > flag > default. authoringWritePrefix makes `show` write
-// the assembled files (instead of stdout) with the prefix prepended to each
-// name.
+// authoringAgents and authoringFeatures select which bundles to assemble
+// when the target path is not a cabin yet (no header); for an existing cabin
+// the header drives the selection and these flags are ignored.
+// authoringForce lets new overwrite existing files. authoringImage/User/Home
+// are project-level authoring params (FROM / container user / container home),
+// resolved with precedence header > flag > default. authoringWritePrefix makes
+// `show` write the assembled files (instead of stdout) with the prefix prepended
+// to each name.
 var (
 	authoringAgents      string
 	authoringFeatures    string
@@ -53,8 +53,8 @@ var (
 )
 
 // authoringShowCmd renders the assembled cabin files to stdout without writing
-// anything. If the path holds a cabin (ai-cabin: header) the active bundles are
-// derived from the header; otherwise the selection comes from --agents/--features
+// anything. If the path holds a cabin (ai-cabin: header) the active bundles
+// are derived from the header; otherwise the selection comes from --agents/--features
 // (default: the full built-in catalogue).
 var authoringShowCmd = &cobra.Command{
 	Use:   "show <path>",
@@ -161,8 +161,8 @@ func cabinName(path string) (string, error) {
 
 // resolveAuthoring resolves the feature selection and blueprints for show/new:
 // from the cabin header when <path> is a cabin, else from --agents/--features
-// (default full catalogue). It also builds the fallback chain with the
-// cabin-local override layer when present.
+// (default full catalogue). It also builds the fallback chain
+// with the cabin-local override layer when present.
 func resolveAuthoring(path string) (*authoringResolution, error) {
 	vars, err := config.ResolveVars(profileFlag, cliVars)
 	if err != nil {
@@ -180,8 +180,8 @@ func resolveAuthoring(path string) (*authoringResolution, error) {
 	switch {
 	case herr == nil:
 		h = *headerPtr
-		// The header cabin field (when set) wins over the dir basename so the
-		// authored image name matches the compose project name canonical.
+		// The header cabin field (when set) wins over the dir basename
+		// so the authored image name matches the compose project name canonical.
 		if h.Cabin == "" {
 			h.Cabin = name
 		}
@@ -198,14 +198,14 @@ func resolveAuthoring(path string) (*authoringResolution, error) {
 	}
 
 	// Authoring params precedence: flag > recorded (authored_with) > default.
-	// A flag on an existing cabin therefore overrides the recorded value, so
-	// re-running authoring regenerates the files with the new choice. Each
-	// trailing default fills the void when neither flag nor record is set, so
-	// h.AuthoredWith is always fully resolved (defaults included) for the
-	// {<.X>} render. The resolved values — defaults included — are recorded in
-	// authored_with, so re-running authoring reproduces the same image/user/
-	// home even if the package defaults later change: the record pins the
-	// author's actual choice rather than re-deriving it from defaults.
+	// A flag on an existing cabin therefore overrides the recorded value,
+	// so re-running authoring regenerates the files with the new choice.
+	// Each trailing default fills the void when neither flag nor record is set,
+	// so h.AuthoredWith is always fully resolved (defaults included)
+	// for the {<.X>} render. The resolved values — defaults included —
+	// are recorded in authored_with, so re-running authoring reproduces
+	// the same image/user/home even if the package defaults later change:
+	// the record pins the author's actual choice rather than re-deriving it from defaults.
 	h.AuthoredWith = cabin.AuthoringParams{
 		Image: firstNonEmpty(authoringImage, h.AuthoredWith.Image, authoring.DefaultBaseImage),
 		User:  firstNonEmpty(authoringUser, h.AuthoredWith.User, authoring.DefaultUser),
@@ -237,8 +237,8 @@ func resolveAuthoring(path string) (*authoringResolution, error) {
 	return &authoringResolution{header: h, blueprints: blueprints, aggregated: aggErr}, nil
 }
 
-// authoringSelection returns the agents/features for a project that is not a
-// cabin yet, defaulting to the full built-in catalogue when no filter is given.
+// authoringSelection returns the agents/features for a project that is not a cabin yet,
+// defaulting to the full built-in catalogue when no filter is given.
 func authoringSelection(agents, features string) ([]string, []cabin.FeatureRef, error) {
 	if agents == "" {
 		agents = "pi,opencode"
@@ -270,8 +270,8 @@ func parseFeatureRefs(value string) ([]cabin.FeatureRef, error) {
 	return refs, nil
 }
 
-// commaList splits a comma-separated flag value, trimming whitespace and
-// dropping empty entries. A nil/empty input yields nil.
+// commaList splits a comma-separated flag value, trimming whitespace
+// and dropping empty entries. A nil/empty input yields nil.
 func commaList(s string) []string {
 	var out []string
 	for _, part := range strings.Split(s, ",") {
@@ -293,14 +293,13 @@ func firstNonEmpty(vals ...string) string {
 }
 
 // writePrefixed materializes the assembled cabin files with prefix prepended
-// to each canonical name. The prefix is a raw string prefix (no separator is
-// inserted), which covers two cases at once: a prefix ending in a separator
-// writes the same base names into another folder (`folder/` ->
-// `folder/ai-cabin.Dockerfile`), and a plain prefix yields no-collision files
-// beside the originals — pass the separator yourself to keep the file dot
-// (`.new.` -> `.new.ai-cabin.Dockerfile`; a bare `.new` would concatenate as
-// `.newai-cabin.Dockerfile`). The destination directory is created (mkdir -p)
-// and existing files are truncated.
+// to each canonical name. The prefix is a raw string prefix (no separator
+// is inserted), which covers two cases at once: a prefix ending in a separator
+// writes the same base names into another folder (`folder/` -> `folder/ai-cabin.Dockerfile`),
+// and a plain prefix yields no-collision files beside the originals —
+// pass the separator yourself to keep the file dot (`.new.` -> `.new.ai-cabin.Dockerfile`;
+// a bare `.new` would concatenate as `.newai-cabin.Dockerfile`). The destination directory
+// is created (mkdir -p) and existing files are truncated.
 func writePrefixed(prefix, dockerfile, compose, taskfile string) error {
 	files := []struct {
 		name string

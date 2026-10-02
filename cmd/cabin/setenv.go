@@ -12,11 +12,11 @@ import (
 )
 
 // setenvCmd outputs the resolved profile/environment variables in a shell
-// evaluable form, mirroring `cabin completion <shell>`. It has no action of its
-// own: running `cabin setenv` prints the Cobra help listing the supported
-// shells, one subcommand per shell, each with its sourcing instructions in
-// --help. The profile is resolved from --profile, then AI_CABIN_PROFILE, then
-// the current profile.
+// evaluable form, mirroring `cabin completion <shell>`. It has no action
+// of its own: running `cabin setenv` prints the Cobra help listing
+// the supported shells, one subcommand per shell, each with its sourcing
+// instructions in --help. The profile is resolved from --profile,
+// then AI_CABIN_PROFILE, then the current profile.
 var setenvCmd = &cobra.Command{
 	Use:   "setenv",
 	Short: "Output environment variables for your shell",
@@ -44,11 +44,11 @@ func init() {
 }
 
 // setenvShell builds one `cabin setenv <shell>` subcommand: it prints each
-// resolved variable with emitEnvVar for the shell's syntax and docs, in its
-// --help, the idiom(s) to load the output (completion parity: source and eval
-// for sh-flavored shells; fish has no <(...) so only the pipe form). Emitting
-// never mutates the parent shell, so the caller must source/eval the output (a
-// binary cannot change its parent's env).
+// resolved variable with emitEnvVar for the shell's syntax and docs,
+// in its --help, the idiom(s) to load the output (completion parity:
+// source and eval for sh-flavored shells; fish has no <(...) so only
+// the pipe form). Emitting never mutates the parent shell, so the caller
+// must source/eval the output (a binary cannot change its parent's env).
 func setenvShell(name, short string, loadLines []string, rcFile, persistLine string) *cobra.Command {
 	var current strings.Builder
 	for i, l := range loadLines {
@@ -98,10 +98,10 @@ The profile is resolved from an optional positional <profile>, then --profile, t
 }
 
 // setenvDelta returns the keys of view that setenv should emit for the shell,
-// sorted: a variable the environment already carries with the same value is a
-// no-op, and an empty resolved value adds nothing (absence behaves like empty
-// for templates), so only what materializes or changes is returned — never the
-// noisy unchanged environment. Pure: no I/O, unit-testable.
+// sorted: a variable the environment already carries with the same value
+// is a no-op, and an empty resolved value adds nothing (absence behaves
+// like empty for templates), so only what materializes or changes is returned —
+// never the noisy unchanged environment. Pure: no I/O, unit-testable.
 func setenvDelta(view, env map[string]string) []string {
 	keys := make([]string, 0, len(view))
 	for k := range view {
@@ -118,9 +118,9 @@ func setenvDelta(view, env map[string]string) []string {
 // emitEnvVar returns the shell statement that sets key=value for the given
 // shell. bash and zsh share the export form; fish uses set -gx (exported,
 // global). The value is always single-quoted (see shellQuote): only the quote
-// character is special inside single quotes, so $, backticks and history are
-// never expanded — a setenv that materializes credentials must not corrupt or
-// execute them. Pure: no I/O, unit-testable.
+// character is special inside single quotes, so $, backticks and history
+// are never expanded — a setenv that materializes credentials must not corrupt
+// or execute them. Pure: no I/O, unit-testable.
 func emitEnvVar(shell, key, value string) string {
 	quoted := shellQuote(shell, value)
 	if shell == "fish" {
@@ -129,10 +129,10 @@ func emitEnvVar(shell, key, value string) string {
 	return fmt.Sprintf("export %s=%s", key, quoted)
 }
 
-// shellQuote wraps value in single quotes for the given shell so bash/zsh and
-// fish do not expand the content. Inside single quotes the only special
-// character is the quote itself: POSIX shells escape an embedded quote as the
-// close-quote/backslash-quote/reopen idiom ('\”), fish as a backslash quote
+// shellQuote wraps value in single quotes for the given shell so bash/zsh
+// and fish do not expand the content. Inside single quotes the only special
+// character is the quote itself: POSIX shells escape an embedded quote
+// as the close-quote/backslash-quote/reopen idiom ('\”), fish as a backslash quote
 // ('\” is written \').
 func shellQuote(shell, value string) string {
 	if shell == "fish" {

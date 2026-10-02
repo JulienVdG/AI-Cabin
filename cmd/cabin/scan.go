@@ -43,11 +43,11 @@ func init() {
 	rootCmd.AddCommand(cabinScanCmd)
 }
 
-// scanCabins walks root and registers every valid cabin directory found. It
-// reports progress to stdout (one line per discovered/skipped cabin) and
-// exits non-zero if any registration failed (a conflicting path without
-// --force). A walk error (unreadable subdirectory) is reported to stderr and
-// aborts the scan; per-directory validation errors are skipped silently
+// scanCabins walks root and registers every valid cabin directory found.
+// It reports progress to stdout (one line per discovered/skipped cabin)
+// and exits non-zero if any registration failed (a conflicting path
+// without --force). A walk error (unreadable subdirectory) is reported
+// to stderr and aborts the scan; per-directory validation errors are skipped silently
 // (non-cabin directories are expected and common).
 func scanCabins(root string, stdout, stderr io.Writer) {
 	expanded, err := expandScanRoot(root)
@@ -118,9 +118,9 @@ func registerScanned(name, normalized string) (string, error) {
 	return "", nil
 }
 
-// expandScanRoot normalizes the scan root (~ expansion + absolute path) so the
-// reported paths and the walk are predictable. Symlink resolution is deferred
-// to ValidateCabin per discovered cabin (the root itself need not be canonical).
+// expandScanRoot normalizes the scan root (~ expansion + absolute path)
+// so the reported paths and the walk are predictable.
+// Symlink resolution is deferred to ValidateCabin per discovered cabin (the root itself need not be canonical).
 func expandScanRoot(root string) (string, error) {
 	expanded := config.ExpandHome(root)
 	abs, err := filepath.Abs(expanded)

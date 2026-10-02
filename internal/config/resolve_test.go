@@ -73,8 +73,8 @@ func TestResolveVars(t *testing.T) {
 			wantVal: "AI Agent + Test User",
 		},
 		{
-			// Profile file merges on top of defaults. Uses a synthetic var so
-			// the assertion does not collide with a leaked env var.
+			// Profile file merges on top of defaults. Uses a synthetic var
+			// so the assertion does not collide with a leaked env var.
 			name:     "profile file overrides defaults",
 			profiles: map[string]string{"perso": "name: perso\nvars:\n  CABIN_TEST_VAR: profile-val\n  SCW_PROJECT_ID: proj-123\n"},
 			current:  "perso",
@@ -165,8 +165,8 @@ func TestResolveVars(t *testing.T) {
 			wantVal:  "perso",
 		},
 		{
-			// AI_CABIN_PROFILE sourced from the env is reflected too (axis A), so
-			// `cabin setenv` exports back the profile the env selected.
+			// AI_CABIN_PROFILE sourced from the env is reflected too
+			// so `cabin setenv` exports back the profile the env selected.
 			name:     "env AI_CABIN_PROFILE reflected in the view",
 			profiles: map[string]string{"via-env": "name: via-env\nvars:\n  CABIN_TEST_VAR: x\n"},
 			env:      map[string]string{"AI_CABIN_PROFILE": "via-env"},
@@ -200,8 +200,8 @@ func TestResolveVars(t *testing.T) {
 			wantVal: "/workspace",
 		},
 		{
-			// CREDENTIAL_INJECT unset defaults to empty (renders [] in the
-			// template), never <no value> — sanitizeTypedVars always sanitizes.
+			// CREDENTIAL_INJECT unset defaults to empty (renders []
+			// in the template), never <no value> — sanitizeTypedVars always sanitizes.
 			name:    "credential_inject defaults to empty when unset",
 			wantVar: "CREDENTIAL_INJECT",
 			wantVal: "",
@@ -239,11 +239,11 @@ func TestResolveVars(t *testing.T) {
 	}
 }
 
-// TestResolveCabin covers the cabin-scoped target resolution used by
-// up/down/build/shell/greyshell/logs/restart/task: --cabin flag > env
+// TestResolveCabin covers the cabin-scoped target resolution
+// used by up/down/build/shell/greyshell/logs/restart/task: --cabin flag > env
 // AI_CABIN_CURRENT_CABIN > active profile var (set with `cabin use`). The
-// active profile is the one selected by --profile / AI_CABIN_PROFILE /
-// config.yaml (axis A), so the current cabin is genuinely per-profile.
+// active profile is the one selected by --profile / AI_CABIN_PROFILE
+// / config.yaml, so the current cabin is genuinely per-profile.
 func TestResolveCabin(t *testing.T) {
 	cases := []struct {
 		name        string
@@ -280,8 +280,8 @@ func TestResolveCabin(t *testing.T) {
 			want:     "blog",
 		},
 		{
-			// The current cabin is per-profile: --profile selects which
-			// profile's var is read.
+			// The current cabin is per-profile: --profile selects
+			// which profile's var is read.
 			name:        "current cabin from an explicitly selected profile",
 			profileFlag: "work",
 			profiles:    map[string]string{"work": "name: work\nvars:\n  AI_CABIN_CURRENT_CABIN: prod-go\n"},

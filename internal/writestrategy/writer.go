@@ -1,7 +1,7 @@
 // Package writestrategy provides the FileCreator strategy: how a destination
 // file is opened for writing. Each implementation carries an overwrite policy
-// (truncate, backup-on-diff, ...), selected by the caller at the call site so
-// the copy/template engine stays policy-agnostic and a new policy is a new
+// (truncate, backup-on-diff, ...), selected by the caller at the call site
+// so the copy/template engine stays policy-agnostic and a new policy is a new
 // type, not a flag threaded through the engine.
 package writestrategy
 
@@ -15,37 +15,37 @@ import (
 	"time"
 )
 
-// FilePerm is the mode used to create destination files: a plain 0666 so the
-// umask reduces it to 0644 (writable by the owner, idempotent on re-run —
-// re-opening an existing file for write succeeds, unlike a 0444 source).
+// FilePerm is the mode used to create destination files:
+// a plain 0666 so the umask reduces it to 0644 (writable by the owner,
+// idempotent on re-run — re-opening an existing file for write succeeds,
+// unlike a 0444 source).
 const FilePerm os.FileMode = 0o666
 
-// DirPerm is the mode used to create destination directories: a plain 0777 so
-// the umask reduces it to 0755. Symmetric with FilePerm (0666/umask for files,
-// 0777/umask for dirs).
+// DirPerm is the mode used to create destination directories:
+// a plain 0777 so the umask reduces it to 0755. Symmetric with FilePerm
+// (0666/umask for files, 0777/umask for dirs).
 const DirPerm os.FileMode = 0o777
 
-// FileCreator abstracts how a destination file is opened for writing. Each
-// implementation carries an overwrite policy, selected by the caller (a facet,
-// a command) at the call site so the copy/template engine stays policy-agnostic.
-// TruncateCreator overwrites immediately; BackupCreator backs up the previous
-// version on diff. Create receives an absolute destination path, resolved by
-// the caller, so the implementations are stateless.
+// FileCreator abstracts how a destination file is opened for writing.
+// Each implementation carries an overwrite policy, selected by the caller
+// (a facet, a command) at the call site so the copy/template engine
+// stays policy-agnostic. TruncateCreator overwrites immediately; BackupCreator
+// backs up the previous version on diff. Create receives an absolute
+// destination path, resolved by the caller, so the implementations are stateless.
 type FileCreator interface {
 	Create(name string) (io.WriteCloser, error)
 }
 
-// ErrSkip is returned by a FileCreator to signal that a destination file was
-// not written because the policy decided to skip it (SkipCreator: the file
-// already exists; a future InteractiveCreator: the user answered "skip"). It is
-// non-fatal: the copy/template engine treats it as "this file was not written"
-// (excluded from the written list) and continues, distinct from an I/O error
-// which is collected for the aggregated error. On ErrSkip the returned writer is
-// non-nil (so a caller that defers Close before checking the error is safe) but
-// need not be used.
+// ErrSkip is returned by a FileCreator to signal that a destination file
+// was skipped by the policy (SkipCreator: the file already exists).
+// It is non-fatal: the engine continues and the file is excluded
+// from the written list, distinct from an I/O error which is collected
+// for the aggregated error. On ErrSkip the returned writer is non-nil
+// (so a caller that defers Close before checking the error is safe)
+// but need not be used.
 var ErrSkip = errors.New("destination file skipped by the write policy")
 
-// TruncateCreator opens the destination with O_CREATE|O_WRONLY|O_TRUNC.
+// TruncateCreator is the overwrite policy: existing content is discarded.
 type TruncateCreator struct{}
 
 // Create opens name for writing, truncating any existing content.
@@ -53,11 +53,8 @@ func (TruncateCreator) Create(name string) (io.WriteCloser, error) {
 	return os.OpenFile(name, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, FilePerm)
 }
 
-// SkipCreator is the no-overwrite policy: Create returns ErrSkip (with a no-op
-// writer) when the destination already exists, so the caller can continue
-// without clobbering an existing file. When the destination is absent it opens
-// for writing like TruncateCreator. Used by internal/skeletons as the default
-// (no-overwrite) policy; --force selects TruncateCreator instead.
+// SkipCreator is the no-overwrite policy:
+// Create skips an existing destination (ErrSkip) and writes only when it is absent.
 type SkipCreator struct{}
 
 // Create returns a no-op writer and ErrSkip when name already exists; otherwise
@@ -71,8 +68,8 @@ func (SkipCreator) Create(name string) (io.WriteCloser, error) {
 	return os.OpenFile(name, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, FilePerm)
 }
 
-// skipWriter is a no-op WriteCloser returned by SkipCreator on an existing
-// target: Write discards (the file is not modified), Close is a no-op.
+// skipWriter is a no-op WriteCloser returned by SkipCreator on an existing target:
+// Write discards (the file is not modified), Close is a no-op.
 type skipWriter struct{}
 
 func (skipWriter) Write(p []byte) (int, error) { return len(p), nil }
@@ -88,11 +85,10 @@ const BackupSuffix = ".cabin-bak"
 // target read chronologically with find | sort.
 const backupTimeLayout = "20060102-150405"
 
-// backupPath returns a non-colliding backup path for name: the BackupSuffix
-// marker followed by a UTC timestamp, read at commit time. Two backups landing
-// in the same second would otherwise collide and silently drop the older one,
-// so a short increment (-2, -3, ...) disambiguates instead — the point of
-// backing up is that a generation is never lost.
+// backupPath returns a non-colliding backup path for name:
+// the BackupSuffix marker followed by a UTC timestamp, read at commit time.
+// A same-second collision would silently drop the older generation,
+// so a short increment (-2, -3, ...) disambiguates instead.
 func backupPath(name string) (string, error) {
 	base := name + BackupSuffix + "." + time.Now().UTC().Format(backupTimeLayout)
 	p := base
@@ -106,10 +102,9 @@ func backupPath(name string) (string, error) {
 	}
 }
 
-// BackupCreator returns a backupWriter that buffers writes, then at Close
-// compares the buffered content against the existing target: identical is a
-// no-op; different or absent backs up the previous version then writes the new
-// content. Stateless: the destination path is passed to Create.
+// BackupCreator is the copy-if-different policy:
+// Close backs up the previous version before writing the new content;
+// an identical target is a no-op.
 type BackupCreator struct{}
 
 // Create returns a backupWriter that buffers writes and commits at Close.
@@ -117,8 +112,7 @@ func (BackupCreator) Create(name string) (io.WriteCloser, error) {
 	return &backupWriter{name: name, buf: new(bytes.Buffer)}, nil
 }
 
-// backupWriter buffers writes and commits at Close with copy-if-different +
-// backup semantics.
+// backupWriter buffers writes; Close commits them (see BackupCreator).
 type backupWriter struct {
 	name   string
 	buf    *bytes.Buffer
@@ -132,8 +126,7 @@ func (w *backupWriter) Write(p []byte) (int, error) {
 	return w.buf.Write(p)
 }
 
-// Close commits the buffered content: read the existing target, compare, and
-// either no-op (identical) or back up + write (different or absent).
+// Close commits the buffered content with copy-if-different + backup semantics.
 func (w *backupWriter) Close() error {
 	if w.closed {
 		return nil

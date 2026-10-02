@@ -16,7 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// profileCmd represents the profile command group
+// profileCmd represents the profile command group.
 var profileCmd = &cobra.Command{
 	Use:   "profile",
 	Short: "Manage AI-Cabin profiles",
@@ -40,7 +40,7 @@ var profileCmd = &cobra.Command{
 	},
 }
 
-// profileListCmd represents the profile list command
+// profileListCmd represents the profile list command.
 var profileListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List available profiles",
@@ -64,8 +64,8 @@ var profileListCmd = &cobra.Command{
 		}
 
 		// Resolve the effective profile (--profile > AI_CABIN_PROFILE > config)
-		// so the list marks the one that will actually be used, not just the
-		// config currentProfile. A resolution error only degrades the marker.
+		// so the list marks the one that will actually be used, not just
+		// the config currentProfile. A resolution error only degrades the marker.
 		sel, err := config.ResolveProfile("", profileFlag, cliVars)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: could not resolve active profile: %v\n", err)
@@ -78,7 +78,7 @@ var profileListCmd = &cobra.Command{
 	},
 }
 
-// profileShowCmd represents the profile show command
+// profileShowCmd represents the profile show command.
 var profileShowCmd = &cobra.Command{
 	Use:   "show [name]",
 	Short: "Show profile details",
@@ -88,8 +88,8 @@ var profileShowCmd = &cobra.Command{
 	ValidArgsFunction: completeProfileNames,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Resolve the profile to display: a positional <name> wins, then
-		// --profile > AI_CABIN_PROFILE > config. The divergence warning is
-		// suppressed for an explicit positional (the user asked for it).
+		// --profile > AI_CABIN_PROFILE > config. The divergence warning
+		// is suppressed for an explicit positional (the user asked for it).
 		profileName := ""
 		if len(args) > 0 {
 			profileName = args[0]
@@ -116,9 +116,9 @@ var profileShowCmd = &cobra.Command{
 		printVars(profile.Vars)
 
 		// Warn about profile vars that the process env shadows (env wins over
-		// profile in the resolved view), so silent precedence surprises are
-		// visible before the view is set on a subprocess. stdout stays the
-		// profile content; the warning goes to stderr.
+		// profile in the resolved view), so silent precedence surprises
+		// are visible before the view is set on a subprocess. stdout stays
+		// the profile content; the warning goes to stderr.
 		if overrides := config.EnvShadowed(profile.Vars); len(overrides) > 0 {
 			keys := make([]string, 0, len(overrides))
 			for k := range overrides {
@@ -138,7 +138,7 @@ var profileShowCmd = &cobra.Command{
 	},
 }
 
-// profileUseCmd represents the profile use command
+// profileUseCmd represents the profile use command.
 var profileUseCmd = &cobra.Command{
 	Use:   "use <name>",
 	Short: "Select active profile",
@@ -149,8 +149,8 @@ var profileUseCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		profileName := args[0]
 
-		// Verify profile exists (LoadProfile resolves an absolute Path() to
-		// display where the selected profile lives).
+		// Verify profile exists (LoadProfile resolves an absolute Path()
+		// to display where the selected profile lives).
 		profile, err := config.LoadProfile(profileName)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Profile %q not found: %v\n", profileName, err)
@@ -168,13 +168,13 @@ var profileUseCmd = &cobra.Command{
 	},
 }
 
-// profileSetCmd sets one or several profile variables and persists them in a
-// single atomic write. It consumes positionals in two spellings (KEY VALUE, or
-// one/few KEY=VALUE for copy-paste of VAR=value lines) merged with the global
-// --var entries; --var wins on key conflict (documented highest precedence). It
-// targets the profile selected by --profile (default: the current profile),
-// matching the other runtime commands, and is the CRUD continuation of `profile
-// init --var` (the initial set).
+// profileSetCmd sets one or several profile variables and persists
+// them in a single atomic write. It consumes positionals in two spellings
+// (KEY VALUE, or one/few KEY=VALUE for copy-paste of VAR=value lines) merged
+// with the global --var entries; --var wins on key conflict
+// (documented highest precedence). It targets the profile selected by --profile
+// (default: the current profile), matching the other runtime commands,
+// and is the CRUD continuation of `profile init --var` (the initial set).
 var profileSetCmd = &cobra.Command{
 	Use:   "set [KEY=VALUE ...] [KEY VALUE]",
 	Short: "Set variables on a profile",
@@ -226,8 +226,8 @@ var profileSetCmd = &cobra.Command{
 //   - KEY VALUE    -> the backwards-compatible pair (only when the first arg
 //     has no '=' and there are exactly two args)
 //
-// Any other shape (e.g. a KEY=VALUE followed by a bare arg) is ambiguous and
-// rejected with a clear error.
+// Any other shape (e.g. a KEY=VALUE followed by a bare arg) is ambiguous
+// and rejected with a clear error.
 func parseProfileSetArgs(args []string) (config.Vars, error) {
 	out := make(config.Vars)
 	if len(args) == 0 {
@@ -263,17 +263,17 @@ func parseProfileSetArgs(args []string) (config.Vars, error) {
 }
 
 // profileInitForce overwrites an existing profile (and re-copies the desk
-// skeleton) when set by --force. Without it, init on an existing profile is a
-// no-op (warn + exit 0, mirroring `cabin add`).
+// skeleton) when set by --force. Without it, init on an existing profile
+// is a no-op (warn + exit 0, mirroring `cabin add`).
 var profileInitForce bool
 
-// profileInitSkeleton selects the desk skeleton to copy to AI_CABIN_DESK: a
-// name resolved from the skeleton catalogue (AI_CABIN_SKELETON_DIRS + the
-// embedded `minimal`). Omitted -> "minimal" (the zero-config default).
+// profileInitSkeleton selects the desk skeleton to copy to AI_CABIN_DESK:
+// a name resolved from the skeleton catalogue (AI_CABIN_SKELETON_DIRS +
+// the embedded `minimal`). Omitted -> "minimal" (the zero-config default).
 var profileInitSkeleton string
 
-// profileInitCmd creates a profile and copies the desk skeleton to the
-// profile's AI_CABIN_DESK. The persisted var set is bounded (defaults ∪ --var
+// profileInitCmd creates a profile and copies the desk skeleton
+// to the profile's AI_CABIN_DESK. The persisted var set is bounded (defaults ∪ --var
 // ∪ existing-on-force); see config.InitProfile for the persistence rule.
 var profileInitCmd = &cobra.Command{
 	Use:   "init [name]",
@@ -319,8 +319,8 @@ On an existing profile: no-op (warn + exit 0); use --force to overwrite both the
 			os.Exit(1)
 		}
 		// Resolve the runtime view (env included) for the skeleton catalogue:
-		// AI_CABIN_SKELETON_DIRS is read from env/--var, not persisted to the
-		// bounded profile, so profile.Vars alone would miss repo skeletons.
+		// AI_CABIN_SKELETON_DIRS is read from env/--var, not persisted
+		// to the bounded profile, so profile.Vars alone would miss repo skeletons.
 		resolvedVars, err := config.ResolveVars(profileFlag, cliVars)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -343,11 +343,11 @@ On an existing profile: no-op (warn + exit 0); use --force to overwrite both the
 	},
 }
 
-// applyDeskSkeleton resolves the desk skeleton by name and copies its tree to
-// dest (the resolved AI_CABIN_DESK). The skeleton is resolved from the union of
-// AI_CABIN_SKELETON_DIRS (a PATH-style list resolved from vars) and the
-// embedded catalogue (desks/minimal); there is no path mode. Omitted ->
-// "minimal" (the zero-config default of `cabin setup`). Desks take no attrs.
+// applyDeskSkeleton resolves the desk skeleton by name and copies its tree
+// to dest (the resolved AI_CABIN_DESK). The skeleton is resolved
+// from the union of AI_CABIN_SKELETON_DIRS (a PATH-style list resolved
+// from vars) and the embedded catalogue (desks/minimal); there is no path mode.
+// Omitted -> "minimal" (the zero-config default of `cabin setup`). Desks take no attrs.
 // The write policy is SkipCreator (no-overwrite existing desk files) unless
 // force selects TruncateCreator (--force re-copies over an existing desk).
 func applyDeskSkeleton(skeleton, dest string, vars map[string]string, force bool) ([]string, error) {
@@ -365,8 +365,8 @@ func applyDeskSkeleton(skeleton, dest string, vars map[string]string, force bool
 	}
 
 	// Validate the name resolves to an existing skeleton dir before Apply
-	// (which would surface a missing manifest error otherwise). Stat on the
-	// union finds it in any layer; a helpful error lists the desks catalogue.
+	// (which would surface a missing manifest error otherwise). Stat
+	// on the union finds it in any layer; a helpful error lists the desks catalogue.
 	skeletonRoot := path.Join("desks", skeleton)
 	if _, err := fs.Stat(merged, skeletonRoot); err != nil {
 		available := listSkeletons(merged, "desks")
@@ -386,10 +386,10 @@ func applyDeskSkeleton(skeleton, dest string, vars map[string]string, force bool
 }
 
 // profileLine renders one profile list entry. The active profile is marked
-// with a star, annotating its origin (--profile / AI_CABIN_PROFILE) when it
-// overrides the use-selected profile; the overridden use-selected profile is
-// itself flagged so the reader sees it is not the one in effect. Pure and
-// unit-testable; the list command prints each line to stdout.
+// with a star, annotating its origin (--profile / AI_CABIN_PROFILE)
+// when it overrides the use-selected profile; the overridden use-selected profile
+// is itself flagged so the reader sees it is not the one in effect.
+// Pure and unit-testable; the list command prints each line to stdout.
 func profileLine(name string, sel config.ProfileSelection) string {
 	if name == sel.Name {
 		suffix := " (current)"

@@ -201,12 +201,12 @@ version: "3"
 		})
 	}
 
-	// Dedicated sentinel check: a Taskfile without the ai-cabin: block must
-	// return ErrNoHeader (not a wrapped string match), so callers can branch
-	// via errors.Is and surface richer UX (snippet, guidance). Also validates
-	// the convention that normalizedPath is still populated on this error
-	// (valid once the path is resolved, before the header check), so the UX
-	// layer can show which directory was inspected.
+	// Dedicated sentinel check: a Taskfile without the ai-cabin: block
+	// must return ErrNoHeader (not a wrapped string match), so callers
+	// can branch via errors.Is and surface richer UX (snippet, guidance).
+	// Also validates the convention that normalizedPath is still populated
+	// on this error (valid once the path is resolved, before the header
+	// check), so the UX layer can show which directory was inspected.
 	t.Run("missing ai-cabin block returns ErrNoHeader sentinel", func(t *testing.T) {
 		dir := t.TempDir()
 		writeTaskfile(t, dir, `version: "3"

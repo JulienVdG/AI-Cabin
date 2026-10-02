@@ -1,8 +1,8 @@
 // Package state materializes embedded runtime artifacts to XDG state
-// ($XDG_STATE_HOME/ai-cabin). State artifacts are cross-cabin files (e.g. the
-// shared lifecycle Taskfile) the CLI writes to disk before `task` parses a
-// cabin Taskfile: an includes: entry resolves at parse time, before any task
-// runs, so it cannot be produced by the deps task.
+// ($XDG_STATE_HOME/ai-cabin). State artifacts are cross-cabin files
+// (e.g. the shared lifecycle Taskfile) the CLI writes to disk before `task`
+// parses a cabin Taskfile: an includes: entry resolves at parse time,
+// before any task runs, so it cannot be produced by the deps task.
 package state
 
 import (
@@ -15,16 +15,15 @@ import (
 	"github.com/JulienVdG/AI-Cabin/internal/config"
 )
 
-// EnsureArtifact materializes an embedded state artifact (srcFS/<name>) to XDG
-// state (config.GetStateDir()/<name>) if it is missing or stale (its bytes
-// differ from the embedded source). Idempotent: a file already up to date is a
-// no-op (no write, no mtime churn). Returns the absolute destination path.
+// EnsureArtifact materializes an embedded state artifact (srcFS/<name>)
+// to XDG state (config.GetStateDir()/<name>) if it is missing or stale
+// (its bytes differ from the embedded source), and returns the absolute
+// destination path.
 //
-// The on-disk copy is state, not config: overwriting a user edit is
-// acceptable (the file is regenerated from the embedded source on each CLI
-// version that ships different content). srcFS is injected (typically
-// embedded.State()) so the function is unit-testable via testing/fstest.MapFS
-// without touching the real embed.FS.
+// Idempotent: a file already up to date is a no-op (no write, no mtime churn).
+// The on-disk copy is state, not config: overwriting a user edit is acceptable.
+// srcFS is injected (typically embedded.State()) so the function
+// is unit-testable via testing/fstest.MapFS.
 func EnsureArtifact(srcFS fs.FS, name string) (string, error) {
 	src, err := fs.ReadFile(srcFS, name)
 	if err != nil {
@@ -37,12 +36,11 @@ func EnsureArtifact(srcFS fs.FS, name string) (string, error) {
 	}
 	dest := filepath.Join(stateDir, name)
 
-	// Up to date: identical bytes -> no-op (idempotent, no mtime churn).
 	if existing, rerr := os.ReadFile(dest); rerr == nil && bytes.Equal(existing, src) {
 		return dest, nil
 	}
 
-	// Missing or stale: (re)write. mkdir the parent for namespaced artifacts.
+	// Mkdir the parent for namespaced artifact names (e.g. "sub/dir/name").
 	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 		return "", fmt.Errorf("create state dir for %q: %w", name, err)
 	}

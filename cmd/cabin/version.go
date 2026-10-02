@@ -16,10 +16,10 @@ type versionInfo struct {
 	Modified bool   // whether the working tree was dirty at build time
 }
 
-// readVersion extracts version facts from the Go build info embedded in the
-// binary. The tag comes from the VCS stamping (git tag at the exact revision),
-// the module version from `go install @VERSION`. Together they describe exactly
-// which commit — and under which release name — this binary was built from.
+// readVersion extracts version facts from the Go build info embedded
+// in the binary. The tag comes from the VCS stamping (git tag at the exact revision),
+// the module version from `go install @VERSION`. Together they describe
+// exactly which commit — and under which release name — this binary was built from.
 func readVersion() versionInfo {
 	var v versionInfo
 	if bi, ok := debug.ReadBuildInfo(); ok {
@@ -40,8 +40,8 @@ func readVersion() versionInfo {
 	return v
 }
 
-// versionCmd prints the cabin version and, when built from a checkout, the
-// VCS facts that pin the exact source revision.
+// versionCmd prints the cabin version and, when built from a checkout,
+// the VCS facts that pin the exact source revision.
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print the cabin version and build info",
@@ -49,8 +49,8 @@ var versionCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		v := readVersion()
 
-		// The tag wins (it is the release name), then the module version from
-		// `go install @VERSION`, then devel for a plain local build.
+		// The tag wins (it is the release name), then the module version
+		// from `go install @VERSION`, then devel for a plain local build.
 		switch {
 		case v.Tag != "":
 			fmt.Printf("cabin %s\n", v.Tag)

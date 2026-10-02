@@ -11,8 +11,8 @@ import (
 
 // CabinsFileName is the cabins registry file in the config dir (name -> path).
 // Orthogonal to profiles: a profile (env vars, git identity) does not reference
-// cabins. This separation means adding/removing a cabin never touches a
-// profile, and switching profiles never touches the cabin registry.
+// cabins. This separation means adding/removing a cabin never touches
+// a profile, and switching profiles never touches the cabin registry.
 const CabinsFileName = "cabins.yaml"
 
 // Cabin is a registered cabin: a name resolving to a path on disk.
@@ -37,8 +37,8 @@ func getCabinsPath() (string, error) {
 }
 
 // CabinsPath returns the absolute path to the common cabins.yaml registry file,
-// for operator-facing output (e.g. `cabin add`/`list` showing where the
-// registry lives so the user can inspect or fix it by hand).
+// for operator-facing output (e.g. `cabin add`/`list` showing where
+// the registry lives so the user can inspect or fix it by hand).
 func CabinsPath() (string, error) {
 	return getCabinsPath()
 }
@@ -46,9 +46,9 @@ func CabinsPath() (string, error) {
 // cabinFileStore reads/writes a single cabins.yaml file.
 // ConfigService constructs one per call (CLI is one-shot = 1 access per process).
 //
-// Reads go through fs (path relative to the config dir); writes go through the
-// injected FileWriter (atomic). This keeps read/write symmetry with the rest of
-// the package and allows mocking I/O errors in tests.
+// Reads go through fs (path relative to the config dir); writes go
+// through the injected FileWriter (atomic). This keeps read/write symmetry
+// with the rest of the package and allows mocking I/O errors in tests.
 type cabinFileStore struct {
 	relPath string     // CabinsFileName, relative to fs root
 	absPath string     // absolute path, for writes via writer
@@ -56,8 +56,8 @@ type cabinFileStore struct {
 	writer  FileWriter // atomic writes
 }
 
-// newCabinFileStore builds a store for the common cabins.yaml wired to the
-// service's fs and writer.
+// newCabinFileStore builds a store for the common cabins.yaml wired
+// to the service's fs and writer.
 func newCabinFileStore(absPath string, filesystem fs.FS, writer FileWriter) *cabinFileStore {
 	return &cabinFileStore{
 		relPath: CabinsFileName,

@@ -19,8 +19,8 @@ import (
 )
 
 // skeletonCmd groups the Class 1 skeleton commands. A skeleton is a fragment
-// with a mandatory skeleton.yaml manifest, resolved by name from
-// AI_CABIN_SKELETON_DIRS + the embedded catalogue. The concern (desk vs
+// with a mandatory skeleton.yaml manifest, resolved by name
+// from AI_CABIN_SKELETON_DIRS + the embedded catalogue. The concern (desk vs
 // project) drives the destination: desks target AI_CABIN_DESK, projects target
 // $AI_CABIN_WORKDIR/<name>.
 var skeletonCmd = &cobra.Command{
@@ -35,17 +35,17 @@ A desk skeleton (desk/<name>) targets AI_CABIN_DESK; a project skeleton (<name>=
 // Without it, existing files are skipped (SkipCreator, the no-overwrite default).
 var skeletonApplyForce bool
 
-// skeletonApplyAttrs carries the per-instance --attr KEY=VAL overrides. For a
-// project skeleton, "project" is set from the positional <name> (unless
-// overridden); for a desk skeleton, attrs are unused (desks take none).
+// skeletonApplyAttrs carries the per-instance --attr KEY=VAL overrides.
+// For a project skeleton, "project" is set from the positional <name>
+// (unless overridden); for a desk skeleton, attrs are unused (desks take none).
 var skeletonApplyAttrs []string
 
 // skeletonApplyCmd is the generic power-user form exposing the skeleton engine.
-// It parses positionals of the form [desk=]desk/<skeleton> or
-// <name>=projects/<skeleton>, resolves the skeleton by name from the union of
-// AI_CABIN_SKELETON_DIRS + the embedded catalogue, and copies/templates it to
-// the concern's default destination. Desks target AI_CABIN_DESK (the
-// profile-init --skeleton wrapper is the adoption accelerator); projects target
+// It parses positionals of the form [desk=]desk/<skeleton>
+// or <name>=projects/<skeleton>, resolves the skeleton by name from the union
+// of AI_CABIN_SKELETON_DIRS + the embedded catalogue, and copies/templates
+// it to the concern's default destination. Desks target AI_CABIN_DESK
+// (the profile-init --skeleton wrapper is the adoption accelerator); projects target
 // $AI_CABIN_WORKDIR/<name> and there is no dedicated `cabin project init`.
 var skeletonApplyCmd = &cobra.Command{
 	Use:   "apply [desk=]desk/<skeleton> [<name>=projects/<skeleton>]",
@@ -150,8 +150,8 @@ func parseSkeletonArg(arg string) (kind skeletonKind, skeleton, destName string,
 	switch k {
 	case "desk":
 		kind = kindDesks
-		// destName stays empty: a desk always targets AI_CABIN_DESK, and the
-		// optional <name>= prefix is a label ignored for desks.
+		// destName stays empty: a desk always targets AI_CABIN_DESK,
+		// and the optional <name>= prefix is a label ignored for desks.
 	case "projects":
 		kind = kindProjects
 		if !hasName {
@@ -168,11 +168,11 @@ func parseSkeletonArg(arg string) (kind skeletonKind, skeleton, destName string,
 	return kind, skeleton, destName, nil
 }
 
-// resolveSkeletonTarget maps a parsed (kind, skeleton, destName) to the
-// destination path, the skeleton root in the merged FS, and the attrs to pass
-// to Apply. For a project, the positional <name> populates the "project" attr
-// (unless the caller already passed --attr project=...). For a desk, attrs are
-// nil (desks take none).
+// resolveSkeletonTarget maps a parsed (kind, skeleton, destName)
+// to the destination path, the skeleton root in the merged FS, and the attrs
+// to pass to Apply. For a project, the positional <name> populates the "project" attr
+// (unless the caller already passed --attr project=...). For a desk, attrs
+// are nil (desks take none).
 func resolveSkeletonTarget(kind skeletonKind, skeleton, destName string, vars map[string]string, attrs map[string]string) (dest, skeletonRoot string, applyAttrs map[string]any, err error) {
 	skeletonRoot = path.Join(string(kind), skeleton)
 	switch kind {
@@ -198,9 +198,9 @@ func resolveSkeletonTarget(kind skeletonKind, skeleton, destName string, vars ma
 }
 
 // buildProjectAttrs assembles the attrs for a project skeleton: the positional
-// <name> populates "project" (unless the caller overrode it via --attr), and
-// the remaining --attr overrides are copied in. Returned as map[string]any for
-// render.Execute (top-level {{.project}}, {{.module}}).
+// <name> populates "project" (unless the caller overrode it via --attr),
+// and the remaining --attr overrides are copied in. Returned as map[string]any
+// for render.Execute (top-level {{.project}}, {{.module}}).
 func buildProjectAttrs(name string, overrides map[string]string) map[string]any {
 	attrs := make(map[string]any, len(overrides)+1)
 	attrs["project"] = name
@@ -228,10 +228,10 @@ func parseAttrs(flags []string) map[string]string {
 	return out
 }
 
-// validateProjectName rejects a name that would escape the workdir or is
-// otherwise unsafe as a path component: no separator, no "..", not absolute.
-// The dest is filepath.Join(workdir, name), so a clean single component is the
-// contract.
+// validateProjectName rejects a name that would escape the workdir
+// or is otherwise unsafe as a path component: no separator, no "..",
+// not absolute. The dest is filepath.Join(workdir, name), so a clean single component
+// is the contract.
 func validateProjectName(name string) error {
 	if name == "" {
 		return errors.New("empty")
@@ -245,10 +245,10 @@ func validateProjectName(name string) error {
 	return nil
 }
 
-// listSkeletons returns the sorted skeleton names available under a kind
-// catalogue (desks/ or projects/) in the merged FS, for helpful errors and
-// completion. A missing catalogue dir yields an empty slice (no skeletons of
-// that kind in any layer).
+// listSkeletons returns the sorted skeleton names available
+// under a kind catalogue (desks/ or projects/) in the merged FS, for helpful
+// errors and completion. A missing catalogue dir yields an empty slice
+// (no skeletons of that kind in any layer).
 func listSkeletons(merged fs.FS, kind skeletonKind) []string {
 	entries, err := fs.ReadDir(merged, string(kind))
 	if err != nil {
@@ -280,8 +280,8 @@ func buildSkeletonLayers() (fs.FS, error) {
 }
 
 // completeDeskSkeletonNames completes the --skeleton flag of `cabin profile
-// init`: desk skeleton names resolved from AI_CABIN_SKELETON_DIRS + the
-// embedded `minimal`. NoFileComp: a skeleton name is never an arbitrary file.
+// init`: desk skeleton names resolved from AI_CABIN_SKELETON_DIRS +
+// the embedded `minimal`. NoFileComp: a skeleton name is never an arbitrary file.
 func completeDeskSkeletonNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	merged, err := buildSkeletonLayers()
 	if err != nil {
@@ -298,9 +298,9 @@ func completeDeskSkeletonNames(cmd *cobra.Command, args []string, toComplete str
 
 // completeSkeletonApply completes the positionals of `cabin skeleton apply`:
 // each positional is a [desk=]desk/<skeleton> or <name>=projects/<skeleton>
-// form. Completion offers the kind/name pairs found in the catalogues so the
-// user can pick a skeleton, then type any <name>= prefix themselves. Returns
-// NoFileComp (a skeleton name is never an arbitrary file).
+// form. Completion offers the kind/name pairs found in the catalogues
+// so the user can pick a skeleton, then type any <name>= prefix themselves.
+// Returns NoFileComp (a skeleton name is never an arbitrary file).
 func completeSkeletonApply(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	merged, err := buildSkeletonLayers()
 	if err != nil {

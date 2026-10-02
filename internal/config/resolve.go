@@ -5,43 +5,27 @@ import (
 	"strings"
 )
 
-// ProfileEnvVar selects the profile file. --profile sets it (same mechanism as
-// --var), so --profile and AI_CABIN_PROFILE env are one mechanism, not two.
+// ProfileEnvVar selects the profile file. --profile sets it (same mechanism
+// as --var), so --profile and AI_CABIN_PROFILE env are one mechanism, not two.
 const ProfileEnvVar = "AI_CABIN_PROFILE"
 
 // CurrentCabinVar is the profile var recording the cabin a user is currently
-// working in, set with `cabin use` (one profile, one current cabin). It is a
-// plain var, so the standard var mechanism applies: an exported
+// working in, set with `cabin use` (one profile, one current cabin).
+// It is a plain var, so the standard var mechanism applies: an exported
 // AI_CABIN_CURRENT_CABIN overrides the profile file (and `cabin profile show`
-// warns when it shadow a same-named profile var). It resolves through
-// ResolveVars and propagates into the container with the other vars, which is
-// harmless: a cabin knowing its own name is not a leak.
+// warns when it shadows a same-named profile var). It resolves
+// through ResolveVars and propagates into the container with the other vars,
+// which is harmless: a cabin knowing its own name is not a leak.
 const CurrentCabinVar = "AI_CABIN_CURRENT_CABIN"
 
-// ResolveVars returns the variable view the CLI sets on its task subprocess:
-// CLI overrides (--var, --profile), process env, selected profile file, and
-// internal defaults — applied with "set if not present" semantics (highest
-// precedence first).
-//
-// Never errors just because no profile file is selected: a legacy .envrc
-// exporting the vars works alone (the env is always part of the view). Errors
-// only on an explicitly selected missing/unparseable profile, or a malformed
-// --var. The whole process env is included, so system vars (PATH, HOME, ...)
-// are preserved; the runner sets the view via os.Setenv without clearing.
-//
-// InitProfile follows the same precedence rule (--var > env > existing >
-// defaults) but is not a caller of ResolveVars: it loads the named profile under
-// creation/update (not the selected one) and persists a bounded key set (env
-// overrides values but does not enlarge the set), whereas this view includes
-// the whole env. See ConfigService.InitProfile for the persistence rule.
 // ResolveCabin resolves the target cabin for cabin-scoped commands
-// (up/down/build/shell/greyshell/logs/restart/task). Precedence, matching the
-// --var > env > profile order of ResolveVars: the --cabin flag (explicit,
-// highest) > the AI_CABIN_CURRENT_CABIN env var > the active profile's
-// current-cabin var (set with `cabin use`). The active profile is the one
-// selected by --profile / AI_CABIN_PROFILE / config.yaml, resolved via
-// ResolveVars. It errors only when no cabin resolves at all, with guidance for
-// the two ways to name one.
+// (up/down/build/shell/greyshell/logs/restart/task). Precedence, matching
+// the --var > env > profile order of ResolveVars: the --cabin flag
+// (explicit, highest) > the AI_CABIN_CURRENT_CABIN env var >
+// the active profile's current-cabin var (set with `cabin use`). The active profile
+// is the one selected by --profile / AI_CABIN_PROFILE / config.yaml,
+// resolved via ResolveVars. It errors only when no cabin resolves at all,
+// with guidance for the two ways to name one.
 func (s *ConfigService) ResolveCabin(cabinFlag, profileFlag string) (string, error) {
 	if cabinFlag != "" {
 		return cabinFlag, nil
@@ -56,6 +40,22 @@ func (s *ConfigService) ResolveCabin(cabinFlag, profileFlag string) (string, err
 	return "", fmt.Errorf("no cabin selected: pass --cabin <cabin> before any positional arg, or set one with 'cabin use <cabin>'")
 }
 
+// ResolveVars returns the variable view the CLI sets on its task subprocess:
+// CLI overrides (--var, --profile), process env, selected profile file,
+// and internal defaults — applied with "set if not present" semantics
+// (highest precedence first).
+//
+// Never errors just because no profile file is selected: a legacy .envrc
+// exporting the vars works alone (the env is always part of the view). Errors
+// only on an explicitly selected missing/unparseable profile, or a malformed
+// --var. The whole process env is included, so system vars (PATH, HOME, ...)
+// are preserved; the runner sets the view via os.Setenv without clearing.
+//
+// InitProfile follows the same precedence rule (--var > env > existing
+// > defaults) but is not a caller of ResolveVars: it loads the named profile
+// under creation/update (not the selected one) and persists a bounded key set
+// (env overrides values but does not enlarge the set), whereas this view includes
+// the whole env. See ConfigService.InitProfile for the persistence rule.
 func (s *ConfigService) ResolveVars(profileFlag string, cliVars []string) (Vars, error) {
 	view := make(Vars)
 
@@ -70,8 +70,8 @@ func (s *ConfigService) ResolveVars(profileFlag string, cliVars []string) (Vars,
 	}
 
 	// Process env (set if not present, so --var/--profile win). EnvironMap
-	// skips empty/whitespace keys (`=value`, seen in some sandboxed envs) and
-	// the shell's special `_` variable.
+	// skips empty/whitespace keys (`=value`, seen in some sandboxed envs)
+	// and the shell's special `_` variable.
 	environ := EnvironMap()
 	for k, v := range environ {
 		if _, present := view[k]; !present {
@@ -79,22 +79,22 @@ func (s *ConfigService) ResolveVars(profileFlag string, cliVars []string) (Vars,
 		}
 	}
 
-	// Which profile file to load, resolved through the shared selector so the
-	// runtime view and `cabin profile` display agree on the active profile.
+	// Which profile file to load, resolved through the shared selector
+	// so the runtime view and `cabin profile` display agree on the active profile.
 	name, _, err := s.resolveProfileName(profileFlag, cliVarsMap, environ)
 	if err != nil {
 		return nil, err
 	}
 
-	// Selected profile file (if any). Missing selection is skipped; an
-	// explicitly selected missing file is an error.
+	// Selected profile file (if any). Missing selection is skipped;
+	// an explicitly selected missing file is an error.
 	if name != "" {
 		// Reflect the resolved profile in the view so setenv exports
 		// AI_CABIN_PROFILE even when the profile came from the current-profile
 		// fallback — the standalone `task` path then selects the same profile
 		// for its compose project name. Direct assignment: `name` already
-		// embodies the env/flag precedence, and an empty AI_CABIN_PROFILE in
-		// the env is not a selection (it falls back to the current profile).
+		// embodies the env/flag precedence, and an empty AI_CABIN_PROFILE
+		// in the env is not a selection (it falls back to the current profile).
 		view[ProfileEnvVar] = name
 
 		exists, err := s.ProfileExists(name)
@@ -136,8 +136,8 @@ func setIfAbsent(dst, src map[string]string) {
 }
 
 // ParseCLIVars validates and maps a --var list (KEY=VAL) into a Vars map,
-// shared by ResolveVars, InitProfile and `profile set`'s --var merge so the
-// KEY=VAL shape is enforced once.
+// shared by ResolveVars, InitProfile and `profile set`'s --var merge
+// so the KEY=VAL shape is enforced once.
 func ParseCLIVars(cliVars []string) (Vars, error) {
 	out := make(Vars, len(cliVars))
 	for _, kv := range cliVars {
@@ -151,12 +151,12 @@ func ParseCLIVars(cliVars []string) (Vars, error) {
 }
 
 // sanitizeTypedVars normalizes vars whose input form is permissive (CSV,
-// JSON array, quoted or not) into the canonical form templates expect, so the
-// template can consume the var directly. Applied at the end of ResolveVars so
-// --var, env, and profile values are all covered. Today: CREDENTIAL_INJECT
-// and CREDENTIAL_IGNORE (list normalization via SanitizeNameList, defaulting
-// to empty when unset so the template renders []), CONTAINER_WORKDIR (fallback
-// to AI_CABIN_WORKDIR).
+// JSON array, quoted or not) into the canonical form templates expect,
+// so the template can consume the var directly. Applied at the end
+// of ResolveVars so --var, env, and profile values are all covered.
+// Today: CREDENTIAL_INJECT and CREDENTIAL_IGNORE (list normalization
+// via SanitizeNameList, defaulting to empty when unset
+// so the template renders []), CONTAINER_WORKDIR (fallback to AI_CABIN_WORKDIR).
 func sanitizeTypedVars(view Vars) {
 	// CREDENTIAL_INJECT/IGNORE are optional: always sanitize so an unset var
 	// defaults to empty (renders []), never <no value>.

@@ -29,8 +29,8 @@ const lifecycleTaskfileName = "Taskfile.lifecycle.yml"
 // wrappers (which map to the docker-* lifecycle targets).
 //
 // Materializing the lifecycle on every cabin task keeps the docker-* targets
-// available to `task` standalone and is idempotent (content-compare no-op when
-// up to date).
+// available to `task` standalone and is idempotent (content-compare no-op
+// when up to date).
 func runCabinTask(ctx context.Context, cabinName, taskName string, rawArgs []string, needRelpath bool, stdout, stderr io.Writer) error {
 	c, err := config.GetCabin(cabinName)
 	if err != nil {
@@ -43,8 +43,8 @@ func runCabinTask(ctx context.Context, cabinName, taskName string, rawArgs []str
 	}
 	vm := vars.AsMap()
 
-	// Inject the CLI's own path so the Taskfile can self-delegate via
-	// $AI_CABIN_CMD (same pattern as `make` passing $MAKE). An absolute path
+	// Inject the CLI's own path so the Taskfile can self-delegate
+	// via $AI_CABIN_CMD (same pattern as `make` passing $MAKE). An absolute path
 	// avoids PATH lookups failing on a freshly built binary.
 	exe, err := resolveExecutable()
 	if err != nil {
@@ -52,21 +52,21 @@ func runCabinTask(ctx context.Context, cabinName, taskName string, rawArgs []str
 	}
 	vm["AI_CABIN_CMD"] = exe
 
-	// Path shadowing (relpath): inject the host CWD sub-path relative to the
-	// workdir as CABIN_REL_PATH so the agent launches into the matching
-	// sub-directory inside the greywall sandbox (the Taskfile forwards it via
-	// `docker compose exec -e CABIN_REL_PATH=...`; the container-side wrapper
+	// Path shadowing (relpath): inject the host CWD sub-path
+	// relative to the workdir as CABIN_REL_PATH so the agent launches
+	// into the matching sub-directory inside the greywall sandbox (the Taskfile
+	// forwards it via `docker compose exec -e CABIN_REL_PATH=...`; the container-side wrapper
 	// does a two-step cd: root anchor + relpath inside the sandbox).
 	//
 	// Computed only for targets that drop the user into the container (task,
 	// shell, greyshell); skipped for container-level actions (up/down/build/
-	// logs/restart). The user can opt out with --no-relpath to launch at the
-	// workdir root explicitly (e.g. from a CWD outside the workdir tree).
+	// logs/restart). The user can opt out with --no-relpath to launch
+	// at the workdir root explicitly (e.g. from a CWD outside the workdir tree).
 	//
 	// Fail-fast when CWD is outside the workdir: a silent fallback to the root
 	// would make the agent run in the wrong directory while the user believes
-	// it is in the sub-path. The container-side cd remains the last line of
-	// defense.
+	// it is in the sub-path. The container-side cd remains the last line
+	// of defense.
 	rel := ""
 	if needRelpath && !noRelpathFlag {
 		wd, err := os.Getwd()
@@ -80,8 +80,8 @@ func runCabinTask(ctx context.Context, cabinName, taskName string, rawArgs []str
 	}
 	vm["CABIN_REL_PATH"] = rel
 
-	// Ensure the lifecycle Taskfile is materialized to XDG state and inject its
-	// path so the cabin's includes: resolves to where the file was actually
+	// Ensure the lifecycle Taskfile is materialized to XDG state and inject
+	// its path so the cabin's includes: resolves to where the file was actually
 	// written (matters when XDG_STATE_HOME is redirected, e.g. the dev pattern).
 	lifecyclePath, err := ensureLifecycleArtifact()
 	if err != nil {
@@ -89,21 +89,21 @@ func runCabinTask(ctx context.Context, cabinName, taskName string, rawArgs []str
 	}
 	vm["AI_CABIN_LIFECYCLE_TASKFILE"] = lifecyclePath
 
-	// Resolve the greywall profile list for this cabin and inject it on the
-	// process (from the cabin's path, independent of the caller's CWD).
-	// Best-effort: a resolution failure leaves the var unset instead of
-	// blocking task execution.
+	// Resolve the greywall profile list for this cabin and inject
+	// it on the process (from the cabin's path, independent of the caller's CWD).
+	// Best-effort: a resolution failure leaves the var unset instead
+	// of blocking task execution.
 	if bundles, vars, merged, _, err := resolveCabinFragments(c.Path); err == nil {
 		if profiles, err := fragments.ResolveGreywallProfiles(merged, bundles, vars.AsMap()); err == nil {
 			vm["GREYWALL_PROFILE"] = strings.Join(profiles, ",")
 		}
 	}
 
-	// Compose project name: isolate instances per (profile, cabin) so two
-	// profiles operating the same cabin get distinct projects (containers and
-	// networks) while sharing the image build. Best-effort: a missing profile
-	// falls back to the canonical name alone, and an unreadable Taskfile skips
-	// the injection (compose then defaults to the dir basename). The lifecycle
+	// Compose project name: isolate instances per (profile, cabin)
+	// so two profiles operating the same cabin get distinct projects
+	// (containers and networks) while sharing the image build. Best-effort:
+	// a missing profile falls back to the canonical name alone, and an unreadable Taskfile
+	// skips the injection (compose then defaults to the dir basename). The lifecycle
 	// `sh:` fallback resolves the same name on the standalone `task` path.
 	if project, _, err := composeProjectName(c.Path); err == nil {
 		vm["COMPOSE_PROJECT_NAME"] = project
@@ -113,10 +113,10 @@ func runCabinTask(ctx context.Context, cabinName, taskName string, rawArgs []str
 }
 
 // ensureLifecycleArtifact materializes the embedded lifecycle Taskfile to XDG
-// state (idempotent: no-op when the on-disk copy is up to date) and returns its
-// absolute path. Shared by runCabinTask (sets it on the task subprocess env) and
-// task-target completion (sets it on the process env so Setup() resolves the
-// lifecycle include and the docker-* targets appear).
+// state (idempotent: no-op when the on-disk copy is up to date) and returns
+// its absolute path. Shared by runCabinTask (sets it on the task subprocess
+// env) and task-target completion (sets it on the process env so Setup()
+// resolves the lifecycle include and the docker-* targets appear).
 func ensureLifecycleArtifact() (string, error) {
 	stateFS, err := embedded.State()
 	if err != nil {
@@ -125,8 +125,8 @@ func ensureLifecycleArtifact() (string, error) {
 	return state.EnsureArtifact(stateFS, lifecycleTaskfileName)
 }
 
-// exitOnRunError prints a run error to stderr with actionable guidance and
-// exits non-zero. ErrCabinNotFound gets a richer message (how to register);
+// exitOnRunError prints a run error to stderr with actionable guidance
+// and exits non-zero. ErrCabinNotFound gets a richer message (how to register);
 // other errors are printed as-is. Shared by `cabin task` and the wrappers.
 func exitOnRunError(w io.Writer, cabinName string, err error) {
 	if errors.Is(err, config.ErrCabinNotFound) {
@@ -140,23 +140,23 @@ func exitOnRunError(w io.Writer, cabinName string, err error) {
 	os.Exit(1)
 }
 
-// resolveTargetCabin resolves the cabin for cabin-scoped commands from the
-// global --cabin flag / AI_CABIN_CURRENT_CABIN env / active profile var
-// (config.ResolveCabin). Shared by `cabin task` and the lifecycle wrappers so
-// they all honor the same precedence.
+// resolveTargetCabin resolves the cabin for cabin-scoped commands
+// from the global --cabin flag / AI_CABIN_CURRENT_CABIN env / active profile var
+// (config.ResolveCabin). Shared by `cabin task` and the lifecycle wrappers
+// so they all honor the same precedence.
 func resolveTargetCabin() (string, error) {
 	return config.ResolveCabin(cabinFlag, profileFlag)
 }
 
-// lifecycleWrapper builds a `cabin <cmd>` command that delegates to the
-// shared docker-<cmd> Taskfile target. The target cabin is resolved by
-// --cabin / current-cabin (resolveTargetCabin), not a positional arg. The
-// `docker-` prefix avoids collision with cabin-owned targets: task errors on a
-// flatten include with a duplicate name, so the cabin owns setup/deps/agent
+// lifecycleWrapper builds a `cabin <cmd>` command that delegates
+// to the shared docker-<cmd> Taskfile target. The target cabin is resolved
+// by --cabin / current-cabin (resolveTargetCabin), not a positional arg.
+// The `docker-` prefix avoids collision with cabin-owned targets: task errors
+// on a flatten include with a duplicate name, so the cabin owns setup/deps/agent
 // targets and the lifecycle owns the docker-* names. needRelpath selects
 // whether the host CWD sub-path is injected (shell/greyshell drop the user
-// into the container) or skipped (up/down/build/logs/restart are
-// container-level actions with no CWD to propagate).
+// into the container) or skipped (up/down/build/logs/restart
+// are container-level actions with no CWD to propagate).
 func lifecycleWrapper(name, target, short string, needRelpath bool) *cobra.Command {
 	return &cobra.Command{
 		Use:   name,

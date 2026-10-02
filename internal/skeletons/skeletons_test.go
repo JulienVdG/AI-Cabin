@@ -32,8 +32,8 @@ func deskSkeleton() fstest.MapFS {
 	}
 }
 
-// projectSkeleton is a Class 1 project skeleton using entries mode: the
-// manifest maps src (under content/) to dst, with a templated destination
+// projectSkeleton is a Class 1 project skeleton using entries mode:
+// the manifest maps src (under content/) to dst, with a templated destination
 // name (cmd/{{.project}}/main.go) and per-instance attrs ({{.module}}). This
 // exercises the fragments Materializer entries path via the skeletons facade.
 func projectSkeleton() fstest.MapFS {
@@ -44,8 +44,8 @@ func projectSkeleton() fstest.MapFS {
 	}
 }
 
-// readDest reads a destination file relative to dest, failing the test if it
-// does not exist (a missing target is a bug the assertion should catch).
+// readDest reads a destination file relative to dest, failing the test
+// if it does not exist (a missing target is a bug the assertion should catch).
 func readDest(t *testing.T, dest, rel string) string {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join(dest, rel))
@@ -76,9 +76,9 @@ func TestApply(t *testing.T) {
 
 	t.Run("MirrorCopiesPlainAndRendersTmpl", func(t *testing.T) {
 		// A desk skeleton with mirror: content. Plain files are copied as-is;
-		// .tmpl files are rendered with vars (namespaced .Vars.X) and the
-		// .tmpl suffix is stripped from the dst. The manifest itself is not
-		// copied (it lives outside content/).
+		// .tmpl files are rendered with vars (namespaced .Vars.X)
+		// and the .tmpl suffix is stripped from the dst. The manifest itself
+		// is not copied (it lives outside content/).
 		srcFS := deskSkeleton()
 		dest := t.TempDir()
 
@@ -110,8 +110,8 @@ func TestApply(t *testing.T) {
 
 	t.Run("SkipCreatorNoOverwrite", func(t *testing.T) {
 		// A second Apply with SkipCreator on an existing dest: existing files
-		// are skipped (ErrSkip, non-fatal), their content unchanged. This is
-		// the no-overwrite default of `cabin profile init` (without --force):
+		// are skipped (ErrSkip, non-fatal), their content unchanged.
+		// This is the no-overwrite default of `cabin profile init` (without --force):
 		// re-running does not clobber a desk the user edited.
 		srcFS := deskSkeleton()
 		dest := t.TempDir()
@@ -135,9 +135,9 @@ func TestApply(t *testing.T) {
 	})
 
 	t.Run("TruncateCreatorOverwrites", func(t *testing.T) {
-		// TruncateCreator (--force) overwrites existing files: a re-run with
-		// changed source updates every destination. The .cabin-bak backup is a
-		// BackupCreator concern, not TruncateCreator's (skeletons use truncate
+		// TruncateCreator (--force) overwrites existing files: a re-run
+		// with changed source updates every destination. The .cabin-bak backup
+		// is a BackupCreator concern, not TruncateCreator's (skeletons use truncate
 		// for --force, not backup).
 		srcFS := deskSkeleton()
 		dest := t.TempDir()
@@ -161,8 +161,8 @@ func TestApply(t *testing.T) {
 		// A project skeleton with entries: exercises templated destination
 		// names (cmd/{{.project}}/main.go) and per-instance attrs
 		// ({{.module}}), distinct from profile vars ({{.Vars.X}}). The
-		// positional <name> populates the "project" attr; "module" comes from
-		// the caller. The manifest itself is not copied (it is not an entry).
+		// positional <name> populates the "project" attr; "module" comes
+		// from the caller. The manifest itself is not copied (it is not an entry).
 		srcFS := projectSkeleton()
 		dest := t.TempDir()
 		attrs := map[string]any{
@@ -189,8 +189,8 @@ func TestApply(t *testing.T) {
 
 	t.Run("EntriesUndefinedAttrErrors", func(t *testing.T) {
 		// A referenced-but-unset attr renders <no value> (ErrUndefinedVar),
-		// surfaced so the user learns which --attr to pass. The output is
-		// still written (écriture-malgré-erreur) for inspection.
+		// surfaced so the user learns which --attr to pass. The output
+		// is still written (écriture-malgré-erreur) for inspection.
 		srcFS := projectSkeleton()
 		dest := t.TempDir()
 		// "module" omitted -> {{.module}} renders <no value>.
@@ -209,8 +209,8 @@ func TestApply(t *testing.T) {
 	t.Run("MirrorCollectsRenderErrorsNoFailFast", func(t *testing.T) {
 		// A .tmpl referencing an undefined var yields render.ErrUndefinedVar
 		// (the output contains "<no value>"). The error is collected (not
-		// fatal), the other files still copy. Mirrors internal/fragments: the
-		// user sees every issue in one run.
+		// fatal), the other files still copy. Mirrors internal/fragments:
+		// the user sees every issue in one run.
 		srcFS := fstest.MapFS{
 			"sk/skeleton.yaml":          {Data: []byte("mirror: content\n")},
 			"sk/content/ok.txt":         {Data: []byte("plain\n")},
@@ -246,8 +246,8 @@ func TestApply(t *testing.T) {
 		// A plain fs.FS (no ReadDirFS+StatFS) is rejected by NewMaterializer
 		// rather than failing deep in the walk. The manifest check uses Open
 		// (works on any fs.FS), so the rejection happens at NewMaterializer.
-		// bareFS implements only fs.FS (Open) and returns ErrNotExist, so the
-		// manifest check fails first with the "no manifest" error.
+		// bareFS implements only fs.FS (Open) and returns ErrNotExist,
+		// so the manifest check fails first with the "no manifest" error.
 		srcFS := bareFS{}
 		dest := t.TempDir()
 
@@ -298,8 +298,8 @@ func TestBuildLayersCatalogue(t *testing.T) {
 	})
 
 	t.Run("LayerWithoutSkeletonsTolerated", func(t *testing.T) {
-		// A layer root with no skeletons/ subdir must not break resolution: the
-		// catalogue still resolves the embedded minimal desk.
+		// A layer root with no skeletons/ subdir must not break resolution:
+		// the catalogue still resolves the embedded minimal desk.
 		merged, err := skeletons.BuildLayers(nil, []string{layerRoot}, emb)
 		require.NoError(t, err)
 
