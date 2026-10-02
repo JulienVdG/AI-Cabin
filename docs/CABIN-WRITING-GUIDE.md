@@ -252,6 +252,22 @@ Each declaration opens a TCP bridge inside the container
 that opens that port in the sandbox. The agent then connects to
 `localhost:5432` as if the database were local.
 
+The local port can also differ from the target port: an `apache` service
+listening on 80 but published to the host as `8080:80`, or a target port
+already bound inside the container. Add the optional `listen` attr so the
+agent reaches the service on the same port as the host:
+
+```yaml
+ai-cabin:
+  features:
+    - port-forward: {port: 80, host: apache, listen: 8080}
+```
+
+The bridge listens on `localhost:8080` and forwards to `apache:80`. Without
+`listen`, the local port is the target port. Each forward is named after its
+listen socket, so two bridges to the same service on different local ports
+coexist.
+
 The auxiliary services themselves (and the agent's `depends_on`) live in your
 **project's own compose**, not in the cabin-generated one. When the project
 already has a `docker-compose.yml` (e.g. a Postgres side container next to the

@@ -1,5 +1,5 @@
 {
   "network": {
-    "forwardPorts": [{{.port}}]
+    "forwardPorts": [{{default .port .listen}}]
   }
 }

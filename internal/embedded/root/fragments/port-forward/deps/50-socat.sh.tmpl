@@ -1,5 +1,7 @@
 #!/bin/bash
-# Forward localhost:{{.port}} -> {{.host}}:{{.port}}
+# Forward localhost:{{default .port .listen}} -> {{.host}}:{{.port}}.
+# The optional listen attr (default: the target port) decouples the local
+# socket from the target port.
 # One socat process per forwarded port (fork handles connections).
-echo "[entrypoint] Starting socat forward {{.host}}:{{.port}}..."
-socat TCP-LISTEN:{{.port}},fork,reuseaddr TCP:{{.host}}:{{.port}} &
+echo "[entrypoint] Starting socat forward {{.host}}:{{.port}} on localhost:{{default .port .listen}}..."
+socat TCP-LISTEN:{{default .port .listen}},fork,reuseaddr TCP:{{.host}}:{{.port}} &

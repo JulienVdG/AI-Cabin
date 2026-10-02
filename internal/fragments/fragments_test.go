@@ -241,6 +241,17 @@ func TestMaterialize(t *testing.T) {
 		sort.Strings(w2)
 		assert.Equal(t, []string{"docker-entrypoint.d/50-socat-apache-8080.sh"}, w2)
 
+		// Third instance: same target (mariadb:3306) on a distinct local
+		// socket. listen decouples the socat socket from the target port, and
+		// the dst names key on the listen socket so both bridges coexist.
+		attrs3 := map[string]any{"host": "mariadb", "port": "3306", "listen": "13306"}
+		w3, err := depsMat.Materialize("port-forward", attrs3)
+		require.NoError(t, err)
+		sort.Strings(w3)
+		assert.Equal(t, []string{"docker-entrypoint.d/50-socat-mariadb-13306.sh"}, w3)
+		assert.Contains(t, readDest(t, depsDest, "docker-entrypoint.d/50-socat-mariadb-13306.sh"),
+			"socat TCP-LISTEN:13306,fork,reuseaddr TCP:mariadb:3306 &")
+
 		// --- setup facet (BackupCreator): greywall forward profile into
 		// $AI_CABIN_HOME/.config/greywall/learned/.
 		setupDest := t.TempDir()
@@ -257,6 +268,15 @@ func TestMaterialize(t *testing.T) {
 		require.NoError(t, err)
 		sort.Strings(ws2)
 		assert.Equal(t, []string{".config/greywall/learned/forward-apache-8080.json"}, ws2)
+
+		// listen instance: the greywall forward profile opens the listen
+		// port (the local socket the agent connects to), not the target port.
+		ws3, err := setupMat.Materialize("port-forward", attrs3)
+		require.NoError(t, err)
+		sort.Strings(ws3)
+		assert.Equal(t, []string{".config/greywall/learned/forward-mariadb-13306.json"}, ws3)
+		assert.JSONEq(t, `{"network":{"forwardPorts":[13306]}}`,
+			readDest(t, setupDest, ".config/greywall/learned/forward-mariadb-13306.json"))
 	})
 
 	t.Run("SetupEntries", func(t *testing.T) {
@@ -769,5 +789,29 @@ func TestResolveGreywallProfiles(t *testing.T) {
 		got, err := fragments.ResolveGreywallProfiles(merged, bundles, nil)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"workspace", "pi", "go", "forward-mariadb-3306"}, got)
+	})
+
+	t.Run("FromEmbeddedWithPortForwardListen", func(t *testing.T) {
+		// listen decouples the local socket from the target port: the derived
+		// profile name keys on the listen socket (forward-<host>-<listen>),
+		// so two bridges to the same target on distinct local sockets resolve
+		// to two distinct profiles.
+		embedFS, err := embedded.Fragments()
+		require.NoError(t, err)
+		merged, err := fragments.BuildLayers(nil, nil, "", embedFS)
+		require.NoError(t, err)
+
+		header, err := cabin.ParseHeader([]byte(`ai-cabin:
+  agents: [pi]
+  features:
+    - port-forward: {port: 3306, host: mariadb}
+    - port-forward: {port: 3306, host: mariadb, listen: 13306}
+`))
+		require.NoError(t, err)
+		bundles := cabin.ActiveBundles(header)
+
+		got, err := fragments.ResolveGreywallProfiles(merged, bundles, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"workspace", "pi", "forward-mariadb-3306", "forward-mariadb-13306"}, got)
 	})
 }

@@ -12,6 +12,13 @@ release time.
 
 ### Changes
 
+- **`port-forward` decoupled local and target ports** — the bundle accepts an
+  optional `listen` attr (`port-forward: {port: 80, host: apache, listen: 8080}`):
+  socat listens on `listen` (default: the target `port`) and still forwards to
+  `host:port`. A target port already bound inside the container no longer
+  blocks the bridge, and the local port can be picked to match the one
+  published to the host.
+
 - **`install.d` download steps are now architecture-aware** — the fragment
   deps install scripts (pi, opencode, and the opt-in Go toolchain) resolve
   the target architecture once via `uname -m` and pick the matching release
