@@ -304,7 +304,7 @@ The registry maps cabin names to their directory so `cabin use` and `--cabin <na
 
 ### Current cabin
 
-Cabin-scoped commands (`build`, `up`, `down`, `restart`, `logs`, `shell`, `greyshell`, `task`) target a **current cabin**, so you never repeat a name. Set it once per profile with `cabin use` (it is sugar for `cabin profile set AI_CABIN_CURRENT_CABIN <name>`; the current cabin is a profile variable, so each profile has its own):
+Cabin-scoped commands (`build`, `up`, `down`, `restart`, `logs`, `shell`, `greyshell`, `compose`, `task`) target a **current cabin**, so you never repeat a name. Set it once per profile with `cabin use` (it is sugar for `cabin profile set AI_CABIN_CURRENT_CABIN <name>`; the current cabin is a profile variable, so each profile has its own):
 
 ```bash
 cabin use opencode-go    # make opencode-go the current cabin of the active profile
@@ -328,7 +328,18 @@ The cabin commands below operate on the current cabin; pass `--cabin <name>` (be
 - `cabin logs` — follow the current cabin's logs
 - `cabin shell` — get a bash shell inside the current cabin's container
 - `cabin greyshell` — get a greywall-sandboxed shell in the current cabin
+- `cabin compose <args...>` — run an arbitrary `docker compose` command in the current cabin's directory
 - `cabin ps` — list agent containers across cabins (`-a` for all, including stopped)
+
+`cabin compose` is a raw passthrough for the cabin's whole compose stack — the sidecar services (mariadb, apache, ...) as well as the agent. It resolves the same env as the other lifecycle commands (compose project name, greywall profile, profile vars), so it targets the current `(profile, cabin)` instance without `eval "$(cabin setenv ...)"` and without cd-ing into the cabin dir:
+
+```bash
+cabin compose restart apache    # restart a sidecar after editing its conf files
+cabin compose logs -f apache
+cabin compose ps
+```
+
+Args are forwarded verbatim to `docker compose` and no `prepare` step runs — it does what you asked and nothing more; use `cabin up`/`restart` for the managed lifecycle.
 
 ### Task
 

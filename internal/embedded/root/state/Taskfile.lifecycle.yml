@@ -101,3 +101,8 @@ tasks:
     cmds:
       - task: prepare
       - docker compose restart {{.AGENT_SERVICE}}
+
+  docker-compose:
+    desc: Run an arbitrary docker compose command (args forwarded as CLI_ARGS)
+    cmds:
+      - docker compose {{.CLI_ARGS}}

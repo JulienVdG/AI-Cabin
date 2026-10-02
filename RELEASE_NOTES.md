@@ -12,6 +12,8 @@ release time.
 
 ### Changes
 
+- **New `cabin compose <args...>` passthrough** — run an arbitrary `docker compose` command on the current cabin's stack without eval-ing `cabin setenv` and cd-ing into the cabin dir: `cabin compose restart apache` after editing a sidecar service's conf files, `cabin compose logs -f apache`, .... The command resolves the same env as the other lifecycle commands (compose project name, greywall profile, profile vars) so it targets the current `(profile, cabin)` instance, and forwards args verbatim to `docker compose`. No `prepare` step runs (raw passthrough; `cabin up|down|build|restart` remain the managed lifecycle). Also available standalone as the new shared lifecycle target `task docker-compose -- <args>`.
+
 - **`port-forward` decoupled local and target ports** — the bundle accepts an
   optional `listen` attr (`port-forward: {port: 80, host: apache, listen: 8080}`):
   socat listens on `listen` (default: the target `port`) and still forwards to

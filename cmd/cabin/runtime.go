@@ -175,7 +175,46 @@ func lifecycleWrapper(name, target, short string, needRelpath bool) *cobra.Comma
 	}
 }
 
+// composeCmd passes raw args to docker compose in the target cabin,
+// for manual operations on the cabin's stack (sidecar services included).
+var composeCmd = &cobra.Command{
+	Use:   "compose <args...>",
+	Short: "Run an arbitrary docker compose command in the cabin",
+	Long: `Run an arbitrary docker compose command in the target cabin's directory,
+with the cabin's env resolved (compose project name, greywall profile, profile vars).
+Meant for sidecar services of the cabin's stack (restart service, follow its logs, ...).
+
+The cabin is selected with --cabin (before any positional) or the current
+cabin of the active profile ('cabin use <cabin>'); pass --profile to pick the
+profile. Args after the first positional are forwarded raw to docker compose.
+
+No prepare step runs: this is a raw passthrough; use cabin up|down|build|restart
+for the managed lifecycle.
+
+Examples:
+  cabin compose restart apache
+  cabin compose logs -f apache
+  cabin compose ps
+`,
+	Args: cobra.MinimumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		cabinName, err := resolveTargetCabin()
+		if err != nil {
+			exitOnRunError(os.Stderr, cabinName, err)
+			return
+		}
+		if err := runCabinTask(cmd.Context(), cabinName, "docker-compose", args, false, os.Stdout, os.Stderr); err != nil {
+			exitOnRunError(os.Stderr, cabinName, err)
+		}
+	},
+}
+
 func init() {
+	// Stop parsing flags at the first positional: compose args (incl. docker
+	// compose's own --profile) must reach {{.CLI_ARGS}} verbatim.
+	composeCmd.Flags().SetInterspersed(false)
+	rootCmd.AddCommand(composeCmd)
+
 	rootCmd.AddCommand(
 		lifecycleWrapper("up", "docker-up", "Start the cabin in background", false),
 		lifecycleWrapper("down", "docker-down", "Stop the cabin", false),

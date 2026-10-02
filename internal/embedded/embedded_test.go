@@ -145,6 +145,7 @@ func TestState(t *testing.T) {
 	for _, task := range []string{
 		"docker-up", "docker-down", "docker-build",
 		"docker-shell", "docker-greyshell", "docker-logs", "docker-restart",
+		"docker-compose",
 	} {
 		assert.Contains(t, content, task, "lifecycle Taskfile missing the %q target", task)
 	}
