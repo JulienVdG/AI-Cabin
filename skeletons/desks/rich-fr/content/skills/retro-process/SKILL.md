@@ -1,6 +1,6 @@
 ---
 name: retro-process
-description: Session retrospective following desk/retro.md [feedback, session review, improvement, workflow, validation]
+description: Session retrospective following desk/retro.md; retro edits go to ~/desk/AGENTS.md and ~/desk/skills/ [feedback, session review, improvement, workflow, validation, retro, edit locations]
 license: MIT
 compatibility: opencode
 metadata:

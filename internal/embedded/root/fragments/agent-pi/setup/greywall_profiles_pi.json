@@ -50,7 +50,8 @@
       "~/.zprofile",
       "~/.profile",
       "~/.ssh",
-      "~/.gnupg"
+      "~/.gnupg",
+      "~/.pi/agent/AGENTS.md"
     ]
   },
   "command": {

@@ -30,6 +30,13 @@ release time.
 
 - **`BackupCreator` backups are now timestamped** — `<file>.cabin-bak.<YYYYMMDD-HHMMSS>` (UTC, lexicographically sortable), disambiguated with a `-2`/`-3`... suffix when two backups land in the same second, instead of the former single-slot `.cabin-bak` that was overwritten at each setup re-run. A diff no longer erases the previous backup: each change keeps its own generation. The `.cabin-bak` prefix is kept stable, so backups stay findable by pattern (`find`, `gitignore`). The mark for cleanup is left to the user (`find`/`git status`) — cleanup is not automated.
 
+- **Agents can no longer edit their own AGENTS.md** — the instruction files
+  the cabins generate (`~/.pi/agent/AGENTS.md` for pi,
+  `~/.config/opencode/AGENTS.md` for opencode) are read-only inside the
+  greywall sandbox: the agent keeps reading them, edits belong to the user.
+  The masters stay the desk `AGENTS.md` and the shipped workspace fragment,
+  which `cabin up` concatenates into the generated file at every start.
+
 ### Fixes
 
 - **`profile set` nothing-to-persist hint** — the error printed when

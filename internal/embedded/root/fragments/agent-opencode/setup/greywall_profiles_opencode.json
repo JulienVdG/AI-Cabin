@@ -59,7 +59,8 @@
       "~/.zprofile",
       "~/.profile",
       "~/.ssh",
-      "~/.gnupg"
+      "~/.gnupg",
+      "~/.config/opencode/AGENTS.md"
     ]
   },
   "command": {
