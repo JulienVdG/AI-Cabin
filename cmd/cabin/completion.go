@@ -127,6 +127,36 @@ func completeVarNames(cmd *cobra.Command, args []string, toComplete string) ([]s
 	return out, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveNoSpace
 }
 
+// completeProfileKeys completes the first positional of the profile
+// var-read/edit commands (get/append/prepend) with the union of the known
+// settable keys and the selected profile's persisted vars (the profile chosen
+// by --profile, default: current), without any value suffix: the second
+// positional (a value) gets no completion. Resolution errors are silently
+// tolerated so the completion never crashes the shell.
+func completeProfileKeys(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) > 0 {
+		// The second positional is a value, never a key.
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	keys := make(map[string]bool, len(knownConfigVarKeys))
+	for _, k := range knownConfigVarKeys {
+		keys[k] = true
+	}
+	if prof, err := config.GetActiveProfile(profileFlag); err == nil {
+		for k := range prof.Vars {
+			keys[k] = true
+		}
+	}
+	var out []string
+	for k := range keys {
+		if strings.HasPrefix(k, toComplete) {
+			out = append(out, k)
+		}
+	}
+	sort.Strings(out)
+	return out, cobra.ShellCompDirectiveNoFileComp
+}
+
 // knownConfigVarKeys lists the known settable profile variables, forming
 // the base of the --var completion so a key is suggested even when the current
 // profile has not persisted it. It covers the structural keys

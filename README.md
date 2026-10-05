@@ -280,6 +280,8 @@ The active profile is selected with `--profile` (default: the active profile, in
 - `cabin profile list` — list available profiles
 - `cabin profile show` — show the active profile
 - `cabin profile set [KEY=VALUE ...] [KEY VALUE]` — set variables on a profile (`KEY=VALUE` entries for copy-pasting, or the `KEY VALUE` pair; merged with the global `--var`)
+- `cabin profile get <var>` — print the raw value of a profile variable on stdout (no labels, script-friendly: `$(cabin --profile work get VAR)` substitutes into a command); a missing variable exits non-zero with a message on stderr, and a shadowed one (same-named env var with another value) warns on stderr without polluting the value
+- `cabin profile append <var> <value>` / `cabin profile prepend <var> <value>` — add a value to a comma-separated list variable (`CREDENTIAL_INJECT`, `AI_CABIN_LAYER_DIRS`, `AI_CABIN_FRAGMENTS_DIRS`, ...) at the chosen end of the list, without retyping the whole value. Only the target variable is persisted (the global `--var` entries stay a temporary override) and a value already present is skipped (dedup no-op), so appending a credential or layer is a one-liner that is safe to re-run
 - `cabin profile use <name>` — select the active profile
 
 Value resolution, highest to lowest: `--var KEY=VAL` (repeatable global flag), environment variables, the profile file, then built-in defaults. Since environment variables outrank the profile file, a profile variable can be silently shadowed by a same-named shell variable; `cabin profile show` warns when that happens (it prints each shadowed variable with its environment value), so it doubles as a debug tool for precedence surprises.

@@ -89,3 +89,41 @@ func TestParseProfileSetArgs(t *testing.T) {
 		})
 	}
 }
+
+// TestEditListValue covers the comma-separated list edit shared by `profile
+// append` and `profile prepend`: insertion at the right end, the empty-list
+// case, whitespace trimming of entries and value, and the dedup no-op (an
+// already-present value returns the list unchanged, preserving its original
+// spacing, and reports no change).
+func TestEditListValue(t *testing.T) {
+	cases := []struct {
+		name    string
+		current string
+		value   string
+		prepend bool
+		want    string
+		wantCh  bool
+	}{
+		{"append to empty list", "", "a", false, "a", true},
+		{"append to existing list", "a,b", "c", false, "a,b,c", true},
+		{"prepend to empty list", "", "a", true, "a", true},
+		{"prepend to existing list", "a,b", "c", true, "c,a,b", true},
+		{"append single-value list", "a", "b", false, "a,b", true},
+		{"prepend single-value list", "a", "b", true, "b,a", true},
+		{"append already present is a no-op", "a,b", "b", false, "a,b", false},
+		{"prepend already present is a no-op", "a,b", "a", true, "a,b", false},
+		{"already present keeps original spacing", "a, b", "a", false, "a, b", false},
+		{"append trims existing entries", "a, ,b", "c", false, "a,b,c", true},
+		{"append trims the value", "a", " b ", false, "a,b", true},
+		{"prepend trims existing entries", " b , a", "c", true, "c,b,a", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, changed := editListValue(tc.current, tc.value, tc.prepend)
+			if got != tc.want || changed != tc.wantCh {
+				t.Errorf("editListValue(%q, %q, %v) = (%q, %v), want (%q, %v)",
+					tc.current, tc.value, tc.prepend, got, changed, tc.want, tc.wantCh)
+			}
+		})
+	}
+}

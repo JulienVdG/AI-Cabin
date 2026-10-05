@@ -262,6 +262,149 @@ func parseProfileSetArgs(args []string) (config.Vars, error) {
 	return nil, fmt.Errorf("invalid arguments %q: expected KEY=VALUE entries or a KEY VALUE pair", args)
 }
 
+// profileGetCmd prints the raw value of a profile variable on stdout,
+// script-friendly (no labels), so a command substitution can use it:
+// $(cabin --profile toto get MYVAR). The value printed is the one persisted
+// in the profile selected by --profile (default: the current one); a variable
+// absent from the profile is an error (exit 1 + stderr), while a variable set
+// to an empty value prints an empty line and exits 0 (it is present, just empty).
+var profileGetCmd = &cobra.Command{
+	Use:   "get <var>",
+	Short: "Print the value of a profile variable",
+	Long:  `Print the raw value of the profile variable <var> on stdout, without labels, so a command substitution can use it (e.g. $(cabin --profile toto get MYVAR)). The variable is read from the profile selected by --profile (default: the current one), as persisted. A missing variable prints an error on stderr and exits non-zero; a variable set to an empty value prints an empty line and exits 0.`,
+	Args:  cobra.ExactArgs(1),
+	// <var> is completed from the known/persisted profile keys.
+	ValidArgsFunction: completeProfileKeys,
+	Run: func(cmd *cobra.Command, args []string) {
+		profile, err := config.GetActiveProfile(profileFlag)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+
+		key := args[0]
+		value, present := profile.Vars[key]
+		if !present {
+			fmt.Fprintf(os.Stderr, "Error: variable %q is not set on profile %q\n", key, profile.Name)
+			os.Exit(1)
+		}
+
+		// Stdout stays the clean substitution value; a shadow warning
+		// (the process env would override the printed value at runtime)
+		// goes to stderr, mirroring `cabin profile show`.
+		fmt.Println(value)
+		// Warn only when the process env actually shadows the queried var
+		// (EnvShadowed maps name -> env value for differing same-named vars).
+		if ev, ok := config.EnvShadowed(profile.Vars)[key]; ok {
+			fmt.Fprintf(os.Stderr, "Warning: %s is overridden by the environment (env=%q)\n", key, ev)
+		}
+	},
+}
+
+// profileAppendCmd and profilePrependCmd edit the comma-separated list stored
+// in a single profile variable and persist it atomically. Unlike `profile set`
+// (which persists everything it is given, --var included), they persist only
+// the target variable: the global --var entries stay a temporary override
+// (their default behavior, applied to resolution but never written). The base
+// list is the profile's persisted value of the variable, not the resolved view,
+// so a same-named env/--var value does not leak into the edit.
+var profileAppendCmd = &cobra.Command{
+	Use:   "append <var> <value>",
+	Short: "Append a value to a profile list variable",
+	Long:  `Append <value> to the end of the comma-separated list stored in the profile variable <var> (e.g. CREDENTIAL_INJECT, AI_CABIN_LAYER_DIRS, AI_CABIN_FRAGMENTS_DIRS) and persist the new value atomically. Only <var> is persisted; the global --var entries stay a temporary override (unlike ` + "`cabin profile set`" + `, which persists them). The value is skipped when already present (dedup), so re-running the same append is a no-op. Targets the profile selected by --profile (default: the current one).`,
+	Args:  cobra.ExactArgs(2),
+	// <var> is completed from the known/persisted profile keys.
+	ValidArgsFunction: completeProfileKeys,
+	Run: func(cmd *cobra.Command, args []string) {
+		runProfileListEdit(args, false)
+	},
+}
+
+// profilePrependCmd prepends a value to a profile list variable. It shares
+// the run body and the persistence semantics of profileAppendCmd (only the
+// target variable is persisted; the value goes at the beginning of the list).
+var profilePrependCmd = &cobra.Command{
+	Use:   "prepend <var> <value>",
+	Short: "Prepend a value to a profile list variable",
+	Long:  `Prepend <value> to the beginning of the comma-separated list stored in the profile variable <var> and persist the new value atomically. Only <var> is persisted; the global --var entries stay a temporary override (unlike ` + "`cabin profile set`" + `, which persists them). The value is skipped when already present (dedup), so re-running the same prepend is a no-op. Targets the profile selected by --profile (default: the current one).`,
+	Args:  cobra.ExactArgs(2),
+	// <var> is completed from the known/persisted profile keys.
+	ValidArgsFunction: completeProfileKeys,
+	Run: func(cmd *cobra.Command, args []string) {
+		runProfileListEdit(args, true)
+	},
+}
+
+// runProfileListEdit is the shared run body of profile append/prepend.
+// It rejects an empty key or value up front, reads the persisted list of the
+// target variable from the profile selected by --profile, computes the edited
+// list via editListValue (dedup included), and persists the result atomically.
+func runProfileListEdit(args []string, prepend bool) {
+	key, value := args[0], args[1]
+	if strings.TrimSpace(key) == "" {
+		fmt.Fprintf(os.Stderr, "Error: variable name must not be empty\n")
+		os.Exit(1)
+	}
+	if strings.TrimSpace(value) == "" {
+		fmt.Fprintf(os.Stderr, "Error: value must not be empty\n")
+		os.Exit(1)
+	}
+
+	profile, err := config.GetActiveProfile(profileFlag)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	verb := "Appended"
+	if prepend {
+		verb = "Prepended"
+	}
+
+	newValue, changed := editListValue(profile.Vars[key], value, prepend)
+	if !changed {
+		fmt.Printf("Profile: %s\n", profile.Name)
+		fmt.Printf("Path: %s\n", profile.Path())
+		fmt.Printf("%s is already in %s on profile %q (unchanged)\n", value, key, profile.Name)
+		return
+	}
+
+	updated, err := config.SetProfileVar(profileFlag, key, newValue)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Profile: %s\n", updated.Name)
+	fmt.Printf("Path: %s\n", updated.Path())
+	fmt.Printf("%s %s to %s on profile %q (now: %s)\n", verb, value, key, profile.Name, newValue)
+}
+
+// editListValue inserts value into a comma-separated list (current): at the
+// beginning (prepend) or the end (append). Entries are whitespace-trimmed
+// and empty ones dropped; the insert is skipped when value is already present
+// (dedup), in which case the list is returned exactly as-is (a no-op, second
+// return false). Prepend/append of a newly created list returns just value.
+func editListValue(current, value string, prepend bool) (string, bool) {
+	value = strings.TrimSpace(value)
+	items := make([]string, 0)
+	for _, part := range strings.Split(current, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if part == value {
+			return current, false
+		}
+		items = append(items, part)
+	}
+	if prepend {
+		items = append([]string{value}, items...)
+	} else {
+		items = append(items, value)
+	}
+	return strings.Join(items, ","), true
+}
+
 // profileInitForce overwrites an existing profile (and re-copies the desk
 // skeleton) when set by --force. Without it, init on an existing profile
 // is a no-op (warn + exit 0, mirroring `cabin add`).
@@ -416,6 +559,9 @@ func init() {
 	profileCmd.AddCommand(profileShowCmd)
 	profileCmd.AddCommand(profileUseCmd)
 	profileCmd.AddCommand(profileSetCmd)
+	profileCmd.AddCommand(profileGetCmd)
+	profileCmd.AddCommand(profileAppendCmd)
+	profileCmd.AddCommand(profilePrependCmd)
 	profileCmd.AddCommand(profileInitCmd)
 	rootCmd.AddCommand(profileCmd)
 }

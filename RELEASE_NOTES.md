@@ -12,6 +12,24 @@ release time.
 
 ### Changes
 
+- **`cabin profile append|prepend <var> <value>`** — add a value at the end or
+  beginning of a comma-separated profile list variable (`CREDENTIAL_INJECT`,
+  `AI_CABIN_LAYER_DIRS`, `AI_CABIN_FRAGMENTS_DIRS`, ...) without retyping the
+  whole list: `cabin profile append CREDENTIAL_INJECT MY_CRED` is a one-liner.
+  Only the target variable is persisted (the global `--var` entries stay a
+  temporary override, unlike `cabin profile set` which persists them), and an
+  already-present value is skipped, so re-running the same append/prepend is a
+  no-op for scripts and idempotent setup lines.
+
+- **`cabin profile get <var>`** — print the raw value of a profile variable on
+  stdout, without labels, so a command substitution can use it directly:
+  `$(cabin --profile work get SCW_PROJECT_ID)`. The value read is the persisted
+  one from the profile selected by `--profile` (default: the current one). A
+  missing variable exits non-zero with a message on stderr; a variable set to
+  an empty value prints an empty line and exits 0. When a same-named
+  environment variable shadows the printed value (the runtime view would
+  override it), a warning goes to stderr without polluting the value.
+
 - **New `cabin compose <args...>` passthrough** — run an arbitrary `docker compose` command on the current cabin's stack without eval-ing `cabin setenv` and cd-ing into the cabin dir: `cabin compose restart apache` after editing a sidecar service's conf files, `cabin compose logs -f apache`, .... The command resolves the same env as the other lifecycle commands (compose project name, greywall profile, profile vars) so it targets the current `(profile, cabin)` instance, and forwards args verbatim to `docker compose`. No `prepare` step runs (raw passthrough; `cabin up|down|build|restart` remain the managed lifecycle). Also available standalone as the new shared lifecycle target `task docker-compose -- <args>`.
 
 - **`port-forward` decoupled local and target ports** — the bundle accepts an
