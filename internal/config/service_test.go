@@ -85,7 +85,7 @@ func newInitService(t *testing.T) *config.ConfigService {
 
 // initDefaultVars is the set BuildDefaultProfile produces (the bounded base).
 // Used to assert the persisted set stays bounded — never the whole env.
-var initDefaultVars = map[string]string{
+var initDefaultVars = config.Vars{
 	config.HomeVar:    "/tmp/test-home",
 	config.DeskVar:    "/tmp/test-home/Documents/desk",
 	config.WorkdirVar: "/tmp/test-home/projects",
@@ -408,7 +408,7 @@ func TestConfigService_SaveProfile(t *testing.T) {
 		// Build a profile.
 		profile := &config.Profile{
 			Name: "test-save",
-			Vars: map[string]string{
+			Vars: config.Vars{
 				"TEST_VAR": "test-value",
 			},
 		}
@@ -454,7 +454,7 @@ func TestConfigService_SaveProfile(t *testing.T) {
 
 		profile := &config.Profile{
 			Name: "test-save",
-			Vars: map[string]string{"TEST_VAR": "test-value"},
+			Vars: config.Vars{"TEST_VAR": "test-value"},
 		}
 
 		err := svc.SaveProfile(profile)

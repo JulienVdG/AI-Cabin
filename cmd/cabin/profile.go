@@ -5,7 +5,6 @@ import (
 	"io/fs"
 	"os"
 	"path"
-	"sort"
 	"strings"
 
 	"github.com/JulienVdG/AI-Cabin/internal/config"
@@ -120,13 +119,8 @@ var profileShowCmd = &cobra.Command{
 		// are visible before the view is set on a subprocess. stdout stays
 		// the profile content; the warning goes to stderr.
 		if overrides := config.EnvShadowed(profile.Vars); len(overrides) > 0 {
-			keys := make([]string, 0, len(overrides))
-			for k := range overrides {
-				keys = append(keys, k)
-			}
-			sort.Strings(keys)
 			fmt.Fprintf(os.Stderr, "Warning: these profile variables are overridden by the environment (env wins):\n")
-			for _, k := range keys {
+			for _, k := range config.OrderedVarKeys(overrides) {
 				fmt.Fprintf(os.Stderr, "  %s (env=%s)\n", k, overrides[k])
 			}
 		}
@@ -206,14 +200,9 @@ var profileSetCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		keys := make([]string, 0, len(vars))
-		for k := range vars {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
 		fmt.Printf("Profile: %s\n", profile.Name)
 		fmt.Printf("Path: %s\n", profile.Path())
-		for _, k := range keys {
+		for _, k := range config.OrderedVarKeys(vars) {
 			fmt.Printf("Set %s=%s on profile %q\n", k, vars[k], profile.Name)
 		}
 	},

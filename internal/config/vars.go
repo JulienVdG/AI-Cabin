@@ -3,7 +3,10 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // FragmentsDirsEnvVar is the comma-separated list of fragment override
@@ -64,6 +67,11 @@ const (
 	ContainerWorkdirVar = "CONTAINER_WORKDIR"
 )
 
+// VarPrefix is the naming-convention prefix of general and host-side vars
+// (AI_CABIN_*), as opposed to CONTAINER_* which describe the in-container
+// side only. It drives the canonical key rank of OrderedVarKeys.
+const VarPrefix = "AI_CABIN_"
+
 // SanitizeNameList normalizes a list-of-env-var-names value into the raw
 // content of a JSON array ("A","B", or empty when no entries survive).
 // Accepts CSV (A,B), JSON array (["A","B"]), or bracketed CSV ([A,B]);
@@ -98,12 +106,66 @@ func SanitizeNameList(s string) string {
 	return strings.Join(quoted, ",")
 }
 
-// Vars is the resolved variable view the CLI sets on its subprocesses: profile
-// vars, process env, and --var overrides merged with first-set-wins semantics
-// (see ResolveVars). Methods derive higher-level values from the view,
-// keeping the derivation logic next to the data it reads
-// instead of spreading it across callers.
+// Vars is a variable map in two roles: the persisted profile vars (Profile.Vars,
+// YAML-marshaled in canonical key order, see MarshalYAML) and the resolved
+// variable view the CLI sets on its subprocesses: profile vars, process env,
+// and --var overrides merged with first-set-wins semantics (see ResolveVars).
+// Methods derive higher-level values from the view, keeping the derivation
+// logic next to the data it reads instead of spreading it across callers.
 type Vars map[string]string
+
+// MarshalYAML serializes the map in the canonical key order (OrderedVarKeys)
+// so persisted profile files lead with AI_CABIN_HOME and AI_CABIN_DESK for
+// human editors — a bare map would marshal alphabetically.
+func (v Vars) MarshalYAML() (any, error) {
+	node := &yaml.Node{Kind: yaml.MappingNode}
+	for _, k := range OrderedVarKeys(v) {
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: k},
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: v[k]},
+		)
+	}
+	return node, nil
+}
+
+// OrderedVarKeys returns the keys of a var map in the canonical order: HomeVar
+// and DeskVar first (the paths every profile edit starts from), then the
+// remaining AI_CABIN_* keys alphabetically, then everything else
+// alphabetically. One order shared by the YAML marshal (profile files) and
+// every CLI display of a var map (printVars, profile set, the EnvShadowed
+// warning, setenv), so files and console listings agree.
+func OrderedVarKeys(vars map[string]string) []string {
+	keys := make([]string, 0, len(vars))
+	for k := range vars {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool { return lessVarKey(keys[i], keys[j]) })
+	return keys
+}
+
+// lessVarKey orders two var keys by canonical rank, then alphabetically.
+func lessVarKey(a, b string) bool {
+	ra, rb := varRank(a), varRank(b)
+	if ra != rb {
+		return ra < rb
+	}
+	return a < b
+}
+
+// varRank returns the canonical rank of a var key: HomeVar, then DeskVar,
+// then the other AI_CABIN_* keys, then the rest.
+func varRank(k string) int {
+	switch k {
+	case HomeVar:
+		return 0
+	case DeskVar:
+		return 1
+	}
+	if strings.HasPrefix(k, VarPrefix) {
+		return 2
+	}
+	return 3
+}
 
 // AsMap returns the underlying map for pass-through to APIs that take a raw
 // map[string]string (e.g. task.Run sets each entry on os.Setenv without reading

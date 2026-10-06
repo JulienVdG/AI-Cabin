@@ -8,9 +8,9 @@ import (
 
 // Profile represents a user profile with environment variables.
 type Profile struct {
-	Name string            `yaml:"name"`
-	Vars map[string]string `yaml:"vars"`
-	path string            // runtime path, not serialized
+	Name string `yaml:"name"`
+	Vars Vars   `yaml:"vars"`
+	path string // runtime path, not serialized
 }
 
 // Path returns the full path to the profile file.

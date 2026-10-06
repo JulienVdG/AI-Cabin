@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"sort"
 	"strings"
 
 	"github.com/JulienVdG/AI-Cabin/internal/config"
@@ -98,21 +97,23 @@ The profile is resolved from an optional positional <profile>, then --profile, t
 }
 
 // setenvDelta returns the keys of view that setenv should emit for the shell,
-// sorted: a variable the environment already carries with the same value
-// is a no-op, and an empty resolved value adds nothing (absence behaves
-// like empty for templates), so only what materializes or changes is returned —
-// never the noisy unchanged environment. Pure: no I/O, unit-testable.
+// in the canonical order (config.OrderedVarKeys): a variable the environment
+// already carries with the same value is a no-op, and an empty resolved value
+// adds nothing (absence behaves like empty for templates), so only what
+// materializes or changes is returned — never the noisy unchanged
+// environment. Pure: no I/O, unit-testable.
 func setenvDelta(view, env map[string]string) []string {
-	keys := make([]string, 0, len(view))
-	for k := range view {
-		if view[k] != "" {
-			if v, present := env[k]; !present || v != view[k] {
-				keys = append(keys, k)
-			}
+	delta := make(map[string]string, len(view))
+	for k, v := range view {
+		if v == "" {
+			continue
 		}
+		if ev, present := env[k]; present && ev == v {
+			continue
+		}
+		delta[k] = v
 	}
-	sort.Strings(keys)
-	return keys
+	return config.OrderedVarKeys(delta)
 }
 
 // emitEnvVar returns the shell statement that sets key=value for the given

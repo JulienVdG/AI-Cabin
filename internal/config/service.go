@@ -298,7 +298,7 @@ func (s *ConfigService) BuildDefaultProfile(name string) (*Profile, error) {
 
 	profile := &Profile{
 		Name: name,
-		Vars: map[string]string{
+		Vars: Vars{
 			HomeVar:           home,
 			DeskVar:           filepath.Join(home, "Documents", "desk"),
 			WorkdirVar:        filepath.Join(home, "projects"),
@@ -468,7 +468,7 @@ func (s *ConfigService) SetProfileVars(name string, vars Vars) (*Profile, error)
 		return nil, err
 	}
 	if profile.Vars == nil {
-		profile.Vars = map[string]string{}
+		profile.Vars = Vars{}
 	}
 	for k, v := range vars {
 		profile.Vars[k] = v

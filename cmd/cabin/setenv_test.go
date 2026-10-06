@@ -3,6 +3,8 @@ package main
 import (
 	"reflect"
 	"testing"
+
+	"github.com/JulienVdG/AI-Cabin/internal/config"
 )
 
 // TestEmitEnvVar covers the per-shell statement format of `cabin setenv
@@ -34,7 +36,8 @@ func TestEmitEnvVar(t *testing.T) {
 
 // TestSetenvDelta covers the shell-delta selection: a variable the shell env
 // already carries unchanged is a no-op, a resolved empty value is skipped,
-// and only what materializes or changes is emitted, sorted.
+// and only what materializes or changes is emitted, in the canonical order
+// (config.OrderedVarKeys).
 func TestSetenvDelta(t *testing.T) {
 	cases := []struct {
 		name string
@@ -67,10 +70,16 @@ func TestSetenvDelta(t *testing.T) {
 			[]string{},
 		},
 		{
-			"results are sorted",
+			"results are in canonical order",
 			map[string]string{"Z": "1", "A": "2", "M": "3"},
 			map[string]string{"A": "2"},
 			[]string{"M", "Z"},
+		},
+		{
+			"AI_CABIN_HOME and AI_CABIN_DESK lead",
+			map[string]string{"Z": "1", config.WorkdirVar: "2", config.HomeVar: "3", config.DeskVar: "4"},
+			map[string]string{},
+			[]string{config.HomeVar, config.DeskVar, config.WorkdirVar, "Z"},
 		},
 	}
 	for _, tc := range cases {

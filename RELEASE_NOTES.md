@@ -10,6 +10,20 @@ release time.
 
 ## Unreleased
 
+### Changes
+
+- **Canonical key order for profile variables** — profile files written by the
+  CLI (`cabin profile init`, `set`, `append/prepend`, `use`) now list
+  `AI_CABIN_HOME` and `AI_CABIN_DESK` first, then the other `AI_CABIN_*`
+  variables alphabetically, then the rest alphabetically, instead of plain
+  alphabetical order: the variables a profile edit starts from lead the
+  `vars:` block for human editors. The same order applies everywhere the CLI
+  shows a variable map (`cabin profile show`, the `cabin setup`/`profile init`
+  output, the `profile set` confirmation, the environment-shadowing warning,
+  `cabin setenv`), so files and console listings agree. Existing profiles keep
+  working unchanged: the order applies when the CLI next saves the file,
+  hand-edited files are left untouched.
+
 ## v1.4.0
 
 ### Changes

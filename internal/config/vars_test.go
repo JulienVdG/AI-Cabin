@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 // TestSplitPathList covers the PATH-style primitive shared by config vars
@@ -159,5 +160,76 @@ func TestLayerDirs(t *testing.T) {
 		assert.Equal(t, []string{"/layers/a", "/layers/b"}, v.LayerDirs())
 		assert.Equal(t, []string{"/layers/a/fragments", "/layers/b/fragments"}, v.LayerFragmentDirs())
 		assert.Equal(t, []string{"/layers/a/skeletons", "/layers/b/skeletons"}, v.LayerSkeletonDirs())
+	})
+}
+
+// TestOrderedVarKeys covers the canonical key order shared by the profile
+// YAML marshal and every CLI display of a var map: HomeVar and DeskVar
+// first, then the remaining AI_CABIN_* keys, then everything else —
+// alphabetical within each rank.
+func TestOrderedVarKeys(t *testing.T) {
+	t.Run("CanonicalThenAlphabetical", func(t *testing.T) {
+		vars := map[string]string{
+			"SCW_PROJECT_ID":         "id",
+			config.WorkdirVar:        "/projects",
+			config.HomeVar:           "/home",
+			"GIT_AGENT_NAME":         "agent",
+			config.DeskVar:           "/desk",
+			"AI_CABIN_CURRENT_CABIN": "blog",
+			"CREDENTIAL_INJECT":      "SCW",
+		}
+		assert.Equal(t, []string{
+			config.HomeVar,
+			config.DeskVar,
+			"AI_CABIN_CURRENT_CABIN",
+			config.WorkdirVar,
+			"CREDENTIAL_INJECT",
+			"GIT_AGENT_NAME",
+			"SCW_PROJECT_ID",
+		}, config.OrderedVarKeys(vars))
+	})
+
+	t.Run("MissingCanonicalKeysKeepPrefixRank", func(t *testing.T) {
+		vars := map[string]string{"Z": "1", "AI_CABIN_X": "2", "A": "3"}
+		assert.Equal(t, []string{"AI_CABIN_X", "A", "Z"}, config.OrderedVarKeys(vars))
+	})
+
+	t.Run("Empty", func(t *testing.T) {
+		assert.Empty(t, config.OrderedVarKeys(map[string]string{}))
+	})
+}
+
+// TestVars_MarshalYAML pins the persisted profile var order: the mapping
+// leads with AI_CABIN_HOME and AI_CABIN_DESK instead of the alphabetical
+// order yaml.v3 picks for a bare map, and special values still round-trip
+// through the hand-built node tree.
+func TestVars_MarshalYAML(t *testing.T) {
+	t.Run("CanonicalOrder", func(t *testing.T) {
+		vars := config.Vars{
+			"GIT_AGENT_NAME":  "agent",
+			config.WorkdirVar: "/projects",
+			config.DeskVar:    "/desk",
+			config.HomeVar:    "/home",
+		}
+		data, err := yaml.Marshal(vars)
+		require.NoError(t, err)
+		assert.Equal(t,
+			"AI_CABIN_HOME: /home\nAI_CABIN_DESK: /desk\nAI_CABIN_WORKDIR: /projects\nGIT_AGENT_NAME: agent\n",
+			string(data))
+	})
+
+	t.Run("EmptyMarshalsAsFlowMapping", func(t *testing.T) {
+		data, err := yaml.Marshal(config.Vars{})
+		require.NoError(t, err)
+		assert.Equal(t, "{}\n", string(data))
+	})
+
+	t.Run("SpecialValuesRoundTrip", func(t *testing.T) {
+		vars := config.Vars{"K": "a: b", "J": "#notcomment"}
+		data, err := yaml.Marshal(vars)
+		require.NoError(t, err)
+		back := map[string]string{}
+		require.NoError(t, yaml.Unmarshal(data, &back))
+		assert.Equal(t, map[string]string(vars), back)
 	})
 }
