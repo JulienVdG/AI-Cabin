@@ -1,6 +1,6 @@
 args: |
   # Define the agent version as a build argument
-  ARG PI_VERSION=v0.72.1
+  ARG PI_VERSION=v1.1.0
 dockerfile: |
   # Agent pi: pi-dev session + ripgrep + fd (install.d/50-pi reads PI_VERSION)
   RUN mkdir -p .pi/agent

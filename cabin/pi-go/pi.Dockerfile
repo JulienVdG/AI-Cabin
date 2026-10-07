@@ -2,7 +2,7 @@
 FROM golang:1.26-trixie
 
 # Define the version as an argument.
-ARG PI_VERSION=v0.72.1
+ARG PI_VERSION=v1.1.0
 
 # Install tools, including bash-completion.
 RUN apt-get update && apt-get install -y \

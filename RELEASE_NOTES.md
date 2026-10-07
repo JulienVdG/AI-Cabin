@@ -12,6 +12,20 @@ release time.
 
 ### Changes
 
+- **pi agent bumped to v1.1.0** — cabins running the pi agent (the `pi-go`
+  reference cabin, and new cabins built from the `agent-pi` fragment) now
+  install pi v1.1.0 instead of v0.72.1. Pi runs fullscreen by default: the
+  session renders on an alternate screen with an internal transcript
+  (PageUp/PageDown scrolling, transcript dumped into the terminal buffer on
+  exit), and colors follow the terminal palette. Users who prefer the classic
+  terminal scrollback run pi with `--tui-mode regular` or set `tuiMode` to
+  `"regular"` in pi settings. The pi download now uses the canonical
+  `earendil-works/pi` repository (the project moved from `badlogic/pi-mono`;
+  old URLs keep redirecting). From v0.77.0 on, API key/header credentials in
+  configs are `$VAR`/`${VAR}` references instead of bare env names; the
+  `agent-pi` models template renders the right syntax for the installed pi
+  version (shipped via the cabin Taskfile `PI_VERSION`).
+
 - **Canonical key order for profile variables** — profile files written by the
   CLI (`cabin profile init`, `set`, `append/prepend`, `use`) now list
   `AI_CABIN_HOME` and `AI_CABIN_DESK` first, then the other `AI_CABIN_*`

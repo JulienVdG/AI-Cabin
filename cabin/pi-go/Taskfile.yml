@@ -26,6 +26,7 @@ env:
   CONTAINER_HOME: /home/ai_agent
   # Per-wrapper greywall extras (e.g. -p for an inbound port).
   GREYWALL_ARGS: ""
+  PI_VERSION: "v1.1.0"
 
 tasks:
   default:

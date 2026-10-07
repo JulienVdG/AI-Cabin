@@ -42,7 +42,7 @@ rm -rf fd.tar.gz fd-v*
 
 # pi.
 mkdir -p /opt
-curl -fsSL "https://github.com/badlogic/pi-mono/releases/download/${PI_VERSION}/pi-${SHORT_ARCH}.tar.gz" -o pi.tar.gz
+curl -fsSL "https://github.com/earendil-works/pi/releases/download/${PI_VERSION}/pi-${SHORT_ARCH}.tar.gz" -o pi.tar.gz
 tar -xzf pi.tar.gz -C /opt
 rm -f pi.tar.gz
 

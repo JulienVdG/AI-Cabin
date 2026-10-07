@@ -2,7 +2,7 @@
   "providers": {
     "scaleway": {
     "baseUrl": "https://api.scaleway.ai/{{ if .Vars.SCW_PROJECT_ID }}{{.Vars.SCW_PROJECT_ID}}/{{ end }}v1",
-      "apiKey": "SCW_SECRET_KEY",
+      "apiKey": "{{ if lt (default "v0.99.0" .Vars.PI_VERSION) "v0.77.0" }}SCW_SECRET_KEY{{ else }}${SCW_SECRET_KEY}{{ end }}",
       "api": "openai-completions",
       "models": [
         {
