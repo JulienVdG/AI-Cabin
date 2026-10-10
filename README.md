@@ -415,7 +415,7 @@ Assembles a new cabin (Dockerfile + compose + Taskfile) from blueprints without 
 - `cabin authoring show <dest>` — render the assembled files to stdout (non-destructive)
 - `cabin authoring new <dest>` — write the assembled files (new files only; `--force` to overwrite)
 
-Both accept `--agents pi,opencode` and `--features git-agent,go`.
+Both accept `--agents pi,opencode` and `--features git-agent,go`, including inline attrs mirroring the header syntax: `--agents 'opencode: {web: cmd}'` starts the opencode web UI (off by default), `--features 'port-forward: {port: 5432, host: postgres}'` forwards a service.
 
 ### Profile Variables
 

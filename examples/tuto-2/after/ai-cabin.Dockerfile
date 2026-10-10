@@ -3,9 +3,9 @@ FROM tuto2-web
 # Force root for the install steps, whatever user the base image ends on
 USER root
 
-ARG OPENCODE_VERSION=1.4.9
+ARG OPENCODE_VERSION=1.18.35
 # Define the agent version as a build argument
-ARG PI_VERSION=v0.72.1
+ARG PI_VERSION=v1.1.0
 
 # Install all required packages in one step
 RUN apt-get update && apt-get install -y \
@@ -45,10 +45,10 @@ RUN echo 'if [ "$GREYWALL_SANDBOX" = "1" ]; then debian_chroot="🔒"; fi' >> /h
 
 # Create future mount-points so their owner is the cabin user
 RUN mkdir -p .local/share .local/state .local/bin .cache .config/greywall desk go
-# Agent opencode: web UI (install.d/50-opencode reads OPENCODE_VERSION)
+# Agent opencode: TUI + optional web UI (install.d/50-opencode reads OPENCODE_VERSION)
 RUN mkdir -p .config/opencode
-EXPOSE 9090
-CMD ["opencode", "web", "--port", "9090", "--hostname", "0.0.0.0"]
 # Agent pi: pi-dev session + ripgrep + fd (install.d/50-pi reads PI_VERSION)
 RUN mkdir -p .pi/agent
 
+# Default command: sleep infinity for manual testing
+CMD ["sleep", "infinity"]

@@ -9,9 +9,11 @@ your host.
 The guide is generic and works for any kind of project. Two companion tutorials
 walk through concrete cases end to end:
 
-- [`examples/tuto-1/`](../examples/tuto-1/) — one agent, no existing Dockerfile.
+- [`examples/tuto-1/`](../examples/tuto-1/) — one agent, no existing Dockerfile;
+  opencode with the web UI on (`opencode: {web: cmd}`).
 - [`examples/tuto-2/`](../examples/tuto-2/) — two agents, an existing Dockerfile
-  and an existing compose with an auxiliary service.
+  and an existing compose with an auxiliary service; opencode TUI-only
+  (bare `opencode`, exec-style).
 
 Each tutorial ships a `before/` starting point (copy it to try the steps) and an
 `after/` solution (the expected result).
@@ -46,11 +48,24 @@ More agents are added the same way (a bundle per agent).
 | Agent | What it runs |
 |-------|--------------|
 | `pi` | pi.dev — terminal TUI, session-based |
-| `opencode` | OpenCode — terminal TUI and web UI at `http://localhost:9090` |
+| `opencode` | OpenCode — terminal TUI, optional web UI (opt-in, see below) |
 
 A cabin can enable one or both. With both, each agent gets its own wrapper and
 config and they share the same sandboxed workspace — useful for comparing
 agents or running a subagent pattern.
+
+The opencode web UI is **opt-in**: a bare `opencode` entry runs the agent exec-only (TUI via `task opencode`, no opened port, no password).
+To start the web server (`http://localhost:9090`) as the container command instead, declare the agent with the `web` attr — the same inline form as `port-forward` attrs (Step 3):
+
+```yaml
+ai-cabin:
+  agents:
+    - pi
+    - opencode: {web: cmd}
+```
+
+The `web` attr accepts `cmd` or `true` (case-insensitive; a YAML boolean or its string alias) to turn the server on; anything else keeps the cabin exec-only.
+The reference cabin `cabin/opencode-go` declares `web: cmd`.
 
 You also choose the **features** your cabin needs:
 
@@ -138,9 +153,11 @@ Edit it afterwards to adjust the cabin:
 - change `agents` / add `features` (e.g. `git-agent`, `port-forward`);
 - give the cabin a name (`cabin: myproject`) — otherwise the directory base
   name is used;
-- carry per-feature attrs, e.g. the forwarded service for `port-forward`
-  (`port-forward: {port: 5432, host: postgres}`, see Step 5), which flags
-  cannot express.
+- carry per-entry attrs, e.g. the forwarded service for `port-forward`
+  (`port-forward: {port: 5432, host: postgres}`, see Step 5) or the opencode
+  web UI (`opencode: {web: cmd}`, see Step 1). The flags accept the same
+  inline form, so `--agents 'opencode: {web: cmd}'` and the header entry
+  are interchangeable.
 
 ---
 

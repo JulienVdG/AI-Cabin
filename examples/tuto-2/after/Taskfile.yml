@@ -23,7 +23,7 @@ vars:
 env:
   # Container-side shared env (bind paths / greywall args; agent bundles override)
   CONTAINER_HOME: /home/ai_agent
-  GREYWALL_ARGS: "-p 9090"
+  GREYWALL_ARGS: ""
 tasks:
   # Alias + agent targets (agent bundles add their run/setup tasks here)
   default:
@@ -62,7 +62,7 @@ tasks:
     desc: Show cabin access info
     cmds:
       - 'echo "greyproxy (host):            http://localhost:43080"'
-      - 'echo "AI Agent (opencode web):     http://localhost:9090 (use chromium)"'
+      - 'echo "AI Agent (opencode TUI):     task opencode (greywall sandboxed)"'
       - 'echo "AI Agent (pi.dev TUI):        Use ''task pi'''
     silent: true
   help:

@@ -1,7 +1,8 @@
 ai-cabin:
   cabin: tuto1
   agents:
-    - opencode
+    - opencode:
+        web: cmd
   features:
     - go: {install: true, version: "1.26.3"}
   authored_with:

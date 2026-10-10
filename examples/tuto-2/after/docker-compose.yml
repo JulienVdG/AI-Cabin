@@ -62,7 +62,6 @@ services:
       # Greywall profile + per-wrapper extras (pass-through from the task env)
       - GREYWALL_PROFILE
       - GREYWALL_ARGS
-      - OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD}
       # Disable Pi.dev telemetry and version checks
       - PI_SKIP_VERSION_CHECK=1
       - PI_OFFLINE=0
@@ -87,6 +86,3 @@ services:
       # Pi.dev sessions, config, extensions
       - ${AI_CABIN_HOME}/.pi:${CONTAINER_HOME}/.pi:rw
       - ${AI_CABIN_DESK}/skills:${CONTAINER_HOME}/.pi/agent/skills:ro
-    ports:
-      - "127.0.0.1:9090:9090"
-      - "[::1]:9090:9090"
