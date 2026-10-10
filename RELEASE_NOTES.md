@@ -1,14 +1,6 @@
 # Release Notes
 
-Changes accumulated since the last release. Published as a versioned section at
-the next release. Until then, items live under **Unreleased**.
-
-A **breaking change** is one that requires action from an existing user before
-they can keep using AI-Cabin as before (migration step, removed command, changed
-format). Add it here as soon as it lands so the upgrade guide is ready at
-release time.
-
-## Unreleased
+## v1.5.0
 
 ### Breaking changes
 
