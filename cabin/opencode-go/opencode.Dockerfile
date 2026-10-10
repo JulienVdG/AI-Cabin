@@ -2,7 +2,7 @@
 FROM golang:1.26-trixie
 
 # Define the version as an argument.
-ARG OPENCODE_VERSION=1.4.9
+ARG OPENCODE_VERSION=1.18.35
 
 # Install tools, including bash-completion.
 RUN apt-get update && apt-get install -y \

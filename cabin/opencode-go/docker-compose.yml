@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: opencode.Dockerfile
       args:
-        - OPENCODE_VERSION=1.4.9
+        - OPENCODE_VERSION=1.18.35
     image: opencode-go
     hostname: opencode-go
     stdin_open: true

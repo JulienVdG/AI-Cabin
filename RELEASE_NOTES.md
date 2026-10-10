@@ -10,6 +10,25 @@ release time.
 
 ## Unreleased
 
+### Breaking changes
+
+- **The opencode web UI is now opt-in.** A cabin running the opencode agent
+  starts the agent exec-only by default: no web server, no `9090` port, no
+  `OPENCODE_SERVER_PASSWORD` (the container command falls back to
+  `sleep infinity`; the TUI stays available via `task opencode`). The web
+  server is declared explicitly with the new agent attr — the header entry
+  `- opencode` becomes `- opencode: {web: cmd}` (the same inline form works
+  in the authoring flags: `--agents 'opencode: {web: cmd}'`). The attr
+  accepts `cmd` or `true` (case-insensitive) to turn the server on; any
+  other value keeps the cabin exec-only.
+  - **Migration**: the web pieces (Dockerfile CMD, compose ports and
+    password env, Taskfile GREYWALL_ARGS) live in the generated files, so
+    switching means editing the `Taskfile.yml` header and regenerating with
+    `cabin authoring new --force` (`cabin build` alone never rewrites them).
+    To keep the web UI on an existing cabin: `- opencode` becomes
+    `- opencode: {web: cmd}`. To drop it: regenerate with the bare entry.
+    Cabins generated after the upgrade follow the header from the start.
+
 ### Changes
 
 - **pi agent bumped to v1.1.0** — cabins running the pi agent (the `pi-go`
@@ -37,6 +56,18 @@ release time.
   `cabin setenv`), so files and console listings agree. Existing profiles keep
   working unchanged: the order applies when the CLI next saves the file,
   hand-edited files are left untouched.
+
+- **opencode agent bumped to v1.18.35** — cabins running the opencode agent
+  (the `opencode-go` reference cabin, and new cabins built from the
+  `agent-opencode` fragment) now install opencode v1.18.35 instead of v1.4.9,
+  catching up with the upstream project (now hosted at `anomalyco/opencode`;
+  the download URL already pointed there). The generated `opencode.json` sets
+  `"autoupdate": false`: the container stays deterministic, the binary is
+  exactly the version pinned by the image build. Sessions and config carry
+  over as-is (the storage was already SQLite on 1.4.9, the `opencode.json`
+  format is unchanged), and the Scaleway model catalog is auto-discovered
+  from the provider API — the Deepseek/GLM/Qwen models appear in the model
+  picker without explicit declarations in the fragment.
 
 ## v1.4.0
 

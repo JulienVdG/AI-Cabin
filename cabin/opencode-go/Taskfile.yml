@@ -1,6 +1,8 @@
 ai-cabin:
   cabin: opencode-go
-  agents: [opencode]
+  agents:
+    - opencode:
+        web: cmd
   features: [git-agent, go]
 
 version: '3'
