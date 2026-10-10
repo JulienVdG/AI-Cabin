@@ -11,6 +11,9 @@ import (
 // it as the source of cabin identity: the registry name, the declared
 // agents, and the feature bundles. `agents: [pi]` is a shorthand
 // for `features: [agent-pi]`; see ActiveBundles for the resolution.
+// Both lists accept a bare string (`- pi`) or a single-key mapping with
+// attrs (`- opencode: {web: cmd}`) — the attrs configure the bundle
+// (blueprint conditionals, deps/setup templating).
 //
 // All fields are optional: a header declaring only "ai-cabin: {}" (empty map)
 // is valid, and the cabin name then falls back to the directory basename.
@@ -21,7 +24,7 @@ import (
 // but present header, use "ai-cabin: {}" (empty map).
 type AICabinHeader struct {
 	Cabin    string       `yaml:"cabin"`
-	Agents   []string     `yaml:"agents"`
+	Agents   []FeatureRef `yaml:"agents"`
 	Features []FeatureRef `yaml:"features,omitempty"`
 	// AuthoredWith records the authoring params used to generate this cabin,
 	// so `cabin authoring show`/`new` on it re-render the same image/user/home.
@@ -52,10 +55,11 @@ func (p AuthoringParams) IsZero() bool {
 	return p.Image == "" && p.User == "" && p.Home == ""
 }
 
-// FeatureRef is a feature bundle selected in the header's `features:` list,
-// carrying optional attrs used as top-level template vars ({{.port}})
-// by internal/render (profile vars are namespaced as {{.Vars.X}}). Two YAML
-// forms are accepted under `features:`:
+// FeatureRef is a feature bundle selected in the header's `agents:`/
+// `features:` lists, carrying optional attrs used as top-level template vars
+// ({{.port}} for features, {<.web>} for agent blueprint conditionals) by
+// internal/render (profile vars are namespaced as {{.Vars.X}}). Two YAML
+// forms are accepted for a list entry:
 //   - a bare string:        `- git-agent`
 //   - a single-key mapping: `- port-forward: {port: 3306, host: mariadb}`
 //
@@ -67,7 +71,7 @@ type FeatureRef struct {
 }
 
 // UnmarshalYAML accepts both the bare-string and single-key-mapping forms
-// for a features: entry. A bare string yields Name with no attrs. A mapping
+// for an agents:/features: entry. A bare string yields Name with no attrs. A mapping
 // must have exactly one key (the feature name); its value is the attrs map
 // (or null for no attrs, e.g. `- git-agent:`). Any other YAML
 // kind is a strict error.
@@ -103,8 +107,8 @@ func (f *FeatureRef) UnmarshalYAML(value *yaml.Node) error {
 }
 
 // MarshalYAML is the write side of the two YAML forms accepted
-// under features:, implemented as the inverse of UnmarshalYAML, so a header
-// round-trips through the CLI. A feature without attrs encodes as a bare
+// under agents:/features:, implemented as the inverse of UnmarshalYAML, so a
+// header round-trips through the CLI. A feature without attrs encodes as a bare
 // string (`- go`); one with attrs encodes as a single-key mapping
 // (`- port-forward: {port: 5432}`).
 func (f FeatureRef) MarshalYAML() (any, error) {
@@ -180,8 +184,10 @@ const BaseBundle = "base"
 
 // ActiveBundles returns the active feature bundles for a cabin, derived
 // from its header and ordered: base (always first), then each `agents:` entry
-// as `agent-<name>` (the shorthand: `agents:[pi]` == `features:[agent-pi]`),
-// then each `features:` entry in declaration order. There is no deduplication:
+// as `agent-<name>` (the shorthand: `agents:[pi]` == `features:[agent-pi]`;
+// the entry's attrs travel along, e.g. `- opencode: {web: cmd}` keeps its
+// attrs on the agent-opencode ref), then each `features:` entry in
+// declaration order. There is no deduplication:
 // a bundle may legitimately appear more than once — most notably
 // port-forward, which models one instance per forwarded service
 // (two entries with different attrs are both kept, not collapsed).
@@ -195,7 +201,7 @@ func ActiveBundles(header *AICabinHeader) []FeatureRef {
 	}
 	out := []FeatureRef{{Name: BaseBundle}}
 	for _, a := range header.Agents {
-		out = append(out, FeatureRef{Name: "agent-" + a})
+		out = append(out, FeatureRef{Name: "agent-" + a.Name, Attrs: a.Attrs})
 	}
 	return append(out, header.Features...)
 }

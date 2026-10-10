@@ -88,6 +88,30 @@ taskfile:
 		}
 	})
 
+	t.Run("merges authored_with with bundle attrs, bundle attrs winning", func(t *testing.T) {
+		fs := fstest.MapFS{
+			"agent-x/blueprint.yaml": {Data: []byte("dockerfile: |\n  RUN echo {<.web>}-{<.Image>}\n")},
+		}
+		h := cabin.AICabinHeader{AuthoredWith: cabin.AuthoringParams{Image: "ubuntu:24.04"}}
+		bundles := []cabin.FeatureRef{{Name: "agent-x", Attrs: map[string]any{
+			"web": "cmd", "Image": "debian:13",
+		}}}
+		got := ResolveBlueprints(fs, bundles, h)
+		if len(got) != 1 {
+			t.Fatalf("len(got) = %d, want 1", len(got))
+		}
+		if got[0].Err != nil {
+			t.Fatalf("unexpected error: %v", got[0].Err)
+		}
+		// Both sources are available to the blueprint ({<.web>} from the bundle
+		// attrs, {<.Image>} initially from authored_with) and a bundle attr
+		// wins over the authored_with record.
+		bp := got[0]
+		if len(bp.Dockerfile) != 1 || bp.Dockerfile[0] != "RUN echo cmd-debian:13" {
+			t.Errorf("dockerfile = %q, want merged attrs with bundle winning over authored_with", bp.Dockerfile)
+		}
+	})
+
 	t.Run("reports a malformed manifest per bundle without dropping the rest", func(t *testing.T) {
 		bundles := []cabin.FeatureRef{{Name: "base"}, {Name: "broken"}}
 		got := ResolveBlueprints(merged, bundles, cabin.AICabinHeader{})

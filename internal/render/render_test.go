@@ -123,6 +123,21 @@ func TestExecute(t *testing.T) {
 			wantOut: "x",
 		},
 		{
+			// lower stringifies absent keys as the empty string: a comparison
+			// on a missing attr stays false instead of surfacing a marker.
+			name:    "LowerOnAbsent",
+			tmpl:    `{{eq (lower .ABSENT) "cmd"}}`,
+			wantOut: "false",
+		},
+		{
+			// lower stringifies a YAML boolean so its string alias compares
+			// equal — the case-insensitive attr values (web: true vs "true").
+			name:    "LowerOnBool",
+			tmpl:    `{{eq (lower .flag) "true"}}`,
+			attrs:   map[string]any{"flag": true},
+			wantOut: "true",
+		},
+		{
 			name:    "DefaultOnValue",
 			tmpl:    `{{default "x" .PRESENT}}`,
 			attrs:   map[string]any{"PRESENT": "value"},

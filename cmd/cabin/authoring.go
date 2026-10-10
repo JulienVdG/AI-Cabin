@@ -239,26 +239,31 @@ func resolveAuthoring(path string) (*authoringResolution, error) {
 
 // authoringSelection returns the agents/features for a project that is not a cabin yet,
 // defaulting to the full built-in catalogue when no filter is given.
-func authoringSelection(agents, features string) ([]string, []cabin.FeatureRef, error) {
+func authoringSelection(agents, features string) ([]cabin.FeatureRef, []cabin.FeatureRef, error) {
 	if agents == "" {
 		agents = "pi,opencode"
 	}
 	if features == "" {
 		features = "git-agent,go"
 	}
+	ags, err := parseFeatureRefs(agents)
+	if err != nil {
+		return nil, nil, err
+	}
 	feats, err := parseFeatureRefs(features)
 	if err != nil {
 		return nil, nil, err
 	}
-	return commaList(agents), feats, nil
+	return ags, feats, nil
 }
 
-// parseFeatureRefs decodes a --features value into []FeatureRef by wrapping
+// parseFeatureRefs decodes a --agents/--features value into []FeatureRef by wrapping
 // it as a YAML flow sequence and unmarshaling through FeatureRef.UnmarshalYAML
-// — the same code a header features: list uses. Each entry is either a bare
-// feature name (`go`) or a feature with inline attrs
-// (`port-forward: {port: 5432, host: postgres}`, a space after the key colon
-// as in the header), so the flag syntax mirrors the header syntax exactly.
+// — the same code a header agents:/features: list uses. Each entry is either
+// a bare name (`go`) or a name with inline attrs
+// (`port-forward: {port: 5432, host: postgres}`, `opencode: {web: cmd}`, a
+// space after the key colon as in the header), so the flag syntax mirrors
+// the header syntax exactly.
 func parseFeatureRefs(value string) ([]cabin.FeatureRef, error) {
 	if strings.TrimSpace(value) == "" {
 		return nil, nil
@@ -268,18 +273,6 @@ func parseFeatureRefs(value string) ([]cabin.FeatureRef, error) {
 		return nil, fmt.Errorf("invalid --features value %q: %w", value, err)
 	}
 	return refs, nil
-}
-
-// commaList splits a comma-separated flag value, trimming whitespace
-// and dropping empty entries. A nil/empty input yields nil.
-func commaList(s string) []string {
-	var out []string
-	for _, part := range strings.Split(s, ",") {
-		if p := strings.TrimSpace(part); p != "" {
-			out = append(out, p)
-		}
-	}
-	return out
 }
 
 // firstNonEmpty returns the first non-empty of the given values.
@@ -381,13 +374,13 @@ func writeNew(blueprints []fragments.BundleBlueprint, h cabin.AICabinHeader, cre
 }
 
 func init() {
-	authoringShowCmd.Flags().StringVar(&authoringAgents, "agents", "", "agents to assemble when the path is not a cabin (pi,opencode)")
+	authoringShowCmd.Flags().StringVar(&authoringAgents, "agents", "", "agents to assemble when the path is not a cabin (pi, opencode, or 'opencode: {web: cmd}' for the web UI)")
 	authoringShowCmd.Flags().StringVar(&authoringFeatures, "features", "", "features to assemble when the path is not a cabin (git-agent,go)")
 	authoringShowCmd.Flags().StringVar(&authoringImage, "image", "", "base image (FROM) for the assembly (default "+authoring.DefaultBaseImage+")")
 	authoringShowCmd.Flags().StringVar(&authoringUser, "user", "", "container user for the assembly (default "+authoring.DefaultUser+")")
 	authoringShowCmd.Flags().StringVar(&authoringHome, "home", "", "container home for the assembly (default "+authoring.DefaultHome+")")
 	authoringShowCmd.Flags().StringVar(&authoringWritePrefix, "write-prefix", "", "write the assembled files with prefix prepended to each name (e.g. '.new', 'folder/') instead of stdout")
-	authoringNewCmd.Flags().StringVar(&authoringAgents, "agents", "", "agents to assemble (pi,opencode)")
+	authoringNewCmd.Flags().StringVar(&authoringAgents, "agents", "", "agents to assemble (pi, opencode, or 'opencode: {web: cmd}' for the web UI)")
 	authoringNewCmd.Flags().StringVar(&authoringFeatures, "features", "", "features to assemble (git-agent,go)")
 	authoringNewCmd.Flags().BoolVar(&authoringForce, "force", false, "overwrite an existing file instead of skipping it")
 	authoringNewCmd.Flags().StringVar(&authoringImage, "image", "", "base image (FROM) for the assembly (default "+authoring.DefaultBaseImage+")")

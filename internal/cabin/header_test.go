@@ -132,7 +132,7 @@ func TestParseHeader_CompleteFields(t *testing.T) {
 	if h == nil {
 		t.Fatal("header = nil, want non-nil for validTaskfile")
 	}
-	if len(h.Agents) != 2 || h.Agents[0] != "opencode" || h.Agents[1] != "pi" {
+	if len(h.Agents) != 2 || h.Agents[0].Name != "opencode" || h.Agents[1].Name != "pi" {
 		t.Errorf("Agents = %v, want [opencode pi]", h.Agents)
 	}
 }
@@ -275,7 +275,7 @@ func TestParseHeader_Features(t *testing.T) {
 		if h == nil {
 			t.Fatal("header = nil")
 		}
-		if len(h.Agents) != 1 || h.Agents[0] != "pi" {
+		if len(h.Agents) != 1 || h.Agents[0].Name != "pi" {
 			t.Errorf("Agents = %v, want [pi]", h.Agents)
 		}
 		if len(h.Features) != 2 {
@@ -369,8 +369,30 @@ func TestActiveBundles(t *testing.T) {
 				t.Errorf("ActiveBundles[%d].Name = %q, want %q", i, got[i].Name, w)
 			}
 			if got[i].Attrs != nil {
-				t.Errorf("ActiveBundles[%d].Attrs = %v, want nil (agents carry no attrs)", i, got[i].Attrs)
+				t.Errorf("ActiveBundles[%d].Attrs = %v, want nil (bare agent entries carry no attrs)", i, got[i].Attrs)
 			}
+		}
+	})
+
+	t.Run("agents carry attrs through the agent-<name> resolution", func(t *testing.T) {
+		h, err := cabin.ParseHeader([]byte(`ai-cabin:
+  agents:
+    - pi
+    - opencode: {web: cmd}
+`))
+		if err != nil {
+			t.Fatalf("ParseHeader error = %v", err)
+		}
+		got := cabin.ActiveBundles(h)
+		if len(got) != 3 {
+			t.Fatalf("ActiveBundles len = %d, want 3", len(got))
+		}
+		web := got[2]
+		if web.Name != "agent-opencode" {
+			t.Fatalf("ActiveBundles[2].Name = %q, want agent-opencode", web.Name)
+		}
+		if web.Attrs["web"] != "cmd" {
+			t.Errorf("ActiveBundles[2].Attrs[web] = %v, want cmd", web.Attrs["web"])
 		}
 	})
 

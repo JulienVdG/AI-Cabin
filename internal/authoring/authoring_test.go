@@ -93,7 +93,7 @@ func TestAssemble(t *testing.T) {
 	t.Run("DockerfileMerge", func(t *testing.T) {
 		fs := bundleFS(map[string]string{cabin.BaseBundle: baseBP, "agent-pi": piBP})
 		bps := fragments.ResolveBlueprints(fs, refs("agent-pi"), cabin.AICabinHeader{})
-		h := cabin.AICabinHeader{Cabin: "x", Agents: []string{"pi"}, AuthoredWith: cabin.AuthoringParams{
+		h := cabin.AICabinHeader{Cabin: "x", Agents: []cabin.FeatureRef{{Name: "pi"}}, AuthoredWith: cabin.AuthoringParams{
 			Image: authoring.DefaultBaseImage, User: authoring.DefaultUser, Home: authoring.DefaultHome,
 		}}
 		var out strings.Builder
@@ -134,7 +134,7 @@ compose:
 `
 		fs := bundleFS(map[string]string{cabin.BaseBundle: baseBP, "agent-opencode": opencodeBP})
 		bps := fragments.ResolveBlueprints(fs, refs("agent-opencode"), cabin.AICabinHeader{})
-		h := cabin.AICabinHeader{Cabin: "mycabin", Agents: []string{"opencode"}}
+		h := cabin.AICabinHeader{Cabin: "mycabin", Agents: []cabin.FeatureRef{{Name: "opencode"}}}
 		var cf strings.Builder
 		if err := authoring.Assemble(bps, h, &authoring.Files{Compose: &cf}); err != nil {
 			t.Fatalf("assemble: %v", err)
@@ -176,7 +176,7 @@ compose:
 	t.Run("TaskfileMerge", func(t *testing.T) {
 		fs := bundleFS(map[string]string{cabin.BaseBundle: baseBP, "agent-pi": piBP})
 		bps := fragments.ResolveBlueprints(fs, refs("agent-pi"), cabin.AICabinHeader{})
-		h := cabin.AICabinHeader{Cabin: "x", Agents: []string{"pi"}}
+		h := cabin.AICabinHeader{Cabin: "x", Agents: []cabin.FeatureRef{{Name: "pi"}}}
 		var tf strings.Builder
 		if err := authoring.Assemble(bps, h, &authoring.Files{Taskfile: &tf}); err != nil {
 			t.Fatalf("assemble: %v", err)
@@ -216,7 +216,7 @@ dockerfile: |
 `
 		fs := bundleFS(map[string]string{cabin.BaseBundle: baseBP, "web": webBP})
 		bps := fragments.ResolveBlueprints(fs, refs("web"), cabin.AICabinHeader{})
-		h := cabin.AICabinHeader{Cabin: "x", Agents: []string{"web"}}
+		h := cabin.AICabinHeader{Cabin: "x", Agents: []cabin.FeatureRef{{Name: "web"}}}
 		var out strings.Builder
 		if err := authoring.Assemble(bps, h, &authoring.Files{Dockerfile: &out}); err != nil {
 			t.Fatalf("assemble: %v", err)
@@ -235,7 +235,7 @@ dockerfile: |
 	t.Run("TaskfileFeatures", func(t *testing.T) {
 		fs := bundleFS(map[string]string{cabin.BaseBundle: baseBP})
 		bps := fragments.ResolveBlueprints(fs, refs(), cabin.AICabinHeader{})
-		h := cabin.AICabinHeader{Cabin: "x", Agents: []string{"pi"}, Features: []cabin.FeatureRef{{Name: "go"}}}
+		h := cabin.AICabinHeader{Cabin: "x", Agents: []cabin.FeatureRef{{Name: "pi"}}, Features: []cabin.FeatureRef{{Name: "go"}}}
 		var tf strings.Builder
 		if err := authoring.Assemble(bps, h, &authoring.Files{Taskfile: &tf}); err != nil {
 			t.Fatalf("assemble: %v", err)
@@ -257,7 +257,7 @@ dockerfile: |
 	t.Run("TaskfileAuthoredWith", func(t *testing.T) {
 		fs := bundleFS(map[string]string{cabin.BaseBundle: baseBP})
 		bps := fragments.ResolveBlueprints(fs, refs(), cabin.AICabinHeader{})
-		h := cabin.AICabinHeader{Cabin: "x", Agents: []string{"opencode"}, AuthoredWith: cabin.AuthoringParams{
+		h := cabin.AICabinHeader{Cabin: "x", Agents: []cabin.FeatureRef{{Name: "opencode"}}, AuthoredWith: cabin.AuthoringParams{
 			Image: "ubuntu:24.04", User: "ubuntu", Home: "/home/ubuntu",
 		}}
 		var tf strings.Builder
@@ -274,6 +274,42 @@ dockerfile: |
 			if !strings.Contains(out, want) {
 				t.Errorf("Taskfile header missing %q\n---\n%s", want, out)
 			}
+		}
+	})
+
+	// TaskfileAgentAttrs covers the agent attrs round-trip: a header entry
+	// with attrs (`opencode: {web: cmd}`) re-encodes to the mapping form,
+	// and parsing the written Taskfile recovers the same attr.
+	t.Run("TaskfileAgentAttrs", func(t *testing.T) {
+		fs := bundleFS(map[string]string{cabin.BaseBundle: baseBP})
+		bps := fragments.ResolveBlueprints(fs, refs(), cabin.AICabinHeader{})
+		h := cabin.AICabinHeader{Cabin: "x", Agents: []cabin.FeatureRef{
+			{Name: "pi"},
+			{Name: "opencode", Attrs: map[string]any{"web": "cmd"}},
+		}}
+		var tf strings.Builder
+		if err := authoring.Assemble(bps, h, &authoring.Files{Taskfile: &tf}); err != nil {
+			t.Fatalf("assemble: %v", err)
+		}
+		out := tf.String()
+		for _, want := range []string{
+			"  agents:",
+			"    - pi",
+			"    - opencode:",
+			"web: cmd",
+		} {
+			if !strings.Contains(out, want) {
+				t.Errorf("Taskfile header missing %q\n---\n%s", want, out)
+			}
+		}
+		// Round-trip: parsing the emitted header recovers the agent attrs.
+		rt, err := cabin.ParseHeader([]byte(out))
+		if err != nil {
+			t.Fatalf("ParseHeader: %v", err)
+		}
+		got := cabin.ActiveBundles(rt)
+		if len(got) != 3 || got[2].Name != "agent-opencode" || got[2].Attrs["web"] != "cmd" {
+			t.Errorf("round-trip bundles = %v, want agent-opencode with web=cmd", got)
 		}
 	})
 

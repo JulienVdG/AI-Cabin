@@ -17,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"path"
 	"strings"
 
@@ -56,16 +57,25 @@ type BundleBlueprint struct {
 // ResolveBlueprints reads the blueprint.yaml of each active bundle
 // from the merged fallback chain and returns the resolved blueprints
 // in bundle order, rendering each file with the authoring {<.X>} substitutions
-// before the YAML parse. The substitution values come from the header's
-// recorded authoring params (AuthoredWith); a blueprint with no {<...>}
+// before the YAML parse. The substitution values are the header's recorded
+// authoring params (AuthoredWith) merged with the bundle's own attrs (the
+// bundle attrs win — a per-bundle value is more specific than the global
+// authoring record), so an entry with attrs (e.g. `- opencode: {web: cmd}`)
+// drives that bundle's blueprint conditionals. A blueprint with no {<...>}
 // action passes through unchanged. A bundle with no blueprint.yaml
 // contributes nothing and is skipped (e.g. port-forward has only
 // deps/setup facets). Every bundle is attempted (no fail-fast) so one
 // broken bundle (a read or parse error) does not hide the rest.
 func ResolveBlueprints(merged fs.FS, bundles []cabin.FeatureRef, h cabin.AICabinHeader) []BundleBlueprint {
 	out := make([]BundleBlueprint, 0, len(bundles))
-	attrs := h.AuthoredWith.ToMap()
+	base := h.AuthoredWith.ToMap()
 	for _, b := range bundles {
+		attrs := base
+		if len(b.Attrs) > 0 {
+			attrs = make(map[string]any, len(base)+len(b.Attrs))
+			maps.Copy(attrs, base)
+			maps.Copy(attrs, b.Attrs)
+		}
 		bp := resolveBundleBlueprint(merged, b, attrs)
 		if bp != nil {
 			out = append(out, *bp)

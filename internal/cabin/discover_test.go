@@ -255,7 +255,7 @@ func TestHeader(t *testing.T) {
 		if header.Cabin != "pi-go" {
 			t.Errorf("header.Cabin = %q, want %q", header.Cabin, "pi-go")
 		}
-		if len(header.Agents) != 1 || header.Agents[0] != "pi" {
+		if len(header.Agents) != 1 || header.Agents[0].Name != "pi" {
 			t.Errorf("header.Agents = %v, want [pi]", header.Agents)
 		}
 		if len(header.Features) != 1 || header.Features[0].Name != "git-agent" {

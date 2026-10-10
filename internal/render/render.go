@@ -25,6 +25,7 @@ import (
 	"io"
 	"io/fs"
 	"maps"
+	"strings"
 	"text/template"
 )
 
@@ -56,6 +57,16 @@ var funcMap = template.FuncMap{
 			return def
 		}
 		return v
+	},
+	// lower stringifies and lowercases v, so attr values compare
+	// case-insensitively and a YAML boolean matches its string alias
+	// (true == "true"). An absent key stringifies as the empty string,
+	// keeping the comparison false instead of surfacing a marker.
+	"lower": func(v any) string {
+		if v == nil {
+			return ""
+		}
+		return strings.ToLower(fmt.Sprintf("%v", v))
 	},
 }
 
