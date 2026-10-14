@@ -41,6 +41,9 @@ func GetConfigDir() (string, error) {
 // so they pre-exist before `task` parses a cabin Taskfile. Redirecting
 // XDG_STATE_HOME matters in dev: ~/.local/state is read-only
 // under the greywall sandbox.
+//
+// The lifecycle Taskfile HOST_DEPS var mirrors this formula: update both
+// when it moves.
 func GetStateDir() (string, error) {
 	stateDir := os.Getenv("XDG_STATE_HOME")
 	if stateDir == "" {

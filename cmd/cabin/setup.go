@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/JulienVdG/AI-Cabin/internal/config"
+	"github.com/JulienVdG/AI-Cabin/internal/hostdeps"
 
 	"github.com/spf13/cobra"
 )
@@ -14,7 +15,9 @@ import (
 // to XDG state (so `task` resolves the cabin's includes: at parse time), creates
 // the default dirs (~/Documents/desk, ~/projects), and creates the profile
 // named by --profile (default: default) pointing at them with the minimal desk
-// skeleton copied to AI_CABIN_DESK.
+// skeleton copied to AI_CABIN_DESK. It also stages the host runtime deps
+// (greywall arch slots, greyproxy CA) into XDG state: the `deps` task then
+// copies them from there into .deps/ without touching the host layout.
 //
 // The --var global flag reaches it (e.g. a custom desk path), but it carries
 // no --skeleton/--force: zero-config means the default profile and the minimal
@@ -27,11 +30,14 @@ var setupCmd = &cobra.Command{
 Creates a profile pointed by --profile (default: the default profile with
 default dirs + git identity derived from the host) and activates it,
 copies the minimal desk skeleton to AI_CABIN_DESK, creates the default workdir
-(~/projects), and materializes the shared lifecycle Taskfile to XDG state so
-task resolves a cabin's includes at parse time.
+(~/projects), materializes the shared lifecycle Taskfile to XDG state so task
+resolves a cabin's includes at parse time, and stages the host runtime deps
+(greywall arch slots, greyproxy CA) the cabin deps task copies from.
 
 Idempotent: re-running with an existing target profile is a no-op (the profile
-and desk are not overwritten). Use ` + "`cabin profile init --force`" + ` to overwrite.
+and desk are not overwritten), except host deps which re-stage the slots they
+resolve — a manually dropped patched greywall is overwritten only when its
+slot is resolved again. Use ` + "`cabin profile init --force`" + ` to overwrite.
 Agent-config materialization stays lazy, triggered on the first cabin task.`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -117,12 +123,38 @@ Agent-config materialization stays lazy, triggered on the first cabin task.`,
 		}
 		fmt.Printf("Active profile set to %q\n", profileName)
 
+		// Host deps last, after activation: a staging failure (offline
+		// download, unusable override) must not undo the bootstrap — the
+		// `deps` precondition guides the retry, and a re-run re-stages.
+		// resolvedVars carries the host-deps knobs (profile, env or --var).
+		arts, err := hostdeps.Stage(resolvedVars)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		printArtifacts(arts)
+
 		fmt.Println("AI-Cabin environment ready.")
 		// Show the onboarding hint only when no cabin is registered yet.
 		if cabins, err := config.ListCabins(); err == nil && len(cabins) == 0 {
 			fmt.Println("Next: scan for cabins with `cabin scan <path>`, then `cabin use <name>` and `cabin task <task>`.")
 		}
 	},
+}
+
+// printArtifacts reports the host-deps staging outcome: one line per staged
+// artifact, the unstaged ones as warnings on stderr.
+func printArtifacts(arts []hostdeps.Artifact) {
+	for _, art := range arts {
+		switch {
+		case !art.Staged:
+			fmt.Fprintf(os.Stderr, "Warning: %s\n", art.Warning)
+		case art.Arch != "":
+			fmt.Printf("Staged greywall (%s) from %s\n", art.Arch, art.Source)
+		default:
+			fmt.Printf("Staged %s from %s\n", art.Name, art.Source)
+		}
+	}
 }
 
 func init() {
