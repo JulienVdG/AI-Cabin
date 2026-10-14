@@ -10,6 +10,35 @@ release time.
 
 ## Unreleased
 
+### Breaking changes
+
+- **Cabin builds require the `cabin setup` host-deps stage.** The `deps` task
+  no longer reads the host layout (`~/.local/bin/greywall`,
+  `~/.local/share/greyproxy/ca-cert.pem`): it copies the greywall binary and
+  the greyproxy CA certificate from a stage `cabin setup` maintains under
+  `$XDG_STATE_HOME/ai-cabin/host-deps/`, so the same cabin builds on Linux
+  and macOS. A missing stage fails the build on a `deps` precondition
+  pointing at `cabin setup` instead of failing later inside `docker build`.
+  - **Migration**: run `cabin setup` once before your next `cabin build`; the
+    host paths now only feed the stage.
+
+### Changes
+
+- **Host deps staging is cross-platform and per-arch.** The stage holds one
+  greywall per architecture slot (`amd64/`, `arm64/`) plus the certificate.
+  `cabin setup` stages each slot from the host binary when it is a linux ELF
+  (`$PATH`, `~/.local/bin/greywall`), else from the pinned greywall release
+  download (v0.3.7).
+  - `AI_CABIN_GREYWALL_ARCHES` picks the slots to stage — the host arch by
+    default, plus amd64 on an arm64 macOS host (Rosetta runs amd64 cabins);
+    a dual-arch Linux host stages both with
+    `cabin setup --var AI_CABIN_GREYWALL_ARCHES=amd64,arm64`. A cross-arch
+    cabin selects its slot with the `GREYWALL_ARCH` Taskfile var (paired
+    with the compose `platform:`).
+  - The stage is hand-editable: a patched greywall dropped in a slot is used
+    by every build until the next `cabin setup` re-stages the slots it
+    resolves.
+
 ## v1.5.0
 
 ### Breaking changes

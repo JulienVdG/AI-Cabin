@@ -75,7 +75,7 @@ This guide targets **Linux** and assumes systemd user units, UFW, and the Docker
 - **Docker** + **Docker Compose v2**
 - **Go** (>= 1.26) — to install the `cabin` CLI
 - **Greywall** (installed on host) - [GreyhavenHQ/greywall](https://github.com/GreyhavenHQ/greywall)
-  - Installed as `~/.local/bin/greywall` (the cabin build expects this exact path)
+  - Any install location works: `cabin setup` stages the binary from `$PATH` or `~/.local/bin/greywall`; on a host without a usable linux binary (macOS), setup downloads the pinned release — see [Host deps](#host-deps)
 - **Greyproxy** (running on host for credential management) - [GreyhavenHQ/greyproxy](https://github.com/GreyhavenHQ/greyproxy)
   - Runs on the host with its CA certificate installed at `~/.local/share/greyproxy/ca-cert.pem` and its **bind address configured** so Docker containers can reach it (see [Greyproxy Integration](#greyproxy-integration)); the default `127.0.0.1` bind is not reachable from containers
 - **Git**
@@ -116,6 +116,7 @@ Zero-config bootstrap with default paths. It creates:
 - a **default profile** with `AI_CABIN_HOME`, `AI_CABIN_DESK`, `AI_CABIN_WORKDIR` and your git identity
 - a minimal **desk** at `AI_CABIN_DESK` (AGENTS.md, TODO, skills)
 - a **workdir** (default `~/projects`)
+- a **host deps stage** (greywall arch slots + greyproxy CA) under `$XDG_STATE_HOME/ai-cabin/host-deps/` — see [Host deps](#host-deps)
 
 **Want custom paths? Decide once, on the first bootstrap** — pass them as `--var`
 on the same command rather than moving them after the fact:
@@ -264,7 +265,34 @@ skeleton** (see [Skeletons](#skeletons)).
 
 ### Setup
 
-- `cabin setup` — Zero-config environment bootstrap. Creates a **default profile** (with `AI_CABIN_HOME`, `AI_CABIN_DESK`, `AI_CABIN_WORKDIR` and your git identity), a minimal **desk** at `AI_CABIN_DESK` (AGENTS.md, TODO, skills), and a **workdir**. Re-running is safe: it repairs missing pieces without overwriting your desk or profile. Decide custom paths once, on first run, with `--var AI_CABIN_DESK=... --var AI_CABIN_WORKDIR=...`.
+- `cabin setup` — Zero-config environment bootstrap. Creates a **default profile** (with `AI_CABIN_HOME`, `AI_CABIN_DESK`, `AI_CABIN_WORKDIR` and your git identity), a minimal **desk** at `AI_CABIN_DESK` (AGENTS.md, TODO, skills), and a **workdir**. It also stages the **host deps** (greywall arch slots, greyproxy CA) — see [Host deps](#host-deps). Re-running is safe: it repairs missing pieces without overwriting your desk or profile. Decide custom paths once, on first run, with `--var AI_CABIN_DESK=... --var AI_CABIN_WORKDIR=...`.
+
+### Host deps
+
+Cabin images embed two artifacts the CLI cannot ship: the greywall sandbox
+binary and the greyproxy CA certificate. `cabin setup` stages them under
+`$XDG_STATE_HOME/ai-cabin/host-deps/` — one greywall per arch slot (`amd64/`,
+`arm64/`) plus `greyproxy-ca.crt` — and every cabin `deps` task copies them
+into `.deps/` at build time. The stage is a hand-editable cache: a patched
+greywall placed there by hand is used as-is by every build, until the next
+`cabin setup` re-stages the slots it resolves from the host.
+
+Staging resolves each arch slot from the host when its machine type matches
+(`$PATH`, then `~/.local/bin/greywall`), else from the pinned greywall
+release download (v0.3.7). A macOS host greywall is a Mach-O the linux image
+cannot run: staging downloads the release instead.
+`AI_CABIN_GREYWALL_ARCHES` lists the slots to stage — the host arch by
+default, plus amd64 on an arm64 macOS host (Rosetta runs amd64 cabins); a
+dual-arch Linux host stages both with
+`cabin setup --var AI_CABIN_GREYWALL_ARCHES=amd64,arm64`.
+
+The CA certificate resolves from `AI_CABIN_GREYPROXY_CA` or the greyproxy
+state path (`~/.local/share/greyproxy/ca-cert.pem`) and is never downloaded —
+it is specific to your greyproxy instance.
+
+Both are ordinary profile variables: `cabin profile set`, `--var` at
+setup, or a shell export all reach them. A build whose stage is missing fails
+fast on the `deps` preconditions with a pointer to `cabin setup`.
 
 ### Profiles
 

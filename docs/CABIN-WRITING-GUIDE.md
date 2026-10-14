@@ -343,6 +343,33 @@ Other per-project lifecycle commands: `cabin down`, `cabin restart`,
 unless `--cabin <name>` is given. `cabin ps` lists agent containers across all
 cabins.
 
+### Host deps: what `cabin build` copies
+
+Besides the bundle fragments, the build copies two host artifacts through
+`.deps/`: the greywall sandbox binary and the greyproxy CA certificate. They
+come from a stage `cabin setup` maintains under
+`$XDG_STATE_HOME/ai-cabin/host-deps/`, never from your host layout — so the
+same cabin builds on Linux and macOS. When the stage is missing, the `deps`
+task stops on a precondition pointing at `cabin setup` instead of failing
+later inside `docker build`.
+
+The greywall binary is staged per architecture. The `deps` task copies the
+slot matching the image platform: your host architecture by default, or the
+`GREYWALL_ARCH` var declared in your cabin's root Taskfile when you build for
+another platform:
+
+```yaml
+vars:
+  GREYWALL_ARCH: amd64
+```
+
+A cross-arch cabin pairs this with the compose `platform:` field of the agent
+service (`platform: linux/amd64`), so the image build and the copied slot
+agree. On an arm64 macOS host both slots are staged by default — Rosetta
+runs amd64 cabins there; on a dual-arch Linux host, stage both explicitly:
+`cabin setup --var AI_CABIN_GREYWALL_ARCHES=amd64,arm64`. See the README's
+Host deps section for the staging knobs.
+
 ---
 
 ## Anatomy of a cabin
