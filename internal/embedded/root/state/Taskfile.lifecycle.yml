@@ -9,6 +9,11 @@ version: '3'
 # task reference. AGENT_SERVICE (default: agent) is declared by the cabin's
 # vars. AGENT_SERVICE stays cabin-owned.
 
+vars:
+  HOST_DEPS: "${XDG_STATE_HOME:-$HOME/.local/state}/ai-cabin/host-deps"
+  GREYWALL_ARCH:
+    sh: 'a=$(uname -m); case "$a" in x86_64|amd64) echo amd64;; aarch64|arm64) echo arm64;; *) echo $a;; esac'
+
 env:
   GREYWALL_PROFILE:
     sh: 'echo "${GREYWALL_PROFILE:-$($AI_CABIN_CMD internal greywall-profile)}"'
@@ -41,13 +46,16 @@ tasks:
       - task: setup
 
   deps:
-    desc: Materialize .deps/ from active bundles (CLI) + copy host binaries
+    desc: Materialize .deps/ from active bundles (CLI) + copy staged host deps
+    preconditions:
+      - sh: 'test -f "{{.HOST_DEPS}}/{{.GREYWALL_ARCH}}/greywall"'
+        msg: "greywall ({{.GREYWALL_ARCH}}) not staged: run `cabin setup` first"
+      - sh: 'test -f "{{.HOST_DEPS}}/greyproxy-ca.crt"'
+        msg: "greyproxy CA not staged: run `cabin setup` first"
     cmds:
       - $AI_CABIN_CMD internal deps
-      # Host binaries the CLI cannot ship (best-effort; absent fails at COPY).
-      - cp ~/.local/bin/greywall .deps/greywall 2>/dev/null || true
-      - cp ~/.local/share/greyproxy/ca-cert.pem .deps/greyproxy-ca.crt 2>/dev/null || true
-
+      - cp "{{.HOST_DEPS}}/{{.GREYWALL_ARCH}}/greywall" .deps/greywall
+      - cp "{{.HOST_DEPS}}/greyproxy-ca.crt" .deps/greyproxy-ca.crt
 
   docker-build:
     desc: Build the cabin image
