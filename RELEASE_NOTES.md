@@ -29,6 +29,9 @@ release time.
   `cabin setup` stages each slot from the host binary when it is a linux ELF
   (`$PATH`, `~/.local/bin/greywall`), else from the pinned greywall release
   download (v0.3.7).
+  - The CA certificate stages from the greyproxy state path of the host
+    platform (XDG data on Linux, `Application Support` on macOS) or
+    `AI_CABIN_GREYPROXY_CA`, and is never downloaded.
   - `AI_CABIN_GREYWALL_ARCHES` picks the slots to stage — the host arch by
     default, plus amd64 on an arm64 macOS host (Rosetta runs amd64 cabins);
     a dual-arch Linux host stages both with

@@ -77,7 +77,7 @@ This guide targets **Linux** and assumes systemd user units, UFW, and the Docker
 - **Greywall** (installed on host) - [GreyhavenHQ/greywall](https://github.com/GreyhavenHQ/greywall)
   - Any install location works: `cabin setup` stages the binary from `$PATH` or `~/.local/bin/greywall`; on a host without a usable linux binary (macOS), setup downloads the pinned release — see [Host deps](#host-deps)
 - **Greyproxy** (running on host for credential management) - [GreyhavenHQ/greyproxy](https://github.com/GreyhavenHQ/greyproxy)
-  - Runs on the host with its CA certificate installed at `~/.local/share/greyproxy/ca-cert.pem` and its **bind address configured** so Docker containers can reach it (see [Greyproxy Integration](#greyproxy-integration)); the default `127.0.0.1` bind is not reachable from containers
+  - Runs on the host with its CA certificate installed at the platform state path (`~/.local/share/greyproxy/ca-cert.pem` on Linux, `~/Library/Application Support/greyproxy/ca-cert.pem` on macOS) and its **bind address configured** so Docker containers can reach it (see [Greyproxy Integration](#greyproxy-integration)); the default `127.0.0.1` bind is not reachable from containers
 - **Git**
 
 ### 1. Install cabin
@@ -287,8 +287,9 @@ dual-arch Linux host stages both with
 `cabin setup --var AI_CABIN_GREYWALL_ARCHES=amd64,arm64`.
 
 The CA certificate resolves from `AI_CABIN_GREYPROXY_CA` or the greyproxy
-state path (`~/.local/share/greyproxy/ca-cert.pem`) and is never downloaded —
-it is specific to your greyproxy instance.
+state path — `~/.local/share/greyproxy/ca-cert.pem` on Linux,
+`~/Library/Application Support/greyproxy/ca-cert.pem` on macOS — and is never
+downloaded; it is specific to your greyproxy instance.
 
 Both are ordinary profile variables: `cabin profile set`, `--var` at
 setup, or a shell export all reach them. A build whose stage is missing fails
@@ -497,7 +498,7 @@ Greywall routes HTTP/SOCKS and DNS traffic through Greyproxy, which serves four 
 ### Prerequisites
 
 - Greyproxy running on the host
-- CA certificate at `~/.local/share/greyproxy/ca-cert.pem`
+- CA certificate at the greyproxy state path — `~/.local/share/greyproxy/ca-cert.pem` on Linux, `~/Library/Application Support/greyproxy/ca-cert.pem` on macOS
 
 ### Bind address
 
@@ -590,7 +591,7 @@ curl --connect-timeout 2 http://<your-IP>:43080/api/health
 
 ### First run
 
-**The build fails with `install: cannot stat ~/.local/bin/greywall`** — the cabin image copies Greywall and the CA from exact host paths during `build`. Install Greywall at `~/.local/bin/greywall` and trust the CA at `~/.local/share/greyproxy/ca-cert.pem` (Prerequisites), then rebuild.
+**The build fails on a `not staged` precondition** — the `deps` task copies greywall and the CA certificate from the host-deps stage, not from the host layout. Run `cabin setup`, which stages them (downloading the pinned greywall release when the host binary is not a linux ELF); the precondition message names the missing piece. See [Host deps](#host-deps).
 
 **The agent runs but can't reach the model / credentials aren't injected** — greyproxy is still bound to `127.0.0.1`, which is unreachable from the container. Set its **bind address** to the Docker bridge (see [Greyproxy Integration](#greyproxy-integration)) and rebuild/restart.
 
