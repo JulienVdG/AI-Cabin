@@ -52,6 +52,20 @@ func isolateHost(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 }
 
+func TestGreyproxyCAPath(t *testing.T) {
+	t.Run("DarwinUsesApplicationSupport", func(t *testing.T) {
+		require.Equal(t,
+			filepath.Join("home", "Library", "Application Support", "greyproxy", "ca-cert.pem"),
+			greyproxyCAPath("darwin", "home"))
+	})
+
+	t.Run("LinuxUsesXdgData", func(t *testing.T) {
+		require.Equal(t,
+			filepath.Join("home", ".local", "share", "greyproxy", "ca-cert.pem"),
+			greyproxyCAPath("linux", "home"))
+	})
+}
+
 func TestEnsureSlot(t *testing.T) {
 	t.Run("DownloadStagesSlot", func(t *testing.T) {
 		isolateHost(t)

@@ -180,7 +180,7 @@ func (s stager) cert() (Artifact, error) {
 	if err != nil {
 		return Artifact{}, err
 	}
-	src := filepath.Join(home, ".local", "share", "greyproxy", "ca-cert.pem")
+	src := greyproxyCAPath(runtime.GOOS, home)
 	if err := copyFile(src, dst, 0o644); err != nil {
 		if os.IsNotExist(err) {
 			_ = os.Remove(dst)
@@ -303,6 +303,16 @@ func extractTarMember(data []byte, name string) ([]byte, error) {
 			return io.ReadAll(tr)
 		}
 	}
+}
+
+// greyproxyCAPath returns the greyproxy state path of the CA certificate
+// on the host platform: the XDG data path on Linux, the Application Support
+// path on macOS.
+func greyproxyCAPath(goos, home string) string {
+	if goos == "darwin" {
+		return filepath.Join(home, "Library", "Application Support", "greyproxy", "ca-cert.pem")
+	}
+	return filepath.Join(home, ".local", "share", "greyproxy", "ca-cert.pem")
 }
 
 // hostCandidate returns the path of a host greywall whose ELF machine type
